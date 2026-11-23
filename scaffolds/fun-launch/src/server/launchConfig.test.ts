@@ -90,6 +90,17 @@ function fixture(legacy = false) {
   return { key, config, record };
 }
 describe('runtime configuration admission', () => {
+  it.each(['mskd', 'dev', 'cashback'] as const)('binds %s to its own reviewed policy and quote mint', async mode => {
+    const { key, config, record } = fixture();
+    // Every mode, MSKD included, pairs to SOL with the 80 SOL target (MSKD pays holders in wXMR)
+    const quoteMint = config.quoteMint;
+    Object.assign(config, { quoteMint, migratedPoolFeeBps: 125, migrationQuoteThreshold: 80000000000n });
+    Object.assign(record, { policy_version: mode + '-v1', quote_mint: quoteMint.toBase58() });
+    await expect(verifyLaunchConfig(NETWORK_GENESIS.devnet, key, config, record.config_digest, mode)).resolves.toBe(record);
+    await expect(verifyLaunchConfig(NETWORK_GENESIS.devnet, key, config, record.config_digest, mode === 'dev' ? 'cashback' : 'dev')).rejects.toThrow('mode');
+    Object.assign(record, { quote_mint: Keypair.generate().publicKey.toBase58() });
+    await expect(verifyLaunchConfig(NETWORK_GENESIS.devnet, key, config, record.config_digest, mode)).rejects.toThrow('quote mint');
+  });
   it('public discovery ignores old environment keys and selects only Bond it. registry records', async () => {
     const old = Keypair.generate().publicKey.toBase58();
     const current = Keypair.generate().publicKey.toBase58();

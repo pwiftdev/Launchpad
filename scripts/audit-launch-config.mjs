@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { inspectLaunchConfig, decodeLaunchConfig } from './launch-policy.cjs';
+import { inspectLaunchConfig, decodeLaunchConfig, reviewedQuote, modeForPolicy } from './launch-policy.cjs';
 import { companyWallets } from './company-wallets.cjs';
 import { buildWalletLaunchTemplate } from './wallet-launch-template.cjs';
 import { expectedNetworkGenesis, localValidatorPolicy } from './network-policy.cjs';
@@ -29,12 +29,16 @@ try {
   if (selected === 'localnet' && !localValidatorPolicy(env))
     throw Error('Invalid isolated validator policy');
   const expected = expectedNetworkGenesis(env),
+    policyVersion = env.LAUNCH_POLICY_VERSION || 'bond-v1',
+    quote = reviewedQuote(policyVersion, expected, env),
     wallets = companyWallets(env, expected),
     authorities = {
       feeClaimer: wallets.collector.toBase58(),
       leftoverReceiver: wallets.treasury.toBase58(),
-      policyVersion: 'bond-v1',
+      policyVersion,
+      ...quote,
     };
+  if (policyVersion !== 'bond-v1' && !modeForPolicy(policyVersion)) throw Error('Unsupported release policy');
   let config,
     address,
     digest,
@@ -43,6 +47,9 @@ try {
     config = buildWalletLaunchTemplate({
       collector: wallets.collector,
       treasury: wallets.treasury,
+      policyVersion,
+      quoteMint: quote.quoteMint,
+      migrationQuoteThreshold: env.MSKD_MIGRATION_QUOTE_THRESHOLD,
     });
   else {
     if (!env.RPC_URL || !env.POOL_CONFIG_KEY) throw Error('Explicit RPC/config required');
@@ -84,7 +91,7 @@ try {
       {
         network: offline ? 'offline template' : selected,
         networkGenesis: actualGenesis,
-        policyVersion: 'bond-v1',
+        policyVersion,
         address,
         configDigest: digest,
         economicPolicyMatches: issues.length === 0,

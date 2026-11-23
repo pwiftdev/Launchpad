@@ -112,7 +112,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...empty,
         status: 'ready',
         availableLamports:
-          coin.mode === 'community'
+          !hasCreatorRewards(coin.mode)
             ? rows
                 .filter((row) => row.status === 'available')
                 .reduce((sum, row) => sum + BigInt(row.lamports), 0n)
@@ -166,7 +166,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res
           .status(403)
           .json({ error: 'Only the original creator can request these rewards' });
-      if (coin.mode === 'community' && input.epoch === null)
+      if (!hasCreatorRewards(coin.mode) && input.epoch === null)
         return res.status(400).json({ error: 'Select a funded hourly reward' });
       try {
         await assertWalletRecipientCredit(

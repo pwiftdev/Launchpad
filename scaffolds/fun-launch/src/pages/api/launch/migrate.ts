@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { PublicKey } from '@solana/web3.js';
 import { z } from 'zod';
 import { apiGuard } from '@/server/apiGuard';
+import { getCoin } from '@/server/dbc';
 import { allowTrading } from '@/server/tradingAccess';
 import { buildGraduationTransactions } from '@/server/graduation';
 
@@ -12,10 +13,14 @@ const input = z
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!apiGuard(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!(await allowTrading(res))) return;
+
   const parsed = input.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Invalid migration request' });
   try {
+    const found = await getCoin(parsed.data.mint);
+    if (!found) return res.status(404).json({ error: 'Unknown launch' });
+    const mode = found.coin.mode;
+    if (!(await allowTrading(res, mode === 'creator' || mode === 'community' ? 'bond' : mode))) return;
     const payer = new PublicKey(parsed.data.wallet);
     if (!PublicKey.isOnCurve(payer.toBytes())) throw new Error('A wallet signer is required');
     return res

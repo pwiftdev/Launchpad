@@ -97,6 +97,14 @@
     {
       "file": "024-bond-it-policy.sql",
       "sha256": "46dead45a583562eef109af9195d221d28dbf6c323666153c550b7f096b9e0bc"
+    },
+    {
+      "file": "025-mskd-modes.sql",
+      "sha256": "1d03200f9b9ca5a9d22152866bbda7663908e40dcb82ec3c6d72bf1730d99be8"
+    },
+    {
+      "file": "026-mskd-sol-pair.sql",
+      "sha256": "3a2e255ecfcb2d13fb8e32ddf364049f756728ffb3ce7d70d6a5668249853b3a"
     }
   ],
   "catalog": {
@@ -128,6 +136,7 @@
       "launch_configs",
       "launch_migration_proofs",
       "launch_migrations",
+      "launch_schema_migrations",
       "launch_upload_authorizations",
       "launch_upload_budgets",
       "offchain_metadata_cache",
@@ -146,6 +155,7 @@
       "wallet_index_cursors",
       "wallet_job_attempts",
       "wallet_jobs",
+      "wallet_mode_sol_expenses",
       "wallet_operating_costs",
       "wallet_operating_sources",
       "wallet_phase_totals",
@@ -2690,6 +2700,16 @@
         "numeric_scale": 0
       },
       {
+        "table_name": "launch_coins",
+        "column_name": "quote_mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": "'So11111111111111111111111111111111111111112'::character varying",
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
         "table_name": "launch_configs",
         "column_name": "network_genesis",
         "udt_name": "varchar",
@@ -2776,6 +2796,16 @@
         "is_nullable": "NO",
         "column_default": "now()",
         "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "launch_configs",
+        "column_name": "quote_mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": "'So11111111111111111111111111111111111111112'::character varying",
+        "character_maximum_length": 44,
         "numeric_precision": null,
         "numeric_scale": null
       },
@@ -2896,6 +2926,26 @@
         "is_nullable": "NO",
         "column_default": "now()",
         "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "launch_schema_migrations",
+        "column_name": "filename",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "launch_schema_migrations",
+        "column_name": "sha256",
+        "udt_name": "bpchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 64,
         "numeric_precision": null,
         "numeric_scale": null
       },
@@ -4438,6 +4488,36 @@
         "character_maximum_length": null,
         "numeric_precision": null,
         "numeric_scale": null
+      },
+      {
+        "table_name": "wallet_mode_sol_expenses",
+        "column_name": "job_id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "wallet_mode_sol_expenses",
+        "column_name": "signature",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 88,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "wallet_mode_sol_expenses",
+        "column_name": "lamports",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 78,
+        "numeric_scale": 0
       },
       {
         "table_name": "wallet_operating_costs",
@@ -6119,17 +6199,17 @@
       },
       {
         "table_name": "launch_coins",
-        "name": "check:0534694b07ff210f4cc8ea16a9d1c02e9fb3f0eb1362b788b764317ba05dff53",
-        "type": "c",
-        "validated": true,
-        "definition": "CHECK ((policy_version = ANY (ARRAY['rinse-v1'::text, 'legacy-devnet'::text, 'wallet-v1'::text, 'bond-v1'::text])))"
-      },
-      {
-        "table_name": "launch_coins",
         "name": "check:1e03c34634b2551f03aa3315d8cd66b483ddf34f46e759a7d1f49fe9d5c22166",
         "type": "c",
         "validated": true,
         "definition": "CHECK ((activation_point >= 0))"
+      },
+      {
+        "table_name": "launch_coins",
+        "name": "check:3c0a7626adb7f05086f57fb49d292944c4a129c39e67ac8f9963440a3f9ff0a2",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((policy_version = ANY (ARRAY['rinse-v1'::text, 'legacy-devnet'::text, 'wallet-v1'::text, 'bond-v1'::text, 'mskd-v1'::text, 'dev-v1'::text, 'cashback-v1'::text])))"
       },
       {
         "table_name": "launch_coins",
@@ -6140,24 +6220,24 @@
       },
       {
         "table_name": "launch_coins",
+        "name": "check:7645b4ad4598b516ecbab94b09d5b73d0684c0ce69ccc9cdd6bc74492284ce01",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((mode = ANY (ARRAY['creator'::text, 'community'::text, 'bond'::text, 'mskd'::text, 'dev'::text, 'cashback'::text])))"
+      },
+      {
+        "table_name": "launch_coins",
+        "name": "check:a60b01031a6323cf03a4d6eb00cef1590230970e3e83410f9b0b9a579d59d8db",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((policy_version <> ALL (ARRAY['bond-v1'::text, 'mskd-v1'::text, 'dev-v1'::text, 'cashback-v1'::text])) OR (activation_time IS NOT NULL)))"
+      },
+      {
+        "table_name": "launch_coins",
         "name": "check:af5ac4c30edd3a0b0a440c658eaab3322b777a9d3d7c1c138ffdcd12da9d76ac",
         "type": "c",
         "validated": true,
         "definition": "CHECK ((finalized_slot >= 0))"
-      },
-      {
-        "table_name": "launch_coins",
-        "name": "check:b241069184c926d39a1c2568a7dd4d0c20f9088110630f88bf14213c52462e9a",
-        "type": "c",
-        "validated": true,
-        "definition": "CHECK ((mode = ANY (ARRAY['creator'::text, 'community'::text, 'bond'::text])))"
-      },
-      {
-        "table_name": "launch_coins",
-        "name": "check:cd5610e22d7f0fe0ef76e21d5876faa566d4cc17290d450a9dd8c86408a74819",
-        "type": "c",
-        "validated": true,
-        "definition": "CHECK (((policy_version <> 'bond-v1'::text) OR (activation_time IS NOT NULL)))"
       },
       {
         "table_name": "launch_coins",
@@ -6203,10 +6283,10 @@
       },
       {
         "table_name": "launch_configs",
-        "name": "check:0534694b07ff210f4cc8ea16a9d1c02e9fb3f0eb1362b788b764317ba05dff53",
+        "name": "check:3c0a7626adb7f05086f57fb49d292944c4a129c39e67ac8f9963440a3f9ff0a2",
         "type": "c",
         "validated": true,
-        "definition": "CHECK ((policy_version = ANY (ARRAY['rinse-v1'::text, 'legacy-devnet'::text, 'wallet-v1'::text, 'bond-v1'::text])))"
+        "definition": "CHECK ((policy_version = ANY (ARRAY['rinse-v1'::text, 'legacy-devnet'::text, 'wallet-v1'::text, 'bond-v1'::text, 'mskd-v1'::text, 'dev-v1'::text, 'cashback-v1'::text])))"
       },
       {
         "table_name": "launch_configs",
@@ -6221,6 +6301,13 @@
         "type": "c",
         "validated": true,
         "definition": "CHECK ((verified_slot >= 0))"
+      },
+      {
+        "table_name": "launch_configs",
+        "name": "check:cfb66deb31ce6f705f016bc332b94be29c7c735e9797d740a6cc62a6d792c179",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((quote_mint)::text = 'So11111111111111111111111111111111111111112'::text))"
       },
       {
         "table_name": "launch_configs",
@@ -6291,6 +6378,20 @@
         "type": "p",
         "validated": true,
         "definition": "PRIMARY KEY (network_genesis, mint)"
+      },
+      {
+        "table_name": "launch_schema_migrations",
+        "name": "check:dc7febcdd51ccd3ba32cd8a5773d63238e65b5ef42209931e33e4a626bd38740",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((sha256 ~ '^[a-f0-9]{64}$'::text))"
+      },
+      {
+        "table_name": "launch_schema_migrations",
+        "name": "launch_schema_migrations_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (filename)"
       },
       {
         "table_name": "launch_upload_authorizations",
@@ -6371,17 +6472,17 @@
       },
       {
         "table_name": "pending_launch_intents",
+        "name": "check:7645b4ad4598b516ecbab94b09d5b73d0684c0ce69ccc9cdd6bc74492284ce01",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((mode = ANY (ARRAY['creator'::text, 'community'::text, 'bond'::text, 'mskd'::text, 'dev'::text, 'cashback'::text])))"
+      },
+      {
+        "table_name": "pending_launch_intents",
         "name": "check:90564b06b385320c67dd0f5701ec5d5114f4b6c59c368046074c1a6d4a1d3920",
         "type": "c",
         "validated": true,
         "definition": "CHECK ((payload_digest ~ '^[a-f0-9]{64}$'::text))"
-      },
-      {
-        "table_name": "pending_launch_intents",
-        "name": "check:b241069184c926d39a1c2568a7dd4d0c20f9088110630f88bf14213c52462e9a",
-        "type": "c",
-        "validated": true,
-        "definition": "CHECK ((mode = ANY (ARRAY['creator'::text, 'community'::text, 'bond'::text])))"
       },
       {
         "table_name": "pending_launch_intents",
@@ -7063,6 +7164,34 @@
         "definition": "UNIQUE (signature)"
       },
       {
+        "table_name": "wallet_mode_sol_expenses",
+        "name": "check:3b2c51aaefae7ff44460fecce10e62bc1d1d91e6dbe6b56790e7f1f5a962b754",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((lamports >= (0)::numeric))"
+      },
+      {
+        "table_name": "wallet_mode_sol_expenses",
+        "name": "wallet_mode_sol_expenses_job_id_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (job_id) REFERENCES wallet_jobs(id)"
+      },
+      {
+        "table_name": "wallet_mode_sol_expenses",
+        "name": "wallet_mode_sol_expenses_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (job_id)"
+      },
+      {
+        "table_name": "wallet_mode_sol_expenses",
+        "name": "wallet_mode_sol_expenses_signature_key",
+        "type": "u",
+        "validated": true,
+        "definition": "UNIQUE (signature)"
+      },
+      {
         "table_name": "wallet_operating_costs",
         "name": "check:3b2c51aaefae7ff44460fecce10e62bc1d1d91e6dbe6b56790e7f1f5a962b754",
         "type": "c",
@@ -7636,6 +7765,11 @@
         "definition": "CREATE UNIQUE INDEX launch_migrations_pkey ON public.launch_migrations USING btree (network_genesis, mint)"
       },
       {
+        "table_name": "launch_schema_migrations",
+        "name": "launch_schema_migrations_pkey",
+        "definition": "CREATE UNIQUE INDEX launch_schema_migrations_pkey ON public.launch_schema_migrations USING btree (filename)"
+      },
+      {
         "table_name": "launch_upload_authorizations",
         "name": "launch_upload_authorizations_expiry",
         "definition": "CREATE INDEX launch_upload_authorizations_expiry ON public.launch_upload_authorizations USING btree (expires_at)"
@@ -7814,6 +7948,16 @@
         "table_name": "wallet_jobs",
         "name": "wallet_jobs_signature_key",
         "definition": "CREATE UNIQUE INDEX wallet_jobs_signature_key ON public.wallet_jobs USING btree (signature)"
+      },
+      {
+        "table_name": "wallet_mode_sol_expenses",
+        "name": "wallet_mode_sol_expenses_pkey",
+        "definition": "CREATE UNIQUE INDEX wallet_mode_sol_expenses_pkey ON public.wallet_mode_sol_expenses USING btree (job_id)"
+      },
+      {
+        "table_name": "wallet_mode_sol_expenses",
+        "name": "wallet_mode_sol_expenses_signature_key",
+        "definition": "CREATE UNIQUE INDEX wallet_mode_sol_expenses_signature_key ON public.wallet_mode_sol_expenses USING btree (signature)"
       },
       {
         "table_name": "wallet_operating_costs",
@@ -8117,6 +8261,13 @@
         "definition": "CREATE TRIGGER wallet_job_identity_immutable BEFORE DELETE OR UPDATE ON public.wallet_jobs FOR EACH ROW EXECUTE FUNCTION rinsed_wallet_job_identity()"
       },
       {
+        "table_name": "wallet_mode_sol_expenses",
+        "name": "wallet_mode_sol_expenses_immutable",
+        "enabled": "O",
+        "function_name": "rinsed_wallet_immutable",
+        "definition": "CREATE TRIGGER wallet_mode_sol_expenses_immutable BEFORE DELETE OR UPDATE ON public.wallet_mode_sol_expenses FOR EACH ROW EXECUTE FUNCTION rinsed_wallet_immutable()"
+      },
+      {
         "table_name": "wallet_operating_costs",
         "name": "wallet_operating_costs_immutable",
         "enabled": "O",
@@ -8146,7 +8297,7 @@
         "security_definer": false,
         "volatility": "v",
         "config": null,
-        "body_sha256": "e8ec4a80babf39f01debeb9f6607a363aa2ca902e7d10810123ec9321adef536"
+        "body_sha256": "13587091ce84e7dbe89350a176f5ca8fa75cded6fc3a0eaf7dc5b0f702c58fee"
       },
       {
         "name": "rinsed_epoch_immutable",

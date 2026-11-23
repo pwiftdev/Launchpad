@@ -22,21 +22,24 @@
       "decimals": 9,
       "mint": "So11111111111111111111111111111111111111112",
       "migrationQuoteThreshold": "80000000000"
-    },
-    "hsol": {
-      "symbol": "hSOL",
-      "decimals": 9,
-      "mainnetMint": "he1iusmfkpAdwvxLNGV8Y1iSbj4rUy6yMhEA3fotn9A",
-      "devnetMintEnv": "MSKD_DEVNET_QUOTE_MINT",
-      "migrationQuoteThresholdEnv": "MSKD_MIGRATION_QUOTE_THRESHOLD"
+    }
+  },
+  "payouts": {
+    "wxmr": {
+      "symbol": "wXMR",
+      "name": "Monero",
+      "decimals": 12,
+      "mainnetMint": "WXMRyRZhsa19ety5erZhHg4N3xj3EVN92u94422teJp",
+      "devnetMintEnv": "MSKD_DEVNET_PAYOUT_MINT"
     }
   },
   "modes": {
     "mskd": {
       "policyVersion": "mskd-v1",
       "label": "MSKD",
-      "tagline": "Paired to hSOL. Holders earn in hSOL.",
-      "quote": "hsol",
+      "tagline": "Paired to SOL. Holders earn in Monero.",
+      "quote": "sol",
+      "payout": "wxmr",
       "beneficiary": "holders"
     },
     "dev": {

@@ -1,4 +1,5 @@
 // Server-only accounting for the upcoming policy. These are accrued budgets, never proof of funding.
+import { BENEFICIARY_NET_BPS, isFeeModeId } from '@/lib/feeModes';
 import bondPolicy from '@/constants/bondPolicy.json';
 import type { LaunchMode } from '@/lib/launchModes';
 export type { LaunchMode } from '@/lib/launchModes';
@@ -36,7 +37,7 @@ export function allocateExecutedFee({
     tradeTime < activationTime
   )
     throw new Error('Invalid confirmed trade time');
-  if (mode !== 'bond' && mode !== 'creator' && mode !== 'community')
+  if (mode !== 'bond' && mode !== 'creator' && mode !== 'community' && !isFeeModeId(mode))
     throw new Error('Unknown launch mode');
   if (phase !== undefined && phase !== 'rinse' && phase !== 'post')
     throw new Error('Unknown executed fee phase');
@@ -49,6 +50,12 @@ export function allocateExecutedFee({
   )
     throw new Error('Invalid executed fee amounts');
   const available = total - protocol - referral;
+  if (isFeeModeId(mode)) {
+    const share = BigInt(BENEFICIARY_NET_BPS);
+    const beneficiary = ((previousPhaseNet + available) * share) / 10_000n - (previousPhaseNet * share) / 10_000n;
+    return { protocol, referral, rinseBuyback: 0n, creator: mode === 'dev' ? beneficiary : 0n,
+      community: mode === 'dev' ? 0n : beneficiary, platform: available - beneficiary };
+  }
   if (mode === 'bond' && phase === undefined)
     throw new Error('Bond it. fees require a verified DBC or DAMM phase');
   const rinse = phase === undefined ? tradeTime < activationTime + 27 : phase === 'rinse';

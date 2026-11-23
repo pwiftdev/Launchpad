@@ -8,6 +8,7 @@ import { PublicKey } from '@solana/web3.js';
 import { CpAmmIdl } from '@meteora-ag/cp-amm-sdk';
 import { type ObservedInstruction } from './chainEvidence';
 import { assertFeeEvidence, feeSourceInstructions, type FeeEvidence } from './feeSourceEvidence';
+import { usesLaunchSlot } from '@/lib/launchModes';
 import { allocateExecutedFee, type FeeAllocation, type LaunchMode } from './feeLedger';
 
 const dbcCoder = new BorshCoder(DynamicBondingCurveIdl as Idl);
@@ -165,7 +166,7 @@ function decodeFinalizedFees(
     if (
       !Number.isSafeInteger(tradeTime) ||
       tradeTime < 0 ||
-      (source.mode === 'bond'
+      (usesLaunchSlot(source.mode)
         ? evidence.slot < source.activationPoint
         : tradeTime < source.activationPoint)
     )
@@ -175,14 +176,14 @@ function decodeFinalizedFees(
     const phase: 0 | 1 =
       claimField === 'claiming_fee'
         ? 1
-        : source.mode === 'bond' || tradeTime < source.activationPoint + 27
+        : usesLaunchSlot(source.mode) || tradeTime < source.activationPoint + 27
           ? 0
           : 1;
     const allocation = allocateExecutedFee({
       total,
       protocol,
       referral,
-      activationTime: source.mode === 'bond' ? 0 : source.activationPoint,
+      activationTime: usesLaunchSlot(source.mode) ? 0 : source.activationPoint,
       tradeTime,
       mode: source.mode,
       phase: phase === 0 ? 'rinse' : 'post',

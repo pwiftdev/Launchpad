@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { inspectLaunchConfig, decodeLaunchConfig } from './launch-policy.cjs';
+import { inspectLaunchConfig, decodeLaunchConfig, reviewedQuote, modeForPolicy } from './launch-policy.cjs';
 import { companyWallets } from './company-wallets.cjs';
-import { expectedNetworkGenesis } from './network-policy.cjs';
+import { expectedNetworkGenesis, NETWORK_GENESIS } from './network-policy.cjs';
 import { databaseConfig } from './postgres-config.cjs';
 const app = createRequire(new URL('../scaffolds/fun-launch/package.json', import.meta.url)),
   args = process.argv.slice(2);
@@ -12,7 +12,7 @@ if (
   (args.includes('--enable') && !args.includes('--write'))
 ) {
   console.error(
-    'Use no arguments for read-only bond-v1 configuration verification; --write persists the reviewed record, --write --enable enables new preparations. No chain transaction is sent.'
+    'Use no arguments for read-only configuration verification; --write persists the reviewed record, --write --enable enables new preparations. No chain transaction is sent.'
   );
   process.exit(1);
 }
@@ -33,6 +33,10 @@ try {
     });
   const genesis = await connection.getGenesisHash();
   if (genesis !== expectedNetworkGenesis(process.env)) throw Error('Wrong RPC genesis');
+  const policyVersion = process.env.LAUNCH_POLICY_VERSION || 'bond-v1';
+  if (policyVersion !== 'bond-v1' && !modeForPolicy(policyVersion)) throw Error('Unsupported policy');
+  if (policyVersion !== 'bond-v1' && genesis === NETWORK_GENESIS['mainnet-beta'] && args.includes('--write')) throw Error('Devnet rehearsal required');
+  const quote = reviewedQuote(policyVersion, genesis);
   const { collector, treasury } = companyWallets(process.env, genesis),
     { context, value } = await connection.getAccountInfoAndContext(key, 'finalized');
   if (!value?.owner.equals(sdk.DYNAMIC_BONDING_CURVE_PROGRAM_ID) || value.executable)
@@ -44,10 +48,11 @@ try {
     issues = inspectLaunchConfig(config, {
       feeClaimer: collector.toBase58(),
       leftoverReceiver: treasury.toBase58(),
-      policyVersion: 'bond-v1',
+      policyVersion,
+      ...quote,
     });
   if (issues.length) {
-    console.log(JSON.stringify({ verified: false, policyVersion: 'bond-v1', issues }, null, 2));
+    console.log(JSON.stringify({ verified: false, policyVersion, issues }, null, 2));
     process.exitCode = 1;
   } else {
     if ((await connection.getGenesisHash()) !== genesis) throw Error('RPC network changed');
@@ -57,7 +62,7 @@ try {
         pool = new Pool(databaseConfig());
       try {
         await pool.query(
-          `INSERT INTO launch_configs(network_genesis,config_key,policy_version,expected_fee_claimer,expected_leftover_receiver,config_digest,enabled_for_launch,verified_slot) VALUES($1,$2,'bond-v1',$3,$4,$5,$6,$7) ON CONFLICT(network_genesis,config_key) DO NOTHING`,
+          `INSERT INTO launch_configs(network_genesis,config_key,policy_version,expected_fee_claimer,expected_leftover_receiver,config_digest,enabled_for_launch,verified_slot,quote_mint) VALUES($1,$2,$8,$3,$4,$5,$6,$7,$9) ON CONFLICT(network_genesis,config_key) DO NOTHING`,
           [
             genesis,
             key.toBase58(),
@@ -66,6 +71,8 @@ try {
             digest,
             args.includes('--enable'),
             context.slot,
+            policyVersion,
+            quote.quoteMint,
           ]
         );
         const row = (
@@ -76,7 +83,7 @@ try {
         ).rows[0];
         if (
           !row ||
-          row.policy_version !== 'bond-v1' ||
+          row.policy_version !== policyVersion || row.quote_mint !== quote.quoteMint ||
           row.config_digest !== digest ||
           row.expected_fee_claimer !== collector.toBase58() ||
           row.expected_leftover_receiver !== treasury.toBase58()
@@ -96,7 +103,7 @@ try {
       JSON.stringify(
         {
           verified: true,
-          policyVersion: 'bond-v1',
+          policyVersion,
           networkGenesis: genesis,
           configKey: key.toBase58(),
           configDigest: digest,

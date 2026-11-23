@@ -1,5 +1,5 @@
 // MASKED (mskd.fun): supplied mask + wordmark art and shared colors for HTML, canvas,
-// wallet metadata and share cards. Black and white first; Helius orange is the only accent.
+// wallet metadata and share cards. Black and white first; Monero orange is the only accent.
 const assets = {
   /** White mask on transparent (dark surfaces) */
   mark: '/brand/mskd-mark.webp',
@@ -22,7 +22,7 @@ const assets = {
   favicon: '/brand/mskd-favicon-32.png',
   /** Intro frame: white mask on black with the eyes and mouth cut out */
   portal: '/brand/mskd-portal.png',
-  /** Avatar for the $MSKD token card: black mask on Helius orange */
+  /** Avatar for the $MSKD token card: black mask on Monero orange */
   token: '/brand/mskd-token.png',
 } as const;
 
@@ -37,7 +37,7 @@ export const BRAND = {
   /** Three-beat promise used in heroes, splash and share cards */
   promise: ['No KYC', 'No accounts', 'No middleman'] as const,
   description:
-    'MASKED is the privacy-first Solana launchpad. No KYC, no accounts, no email: connect any wallet and launch. 1.25% flat before and after bonding, in three modes: MSKD (paired to hSOL, holders earn), Dev, and Cashback. Powered by Meteora.',
+    'MASKED is the privacy-first Solana launchpad. No KYC, no accounts, no email: connect any wallet and launch. 1.25% flat before and after bonding, in three modes: MSKD (holders earn in Monero), Dev, and Cashback. Powered by Meteora.',
   url: (process.env.NEXT_PUBLIC_SITE_URL || 'https://mskd.fun').replace(/\/$/, ''),
   /** Placeholder until the official handle is confirmed */
   xHandle: '@mskdfun',
@@ -48,8 +48,10 @@ export const BRAND = {
   /** Mint of the first-party $MSKD token pinned on the board; null hides the card until it exists. */
   officialMint: null as string | null,
   colors: {
-    /** Helius orange, our only accent (helius.dev/brand) */
-    orange: '#E84125',
+    /** Monero orange, our only accent (sampled from getmonero.org's official symbol) */
+    orange: '#FF6600',
+    /** Monero grey, the symbol's second color */
+    moneroGrey: '#4C4C4C',
     white: '#FFFFFF',
     black: '#090909',
     ink: '#0A0A0A',

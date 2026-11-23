@@ -9,7 +9,7 @@ export type PendingLaunch = {
   symbol: string;
   image: string | null;
   devBuyPercent: number;
-  mode: 'bond' | 'creator' | 'community';
+  mode: import('@/lib/launchModes').LaunchMode;
 } & Partial<LaunchPreparationContext>;
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 const LEGACY_KEY = 'rinsed.pendingLaunch.v1';
@@ -66,7 +66,7 @@ function parse(raw: string | null, wallet: string): PendingLaunch | null {
       row.signature.length < 64 ||
       row.signature.length > 88 ||
       bs58.decode(row.signature).length !== 64 ||
-      !['bond', 'creator', 'community'].includes(String(row.mode)) ||
+      !['bond', 'creator', 'community', 'mskd', 'dev', 'cashback'].includes(String(row.mode)) ||
       typeof row.name !== 'string' ||
       row.name.length > 64 ||
       typeof row.symbol !== 'string' ||

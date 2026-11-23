@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-// Domain-warped fbm smoke in Helius orange over Helius black, plus per-frame film
+// Domain-warped fbm smoke in Monero orange over near-black, plus per-frame film
 // grain. Rendered at half resolution on purpose: the upscale makes the grain chunky and filmic.
 const FRAG = `
 #ifdef GL_FRAGMENT_PRECISION_HIGH
@@ -50,14 +50,14 @@ void main() {
   // near-black with a violet cast
   vec3 col = vec3(0.012, 0.010, 0.010);
   // purple smoke
-  col = mix(col, vec3(0.34, 0.075, 0.035), smoothstep(0.28, 0.95, f));
+  col = mix(col, vec3(0.36, 0.13, 0.0), smoothstep(0.28, 0.95, f));
   // deeper indigo pooling in the folds
-  col += vec3(0.07, 0.012, 0.006) * smoothstep(0.45, 1.0, r.y);
+  col += vec3(0.07, 0.025, 0.0) * smoothstep(0.45, 1.0, r.y);
   // lilac-magenta highlights where the smoke thickens
   float lift = smoothstep(0.62, 0.98, f * (0.6 + r.x));
-  col += vec3(0.91, 0.255, 0.145) * lift * lift * 0.6;
+  col += vec3(1.0, 0.40, 0.0) * lift * lift * 0.6;
   // one soft light from above, heavy vignette
-  col += vec3(0.045, 0.014, 0.008) * smoothstep(1.1, 0.0, length(uv - vec2(0.62, 1.12)));
+  col += vec3(0.045, 0.02, 0.0) * smoothstep(1.1, 0.0, length(uv - vec2(0.62, 1.12)));
   col *= smoothstep(1.6, 0.15, length(p * vec2(0.8, 1.1)));
   // film grain, new every frame
   float g = hash(gl_FragCoord.xy + fract(u_time * 7.13) * vec2(91.7, 37.3));

@@ -8,6 +8,7 @@ import {
   feeModeByPolicy,
   isFeeModeId,
   pct,
+  payoutMintFor,
   quoteMintFor,
   splitRows,
 } from './feeModes';
@@ -32,7 +33,7 @@ describe('fee modes', () => {
 
   it('defines MSKD, Regular Dev and Regular Cashback', () => {
     expect(FEE_MODE_IDS).toEqual(['mskd', 'dev', 'cashback']);
-    expect(feeMode('mskd')).toMatchObject({ quoteSymbol: 'hSOL', quoteDecimals: 9, beneficiary: 'holders' });
+    expect(feeMode('mskd')).toMatchObject({ quoteSymbol: 'SOL', payoutSymbol: 'wXMR', payoutName: 'Monero', beneficiary: 'holders' });
     expect(feeMode('dev')).toMatchObject({ quoteSymbol: 'SOL', beneficiary: 'creator' });
     expect(feeMode('cashback')).toMatchObject({ quoteSymbol: 'SOL', beneficiary: 'holders' });
     expect(feeModeByPolicy('cashback-v1')?.id).toBe('cashback');
@@ -50,10 +51,12 @@ describe('fee modes', () => {
     expect(pct(SCHEDULE.endingFeeBps)).toBe('1.25%');
   });
 
-  it('pairs MSKD to hSOL on mainnet and an explicit mock mint elsewhere', () => {
-    expect(quoteMintFor('mskd', 'mainnet-beta')).toBe('he1iusmfkpAdwvxLNGV8Y1iSbj4rUy6yMhEA3fotn9A');
-    expect(quoteMintFor('mskd', 'devnet')).toBeNull();
-    expect(quoteMintFor('mskd', 'devnet', { MSKD_DEVNET_QUOTE_MINT: 'Mock111' })).toBe('Mock111');
-    expect(quoteMintFor('dev', 'devnet')).toBe('So11111111111111111111111111111111111111112');
+  it('pairs every mode to SOL; MSKD pays holders in wXMR', () => {
+    for (const id of FEE_MODE_IDS)
+      expect(quoteMintFor(id)).toBe('So11111111111111111111111111111111111111112');
+    expect(payoutMintFor('mskd', 'mainnet-beta')).toBe('WXMRyRZhsa19ety5erZhHg4N3xj3EVN92u94422teJp');
+    expect(payoutMintFor('mskd', 'devnet')).toBeNull();
+    expect(payoutMintFor('mskd', 'devnet', { MSKD_DEVNET_PAYOUT_MINT: 'Mock111' })).toBe('Mock111');
+    expect(payoutMintFor('cashback', 'mainnet-beta')).toBe('So11111111111111111111111111111111111111112');
   });
 });

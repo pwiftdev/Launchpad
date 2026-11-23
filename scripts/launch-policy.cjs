@@ -6,6 +6,17 @@ const SOL_MINT = 'So11111111111111111111111111111111111111112';
 const modeForPolicy = (version) =>
   Object.values(modePolicy.modes).find((mode) => mode.policyVersion === version) ?? null;
 exports.modeForPolicy = modeForPolicy;
+exports.verifyQuoteMint = async function verifyQuoteMint(connection, mint) {
+  const { getMint, TOKEN_PROGRAM_ID } = require('@solana/spl-token');
+  const state = await getMint(connection, new PublicKey(mint), 'finalized', TOKEN_PROGRAM_ID);
+  if (!state.isInitialized || state.decimals !== 9)
+    throw new Error('The reviewed quote mint must use nine decimals and the standard SPL token program');
+};
+// Every reviewed launch policy pairs to SOL with the 80 SOL bonding target. MSKD pays holders
+// in wXMR, but its curve, config and fee claims are SOL.
+exports.reviewedQuote = function reviewedQuote() {
+  return { quoteMint: SOL_MINT, migrationQuoteThreshold: '80000000000' };
+};
 const { PublicKey } = require('@solana/web3.js');
 const { BorshCoder } = require('@coral-xyz/anchor');
 const { convertIdlToCamelCase } = require('@coral-xyz/anchor/dist/cjs/idl.js');
@@ -51,7 +62,7 @@ exports.inspectLaunchConfig = function inspectLaunchConfig(config, expected = {}
   check('collectFeeMode', config.collectFeeMode, 0);
   check('activationType', config.activationType, bond ? scheduled.activationType : 1);
   if (mode && mode.quote !== 'sol') {
-    // A non-SOL pair must be pinned by the caller: hSOL on mainnet, a reviewed mock elsewhere.
+    // A non-SOL pair (none today) must be pinned by the caller.
     if (!expected.quoteMint || expected.quoteMint === SOL_MINT)
       issues.push({ field: 'quoteMint', expected: 'An independently pinned quote mint', actual: null });
     else check('quoteMint', config.quoteMint, expected.quoteMint);

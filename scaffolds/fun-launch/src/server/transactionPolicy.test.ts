@@ -95,7 +95,7 @@ beforeEach(() => {
   mocks.supportedConfig.mockResolvedValue(true);
   mocks.getCoin.mockResolvedValue({
     coin: { pool: pool.toBase58(), isMigrated: false, migratedPool: pool.toBase58() },
-    config: { collectFeeMode: 0 },
+    config: { collectFeeMode: 0, quoteMint: NATIVE_MINT },
     account: { poolState: { config } },
   });
   mocks.registeredCoin.mockResolvedValue({
@@ -147,7 +147,7 @@ describe('transaction relay instruction policy', () => {
     mocks.getLaunchConfig.mockResolvedValue({
       key: config,
       record: { policy_version: 'wallet-v1' },
-      config: { tokenType: 0 },
+      config: { tokenType: 0, quoteMint: NATIVE_MINT },
     });
     await expect(validateRelayTransaction(tx(instruction))).resolves.toBeUndefined();
     const unexpected = new TransactionInstruction({
@@ -192,7 +192,7 @@ describe('transaction relay instruction policy', () => {
     for (const migrated of [false, true]) {
       mocks.getCoin.mockResolvedValue({
         coin: { pool: pool.toBase58(), isMigrated: migrated, migratedPool: pool.toBase58() },
-        config: { tokenType: 0 },
+        config: { tokenType: 0, quoteMint: NATIVE_MINT },
         account: { poolState: { config } },
       });
       const instruction = swap(migrated),
@@ -208,7 +208,7 @@ describe('transaction relay instruction policy', () => {
     }
   });
   it('allows only a verified deterministic graduated DAMM pool', async () => {
-    mocks.getCoin.mockResolvedValue({ coin: { isMigrated: true, migratedPool: pool.toBase58() } });
+    mocks.getCoin.mockResolvedValue({ config: { quoteMint: NATIVE_MINT }, coin: { isMigrated: true, migratedPool: pool.toBase58() } });
     await expect(validateRelayTransaction(tx(swap(true)))).resolves.toBeUndefined();
     mocks.getCoin.mockResolvedValue({
       coin: { isMigrated: true, migratedPool: Keypair.generate().publicKey.toBase58() },

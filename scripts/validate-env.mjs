@@ -1,4 +1,6 @@
 import { localValidatorPolicy, expectedNetworkGenesis } from './network-policy.cjs';
+import modePolicy from '../scaffolds/fun-launch/src/constants/modePolicy.json' with { type: 'json' };
+const modeForPolicy = version => Object.values(modePolicy.modes).some(mode => mode.policyVersion === version);
 import { companyWallets } from './company-wallets.cjs';
 const publicBuildKeys = [
   'NEXT_PUBLIC_NETWORK',
@@ -83,7 +85,7 @@ export function validateEnv(env = process.env) {
   for (const key of ['WALLET_WORKER_ENABLED', 'MAINNET_TRADING_ENABLED', 'LAUNCHPAD_PUBLIC'])
     if (env[key] !== undefined && !['true', 'false'].includes(env[key]))
       throw new Error(`Invalid ${key}`);
-  if (env.LAUNCH_POLICY_VERSION && !['wallet-v1', 'bond-v1'].includes(env.LAUNCH_POLICY_VERSION))
+  if (env.LAUNCH_POLICY_VERSION && !['wallet-v1', 'bond-v1'].includes(env.LAUNCH_POLICY_VERSION) && !modeForPolicy(env.LAUNCH_POLICY_VERSION))
     throw new Error('Unknown launch policy version');
   const required = [
     'RPC_URL',
@@ -94,7 +96,7 @@ export function validateEnv(env = process.env) {
   ];
   const missing = required.filter((key) => !env[key] || /^(your_|replace_)/i.test(env[key]));
   if (missing.length) throw new Error(`Set required config vars: ${missing.join(', ')}`);
-  if (env.LAUNCH_POLICY_VERSION === 'bond-v1') {
+  if (env.LAUNCH_POLICY_VERSION === 'bond-v1' || modeForPolicy(env.LAUNCH_POLICY_VERSION)) {
     if (!env.DATABASE_URL || !/^postgres(?:ql)?:\/\//.test(env.DATABASE_URL))
       throw new Error('Bond it. launches require a Postgres database');
     if (

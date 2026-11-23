@@ -37,7 +37,10 @@ const keyFor = (pool: string, token: TokenContext) =>
 function view(entry: Cache, token: TokenContext, stale = false): TradeHistory {
   const supply = token.tokenSupply ?? TOTAL_SUPPLY;
   return {
-    trades: entry.trades.map((trade) => ({ ...trade, marketCapSol: trade.priceSol * supply })),
+    trades: entry.trades.map((trade) => {
+      const rate = token.quoteToSol ?? 1;
+      return { ...trade, sol: trade.sol * rate, feeSol: trade.feeSol * rate, priceSol: trade.priceSol * rate, marketCapSol: trade.priceSol * rate * supply };
+    }),
     complete: entry.baselineComplete && !entry.lost && !entry.retry.size,
     updatedAt: Math.floor(entry.at / 1000),
     stale,

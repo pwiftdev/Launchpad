@@ -11,9 +11,9 @@ exports.buildWalletLaunchTemplate = function buildWalletLaunchTemplate({
   collector,
   treasury,
   policyVersion = 'bond-v1',
-  /** Non-SOL modes only: the pinned quote mint (hSOL on mainnet, a reviewed mock on devnet) */
+  /** Non-SOL modes only: the pinned quote mint (no mode uses one today; all pair to SOL) */
   quoteMint,
-  /** Non-SOL modes only: bonding target in whole quote tokens, e.g. "68" hSOL */
+  /** Non-SOL modes only: bonding target in whole quote tokens, for a non-SOL pair */
   migrationQuoteThreshold,
 }) {
   const mode = modeForPolicy(policyVersion);

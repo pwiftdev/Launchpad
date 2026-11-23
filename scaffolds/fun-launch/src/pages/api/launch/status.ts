@@ -15,8 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!bond && !isFeeModeId(requested))
     return res.status(400).json({ error: 'Invalid launch mode' });
   try {
-    const config = await getConfig(),
-      genesis = await networkGenesis();
+    const genesis = await networkGenesis();
     const network =
       genesis === NETWORK_GENESIS['mainnet-beta']
         ? 'mainnet-beta'
@@ -26,17 +25,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const common = {
       network,
       genesis,
-      poolCreationFeeSol: Number(config.poolCreationFee.toString()) / 1e9,
-      tokenDecimals: config.tokenDecimal,
+
     };
 
     if (!bond && isFeeModeId(requested)) {
-      // MSKD modes stay closed until each has a reviewed, registered config and its fee routing
-      // (holder and creator payouts, hSOL settlement) is live. Shown here so the form can explain.
+      const approved = await verifiedTradingAccess(requested).catch((): null => null);
       const mode = feeMode(requested);
       return res.status(200).json({
         ...common,
-        canLaunch: false,
+        canLaunch: !!approved && approved.genesis === genesis,
+        configKey: approved?.key.toBase58(),
+        poolCreationFeeSol: approved ? Number(approved.config.poolCreationFee.toString()) / 1e9 : 0,
+        tokenDecimals: approved?.config.tokenDecimal,
         policyVersion: mode.policyVersion,
         mode: mode.id,
         quote: mode.quoteSymbol,
@@ -49,10 +49,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         split: SPLIT,
         mainnetTradingEnabled: false,
-        notice: `${mode.label} opens once its launch configuration is reviewed and registered.`,
+        ...(approved ? {} : { notice: `${mode.label} requires a reviewed, enabled launch configuration.` }),
       });
     }
 
+    const config = await getConfig();
     let canPrepare = false,
       policyVersion = 'unreviewed';
     try {
@@ -65,6 +66,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({
       ...common,
       canLaunch: canPrepare,
+      poolCreationFeeSol: Number(config.poolCreationFee.toString()) / 1e9,
+      tokenDecimals: config.tokenDecimal,
       policyVersion,
       mode: 'bond',
       tradingFees: {

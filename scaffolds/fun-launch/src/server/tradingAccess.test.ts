@@ -37,6 +37,15 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('wallet policy financial rollout gate', () => {
+  it.each(['dev','cashback','mskd'] as const)('admits the reviewed %s config on devnet only', async mode => {
+    for (const network of ['devnet','mainnet-beta'] as const) {
+      vi.stubEnv('NEXT_PUBLIC_NETWORK', network);
+      vi.stubEnv('MAINNET_TRADING_ENABLED', 'true');
+      rpc.getGenesisHash.mockResolvedValue(NETWORK_GENESIS[network]);
+      rpc.getLaunchConfig.mockResolvedValue({ genesis: NETWORK_GENESIS[network], record: {policy_version: mode + '-v1', enabled_for_launch:true} });
+      expect(await allowTrading(response(), mode)).toBe(network === 'devnet');
+    }
+  });
   it('allows verified devnet wallet policy without requiring a custom program', async () => {
     const res = response();
     expect(await allowTrading(res)).toBe(true);

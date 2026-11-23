@@ -7,9 +7,16 @@ export async function walletOperatingCosts(
   kind: WalletJobKind,
   maximumFee: bigint,
   tokenAta?: PublicKey,
-  quoteAta?: PublicKey
+  quoteAta?: PublicKey,
+  splQuote = false
 ) {
   if (maximumFee <= 0n) throw new Error('Positive operating fee bound required');
+  if (kind.endsWith('_claim') && splQuote) {
+    if (!quoteAta) throw new Error('Missing payout token account');
+    const [accounts, rent] = await Promise.all([rpc.getMultipleAccountsInfo([quoteAta], 'finalized'), rpc.getMinimumBalanceForRentExemption(165, 'finalized')]);
+    if (accounts.length !== 1 || !Number.isSafeInteger(rent) || rent <= 0) throw new Error('Recipient rent unavailable');
+    return { operatingCostLamports: maximumFee + (accounts[0] ? 0n : BigInt(rent)), temporaryFundingLamports: 0n };
+  }
   if (kind.endsWith('_claim'))
     return { operatingCostLamports: maximumFee, temporaryFundingLamports: 0n };
   if (!tokenAta || !quoteAta) throw new Error('Explicit settlement token accounts required');
@@ -22,7 +29,7 @@ export async function walletOperatingCosts(
   const tokenRent = accounts[0] ? 0n : BigInt(rent);
   const quoteRent = accounts[1] ? 0n : BigInt(rent);
   return {
-    operatingCostLamports: maximumFee + tokenRent + (kind === 'setup' ? quoteRent : 0n),
-    temporaryFundingLamports: kind === 'setup' ? 0n : quoteRent,
+    operatingCostLamports: maximumFee + tokenRent + (kind === 'setup' || splQuote ? quoteRent : 0n),
+    temporaryFundingLamports: kind === 'setup' || splQuote ? 0n : quoteRent,
   };
 }

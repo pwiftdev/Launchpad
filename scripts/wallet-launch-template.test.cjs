@@ -75,7 +75,8 @@ test('canonical generator refuses native PDA and default recipients before prepa
 
 test('MSKD modes: one-slot 99% guard, then a flat 1.25% before and after bonding', () => {
   const wallets = { collector: Keypair.generate().publicKey, treasury: Keypair.generate().publicKey };
-  for (const policyVersion of ['dev-v1', 'cashback-v1']) {
+  // All three modes pair to SOL; MSKD differs only in paying holders in wXMR (off-chain routing)
+  for (const policyVersion of ['mskd-v1', 'dev-v1', 'cashback-v1']) {
     const config = buildWalletLaunchTemplate({ ...wallets, policyVersion });
     assert.equal(config.activationType, 0);
     assert.equal(config.enableFirstSwapWithMinFee, true);
@@ -87,26 +88,4 @@ test('MSKD modes: one-slot 99% guard, then a flat 1.25% before and after bonding
     assert.equal(config.creatorTradingFeePercentage, 0);
     assert.equal(config.partnerPermanentLockedLiquidityPercentage, 100);
   }
-});
-
-test('MSKD mode pairs to a pinned hSOL mint with a reviewed 9-decimal bonding target', () => {
-  const wallets = { collector: Keypair.generate().publicKey, treasury: Keypair.generate().publicKey };
-  const quoteMint = 'he1iusmfkpAdwvxLNGV8Y1iSbj4rUy6yMhEA3fotn9A';
-  const config = buildWalletLaunchTemplate({
-    ...wallets,
-    policyVersion: 'mskd-v1',
-    quoteMint,
-    migrationQuoteThreshold: '68',
-  });
-  assert.equal(config.quoteMint.toBase58(), quoteMint);
-  assert.equal(config.migrationQuoteThreshold.toString(), '68000000000');
-  assert.equal(config.migratedPoolFee.poolFeeBps, 125);
-  assert.throws(
-    () => buildWalletLaunchTemplate({ ...wallets, policyVersion: 'mskd-v1', migrationQuoteThreshold: '68' }),
-    /quote mint/
-  );
-  assert.throws(
-    () => buildWalletLaunchTemplate({ ...wallets, policyVersion: 'mskd-v1', quoteMint }),
-    /bonding target/
-  );
 });

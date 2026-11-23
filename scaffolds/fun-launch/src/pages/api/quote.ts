@@ -40,7 +40,7 @@ export default async function handler(
         side,
         amountIn: amount,
         amountOut,
-        feeSol: quote.feeSol,
+        feeSol: quote.feeSol * (found.coin.quoteToSol ?? 1),
         feePercent: tradeSol > 0 ? (quote.feeSol / tradeSol) * 100 : 0,
         taxPercent: 0,
         route: 'damm-v2',
@@ -68,8 +68,9 @@ export default async function handler(
     const out = Number(q.outputAmount.toString());
     const feeInSol = config.collectFeeMode === 0 || side === 'sell';
     const feeAmount = fee / (feeInSol ? LAMPORTS : 10 ** decimals);
-    const feeSol = feeInSol ? feeAmount : feeAmount * found.coin.priceSol;
-    const tradeSol = side === 'buy' ? amount : out / LAMPORTS + feeSol;
+    const rate = found.coin.quoteToSol ?? 1;
+    const feeSol = feeInSol ? feeAmount * rate : feeAmount * found.coin.priceSol;
+    const tradeSol = side === 'buy' ? amount * rate : (out / LAMPORTS) * rate + feeSol;
 
     const base = config.poolFees.baseFee;
     const tax =
@@ -95,7 +96,7 @@ export default async function handler(
       taxPercent: tax,
       route: 'dbc',
       pool: found.coin.pool,
-      feeMint: feeInSol ? NATIVE_MINT.toBase58() : mint.toBase58(),
+      feeMint: feeInSol ? (config.quoteMint ?? NATIVE_MINT).toBase58() : mint.toBase58(),
       feeAmount,
       feeSolIsEstimate: !feeInSol,
     });

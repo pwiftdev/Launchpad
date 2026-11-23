@@ -56,7 +56,7 @@ export const StatusBar = () => {
         <span
           className={cn(
             'h-1.5 w-1.5 rounded-full',
-            live ? 'bg-signal shadow-[0_0_8px_rgba(232,65,37,0.6)]' : 'bg-amber',
+            live ? 'bg-signal shadow-[0_0_8px_rgba(255,102,0,0.6)]' : 'bg-amber',
             isFetching && 'animate-pulse'
           )}
         />

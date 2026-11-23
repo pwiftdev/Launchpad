@@ -13,8 +13,8 @@ import { uploadSchema } from '@/server/validation';
 import { normalizeLaunchImage } from '@/server/launchImage';
 import type { LaunchPayload } from '@/lib/launchAuth';
 import { DEFAULT_IPFS_GATEWAY, imageSources } from '@/lib/ipfs';
-import { allowTrading } from '@/server/tradingAccess';
-import { getLaunchConfig, connection, networkGenesis } from '@/server/dbc';
+import { verifiedTradingAccess } from '@/server/tradingAccess';
+import { connection, networkGenesis } from '@/server/dbc';
 import { attestLaunchPreparation } from '@/server/launchPreparation';
 import { reserveLaunchIntent } from '@/server/launchRegistry';
 import { launchPayloadDigest } from '@/lib/launchAuth';
@@ -29,7 +29,7 @@ import { cacheUploadedMetadata } from '@/server/dbc';
 const PINATA_JWT = process.env.PINATA_JWT as string;
 const IPFS_GATEWAY_URL = (process.env.IPFS_GATEWAY_URL || DEFAULT_IPFS_GATEWAY).replace(/\/$/, '');
 const RPC_URL = process.env.RPC_URL as string;
-const POOL_CONFIG_KEY = process.env.POOL_CONFIG_KEY as string;
+
 
 // Logos arrive as base64 data URLs (max 2MB file -> ~2.7MB encoded)
 export const config = { api: { bodyParser: { sizeLimit: '4mb' } } };
@@ -44,7 +44,7 @@ type MetadataUploadParams = {
   description?: string;
   socials: Socials;
   burnShare: number;
-  mode?: 'bond' | 'creator' | 'community';
+  mode?: import('@/lib/launchModes').LaunchMode;
   artifactIdentity: ArtifactIdentity;
 };
 
@@ -55,14 +55,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  if (!(await allowTrading(res))) return;
+
 
   const parsed = uploadSchema.safeParse(req.body);
   if (!parsed.success)
     return res.status(400).json({ error: 'Invalid launch fields, address, or authorization' });
-  if (!PINATA_JWT || !RPC_URL || !POOL_CONFIG_KEY) {
+  if (!PINATA_JWT || !RPC_URL) {
     return res.status(503).json({ error: 'Launch service is not configured' });
   }
+  const approved = await verifiedTradingAccess(parsed.data.mode).catch((): null => null);
+  if (!approved) return res.status(503).json({ error: 'Selected mode has no reviewed launch config' });
+  if (parsed.data.configKey && parsed.data.configKey !== approved.key.toBase58())
+    return res.status(409).json({ error: 'Selected config changed. Refresh and sign again.' });
   if (!takeLimit(`upload-ip:${clientIp(req)}`, 5, 3600_000)) {
     res.setHeader('Retry-After', '3600');
     return res.status(429).json({ error: 'Launch limit reached. Try again later.' });
@@ -103,7 +107,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.setHeader('Retry-After', '3600');
       return res.status(429).json({ error: 'Launch limit reached. Try again later.' });
     }
-    const approved = await getLaunchConfig(parsed.data.mode);
     if (parsed.data.mode) {
       if (!approved.record) throw new Error('Reviewed launch policy is required');
       await reserveLaunchIntent({
@@ -193,7 +196,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       metadataUrl,
       userWallet,
       devBuyPercent,
-      mode,
+      approved,
     });
 
     res.status(200).json({
@@ -285,7 +288,7 @@ async function createPoolTransaction({
   metadataUrl,
   userWallet,
   devBuyPercent,
-  mode,
+  approved,
 }: {
   mint: string;
   tokenName: string;
@@ -293,10 +296,9 @@ async function createPoolTransaction({
   metadataUrl: string;
   userWallet: string;
   devBuyPercent: number;
-  mode?: 'bond' | 'creator' | 'community';
+  approved: Awaited<ReturnType<typeof verifiedTradingAccess>>;
 }) {
   const client = new DynamicBondingCurveClient(connection, 'confirmed');
-  const approved = await getLaunchConfig(mode);
   const creator = new PublicKey(userWallet);
 
   const createPoolParam = {

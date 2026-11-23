@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { PublicKey } from '@solana/web3.js';
 import { DynamicBondingCurveClient } from '@meteora-ag/dynamic-bonding-curve-sdk';
+import { usesLaunchSlot } from '@/lib/launchModes';
 import { z } from 'zod';
 import { apiGuard } from '@/server/apiGuard';
 import { connection, networkGenesis, getConfig } from '@/server/dbc';
@@ -84,7 +85,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!proof.signature || proof.signature !== parsed.data.signature)
       throw new Error('Creation signature mismatch');
     if (
-      reviewed.policy_version === 'bond-v1' &&
+      usesLaunchSlot(intent.mode) &&
       (!Number.isSafeInteger(tx.blockTime) || tx.blockTime! <= 0)
     )
       throw new Error('The finalized launch timestamp is required');
@@ -121,8 +122,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       mode: intent.mode,
       recipient: intent.mode === 'community' ? reviewed.expected_fee_claimer : intent.deployer,
       policy_version: reviewed.policy_version,
+      quote_mint: config.quoteMint.toBase58(),
       activation_point: state.activationPoint.toString(),
-      activation_time: reviewed.policy_version === 'bond-v1' ? String(tx.blockTime) : null,
+      activation_time: usesLaunchSlot(intent.mode) ? String(tx.blockTime) : null,
       creation_signature: parsed.data.signature,
       finalized_slot: String(proof.slot),
     });

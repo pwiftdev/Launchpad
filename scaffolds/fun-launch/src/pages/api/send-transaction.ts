@@ -10,7 +10,7 @@ export const config = { api: { bodyParser: { sizeLimit: '8kb' } } };
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!apiGuard(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!(await allowTrading(res))) return;
+
   if (!takeLimit('relay:' + clientIp(req), 20, 60_000)) {
     res.setHeader('Retry-After', '60');
     return res.status(429).json({ error: 'Too many transaction requests' });
@@ -30,7 +30,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const tx = Transaction.from(raw);
     if (!tx.verifySignatures()) throw new Error('A fully signed transaction is required');
     const claimMint = typeof req.body?.mint === 'string' ? new PublicKey(req.body.mint) : undefined;
-    await validateRelayTransaction(tx, { claimMint });
+    const modes = new Set<import('@/lib/launchModes').LaunchMode>();
+    await validateRelayTransaction(tx, { claimMint, onMode: mode => modes.add(mode ?? 'bond') });
+    if (!modes.size) modes.add('bond');
+    for (const mode of modes) if (!(await allowTrading(res, mode === 'creator' || mode === 'community' ? 'bond' : mode))) return;
   } catch {
     return res.status(400).json({ error: 'A fully signed launch or swap transaction is required' });
   }

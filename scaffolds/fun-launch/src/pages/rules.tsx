@@ -85,9 +85,10 @@ export default function Rules() {
           })}
         </div>
         <p className="mt-4 max-w-3xl text-[12px] leading-relaxed text-neutral-500">
-          MSKD mode pairs coins to hSOL, Helius&rsquo;s liquid staking token: SOL staked with the
-          Helius validator, redeemable for SOL. It is worth a little more than 1 SOL and grows as
-          staking rewards accrue. Trades on Solana are public in every mode.
+          MSKD mode trades against SOL like every mode, but pays the holder share in wXMR, a
+          Solana token issued by a bridge that holds Monero, and holders can cash out to real Monero.
+          wXMR depends on that issuer: it can mint more and processes redemptions. Trades on Solana
+          are public in every mode.
         </p>
       </section>
 

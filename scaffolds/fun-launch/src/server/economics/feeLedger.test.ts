@@ -2,6 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { allocateExecutedFee, allocateHolderSnapshot } from './feeLedger';
 
 describe('upcoming executed-fee accounting', () => {
+  it.each(['dev', 'cashback', 'mskd'] as const)('preserves %s beneficiary income across both phases and small collections', mode => {
+    for (const phase of ['rinse', 'post'] as const) {
+      let beneficiary = 0n;
+      for (let previous = 0n; previous < 10n; previous++) {
+        const result = allocateExecutedFee({ mode, phase, total: 3n, protocol: 1n, referral: 1n, previousPhaseNet: previous, activationTime: 0, tradeTime: 1 });
+        const earned = mode === 'dev' ? result.creator : result.community;
+        expect(result.rinseBuyback).toBe(0n);
+        expect(result.platform + earned).toBe(1n);
+        beneficiary += earned;
+      }
+      expect(beneficiary).toBe(6n);
+    }
+  });
   it('routes Bond it. fees as 0.95% burn/0.05% operations before bonding and 0.50% creator/0.30% treasury afterward', () => {
     const common = { mode: 'bond' as const, activationTime: 0, tradeTime: 1_800_000_000 };
     expect(

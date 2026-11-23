@@ -1,5 +1,5 @@
 import { Connection, PublicKey, SystemProgram, VersionedTransaction } from '@solana/web3.js';
-import { NATIVE_MINT, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { createTransferCheckedInstruction, createAssociatedTokenAccountIdempotentInstruction, getAssociatedTokenAddressSync, NATIVE_MINT, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import {
   actualBurnedTokens,
   allInstructions,
@@ -31,7 +31,7 @@ function balance(e: FinalizedEvidence, address: string, post = false): bigint {
     }
   throw new Error('Missing wallet balance account');
 }
-function nativeTransfers(e: FinalizedEvidence, source: string, destination: string): bigint {
+function quoteTransfers(e: FinalizedEvidence, source: string, destination: string, mint: string): bigint {
   const tx = e.transaction,
     keys = tx.transaction.message.getAccountKeys({
       accountKeysFromLookups: tx.meta!.loadedAddresses,
@@ -40,8 +40,8 @@ function nativeTransfers(e: FinalizedEvidence, source: string, destination: stri
     ...(tx.meta!.preTokenBalances ?? []),
     ...(tx.meta!.postTokenBalances ?? []),
   ].find((b) => keys.get(b.accountIndex)?.toBase58() === source);
-  if (sourceBalance?.mint !== NATIVE_MINT.toBase58())
-    throw new Error('Fee/spend source is not wrapped SOL');
+  if (sourceBalance?.mint !== mint)
+    throw new Error('Fee source has an unexpected mint');
   return allInstructions(e).reduce((sum, ix) => {
     if (ix.program !== TOKEN_PROGRAM_ID.toBase58()) return sum;
     if (
@@ -55,7 +55,7 @@ function nativeTransfers(e: FinalizedEvidence, source: string, destination: stri
       ix.data.length === 10 &&
       ix.data[0] === 12 &&
       ix.accounts[0] === source &&
-      ix.accounts[1] === NATIVE_MINT.toBase58() &&
+      ix.accounts[1] === mint &&
       ix.accounts[2] === destination
     )
       return sum + ix.data.readBigUInt64LE(1);
@@ -116,7 +116,25 @@ export async function verifyWalletEffect(
     evidence,
     operatingCostLamports: fee,
   };
-  if (job.kind.endsWith('_claim')) {
+  const quoteMint = new PublicKey(String(job.expectations.quoteMint ?? NATIVE_MINT));
+  const spl = !quoteMint.equals(NATIVE_MINT);
+  if (job.kind.endsWith('_claim') && spl) {
+    const owner = new PublicKey(collector);
+    const recipient = new PublicKey(requiredString(job, 'recipient'));
+    const amount = BigInt(requiredString(job, 'expectedLamports'));
+    if (amount <= 0n || amount !== BigInt(job.lamports) || recipient.toBase58() !== job.recipient) throw new Error('Invalid SPL payout liability');
+    const source = getAssociatedTokenAddressSync(quoteMint, owner);
+    const destination = getAssociatedTokenAddressSync(quoteMint, recipient);
+    const rent = lamportDelta(evidence, destination.toBase58());
+    if (rent < 0n || fee + rent > BigInt(requiredString(job, 'operatingCostLamports')) || delta !== -fee-rent || top.length !== 3) throw new Error('Unexpected SPL payout cost');
+    for (const instruction of [createAssociatedTokenAccountIdempotentInstruction(owner, destination, recipient, quoteMint), createTransferCheckedInstruction(source, quoteMint, destination, owner, amount, 9)]) {
+      const proven = requireInstruction(evidence, { program: instruction.programId.toBase58(), accounts: instruction.keys.map(k => k.pubkey.toBase58()), data: instruction.data });
+      if (proven.eventIndex !== 0) throw new Error('Expected a direct SPL payout');
+    }
+    const debit = owner.equals(recipient) ? 0n : amount;
+    if (tokenDelta(evidence, source.toBase58(), quoteMint.toBase58()) !== -debit || tokenDelta(evidence, destination.toBase58(), quoteMint.toBase58()) !== debit) throw new Error('SPL payout balance mismatch');
+    Object.assign(facts, { recipient: job.recipient, paidLamports: amount, collectorDebitLamports: debit, operatingCostLamports: fee + rent });
+  } else if (job.kind.endsWith('_claim')) {
     const recipient = requiredString(job, 'recipient'),
       amount = BigInt(requiredString(job, 'expectedLamports'));
     if (amount <= 0n || amount !== BigInt(job.lamports) || recipient !== job.recipient)
@@ -154,6 +172,7 @@ export async function verifyWalletEffect(
     if (tokenRent < 0n || tokenRent > BigInt(requiredString(job, 'operatingCostLamports')))
       throw new Error('Unexpected token account funding');
     if (job.kind === 'setup') {
+      if (spl && tokenDelta(evidence, quote, quoteMint.toBase58()) !== 0n) throw new Error('Unexpected quote movement during setup');
       const quoteRent = lamportDelta(evidence, quote);
       facts.operatingCostLamports = fee + tokenRent + quoteRent;
       if (
@@ -176,7 +195,7 @@ export async function verifyWalletEffect(
       });
       if (dexInstruction.eventIndex !== 0)
         throw new Error('Meteora settlement must be a direct collector instruction');
-      if (balance(evidence, quote, true) !== 0n)
+      if (!spl && balance(evidence, quote, true) !== 0n)
         throw new Error('Wrapped SOL was not returned to the collector');
       const closes = instructions.filter(
         (ix) =>
@@ -187,13 +206,16 @@ export async function verifyWalletEffect(
           ix.accounts[1] === collector &&
           ix.accounts[2] === collector
       );
-      if (closes.length !== 1) throw new Error('Expected exactly one collector wrapped SOL close');
+      if (closes.length !== (spl ? 0 : 1)) throw new Error('Expected exactly one collector wrapped SOL close');
       const previousQuoteBalance = balance(evidence, quote);
       if (job.kind === 'collect') {
-        const received = nativeTransfers(evidence, requiredString(job, 'sourceQuoteVault'), quote);
+        const received = quoteTransfers(evidence, requiredString(job, 'sourceQuoteVault'), quote, quoteMint.toBase58());
+        const quoteRent = spl ? lamportDelta(evidence, quote) : 0n;
+        if (quoteRent < 0n || (spl && fee + tokenRent + quoteRent > BigInt(requiredString(job,'operatingCostLamports')))) throw new Error('Unexpected SPL collection rent');
+        facts.operatingCostLamports = fee + tokenRent + quoteRent;
         if (
           received <= 0n ||
-          delta + fee + tokenRent - previousQuoteBalance !== received ||
+          (spl ? delta !== -fee-tokenRent-quoteRent || tokenDelta(evidence, quote, quoteMint.toBase58()) !== received : delta + fee + tokenRent - previousQuoteBalance !== received) ||
           tokenDelta(evidence, token, job.mint) !== 0n
         )
           throw new Error('Collected cash does not match finalized quote-only fee transfers');
@@ -203,7 +225,7 @@ export async function verifyWalletEffect(
         )
           throw new Error('DBC collection differs from the reserved fee events');
         Object.assign(facts, { receivedLamports: received });
-      } else if (job.kind === 'buyback') {
+      } else if (job.kind === 'buyback' && !spl) {
         // The source WSOL ATA is created and closed in one transaction, so validate the destination vault's mint instead.
         const spent = nativeTransfersFromClosedAccount(
           evidence,

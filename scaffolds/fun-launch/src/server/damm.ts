@@ -21,7 +21,7 @@ import {
 import BN from 'bn.js';
 
 export function migratedPoolAddress(config: PoolConfig, mint: PublicKey) {
-  if (config.migrationOption !== 1 || !config.quoteMint.equals(NATIVE_MINT))
+  if (config.migrationOption !== 1 || config.quoteMint.equals(mint))
     throw new Error('Unsupported graduation route');
   const migrationConfig = DAMM_V2_MIGRATION_FEE_ADDRESS[config.migrationFeeOption];
   if (!migrationConfig) throw new Error('Unknown DAMM v2 migration configuration');
@@ -29,24 +29,25 @@ export function migratedPoolAddress(config: PoolConfig, mint: PublicKey) {
 }
 export function assertMigratedPair(
   state: Pick<PoolState, 'tokenAMint' | 'tokenBMint'>,
-  mint: PublicKey
+  mint: PublicKey,
+  quote = NATIVE_MINT
 ) {
   if (
-    !(state.tokenAMint.equals(mint) && state.tokenBMint.equals(NATIVE_MINT)) &&
-    !(state.tokenBMint.equals(mint) && state.tokenAMint.equals(NATIVE_MINT))
+    !(state.tokenAMint.equals(mint) && state.tokenBMint.equals(quote)) &&
+    !(state.tokenBMint.equals(mint) && state.tokenAMint.equals(quote))
   )
     throw new Error('Graduated pool mint pair does not match the launch');
 }
 /** Graduated new-policy fees are at their final floor; mode accounting starts immediately. */
-export function assertReleasedMigrationPolicy(state: PoolState, mint: PublicKey, feeBps = 125) {
-  assertMigratedPair(state, mint);
+export function assertReleasedMigrationPolicy(state: PoolState, mint: PublicKey, feeBps = 125, quote = NATIVE_MINT) {
+  assertMigratedPair(state, mint, quote);
   const base = decodePodAlignedFeeTimeScheduler(
     Buffer.from(state.poolFees.baseFee.baseFeeInfo.data)
   );
   if (
     state.activationType !== 1 ||
     !state.tokenAMint.equals(mint) ||
-    !state.tokenBMint.equals(NATIVE_MINT) ||
+    !state.tokenBMint.equals(quote) ||
     state.collectFeeMode !== 1 ||
     state.poolFees.dynamicFee.initialized !== 0 ||
     !base.cliffFeeNumerator.eqn(feeBps * 100_000) ||
@@ -68,15 +69,16 @@ export async function loadMigratedPool(
     throw new Error('Graduation is pending a valid DAMM v2 pool');
   const client = new CpAmm(connection);
   const state = client._program.coder.accounts.decode<PoolState>('pool', account.data);
-  assertMigratedPair(state, mint);
+  assertMigratedPair(state, mint, config.quoteMint);
   return { address, state, client };
 }
 export function migratedPrice(
   state: Pick<PoolState, 'tokenAMint' | 'tokenBMint' | 'sqrtPrice'>,
   mint: PublicKey,
-  decimals: number
+  decimals: number,
+  quote = NATIVE_MINT
 ) {
-  assertMigratedPair(state, mint);
+  assertMigratedPair(state, mint, quote);
   const baseIsA = state.tokenAMint.equals(mint);
   const price = Number(
     getPriceFromSqrtPrice(
@@ -119,8 +121,8 @@ export async function migratedSwap(
   ]);
   const time = await connection.getBlockTime(slot);
   if (time === null) throw new Error('On-chain quote time unavailable');
-  const inputMint = side === 'buy' ? NATIVE_MINT : mint,
-    outputMint = side === 'buy' ? mint : NATIVE_MINT;
+  const inputMint = side === 'buy' ? config.quoteMint : mint,
+    outputMint = side === 'buy' ? mint : config.quoteMint;
   const inputIsA = state.tokenAMint.equals(inputMint);
   const tokenAInfo = accountA.owner.equals(TOKEN_2022_PROGRAM_ID)
     ? { mint: mintA, currentEpoch: epoch.epoch }
@@ -146,9 +148,9 @@ export async function migratedSwap(
   const feeDecimals = feeMint.equals(state.tokenAMint) ? mintA.decimals : mintB.decimals;
   const feeAmount = Number(quote.totalFee.toString()) / 10 ** feeDecimals;
   const baseDecimals = state.tokenAMint.equals(mint) ? mintA.decimals : mintB.decimals;
-  const feeSol = feeMint.equals(NATIVE_MINT)
+  const feeSol = feeMint.equals(config.quoteMint)
     ? feeAmount
-    : feeAmount * migratedPrice(state, mint, baseDecimals);
+    : feeAmount * migratedPrice(state, mint, baseDecimals, config.quoteMint);
   const transaction = owner
     ? await client.swap({
         payer: owner,
@@ -173,7 +175,7 @@ export async function migratedSwap(
     feeMint: feeMint.toBase58(),
     feeAmount,
     feeSol,
-    feeSolIsEstimate: !feeMint.equals(NATIVE_MINT),
+    feeSolIsEstimate: !feeMint.equals(config.quoteMint),
     transaction,
     pool: address.toBase58(),
     stateSlot: slot,

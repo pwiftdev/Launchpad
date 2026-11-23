@@ -13,10 +13,12 @@ export type Coin = {
   pool: string;
   creator: string;
   originalDeployer?: string;
-  mode?: 'bond' | 'creator' | 'community';
+  mode?: import('@/lib/launchModes').LaunchMode;
   configKey?: string;
+  quoteMint?: string;
+  quoteToSol?: number;
   /** Only immutable reviewed policy records authorize the current schedule display. */
-  feePolicyVersion?: 'bond-v1' | 'wallet-v1' | 'rinse-v1' | 'legacy-devnet';
+  feePolicyVersion?: import('@/lib/launchModes').LaunchPolicyVersion;
   tokenDecimals?: number;
   tokenSupply?: number;
   migratedPool?: string;
@@ -50,7 +52,7 @@ export type CoinsResponse = {
 };
 
 /** A wallet's SOL and token balance, for trade presets. */
-export type BalanceResponse = { sol: number; tokens: number };
+export type BalanceResponse = { sol: number; tokens: number; quoteBalance?: number };
 
 export type CoinResponse = {
   serverTime: number;

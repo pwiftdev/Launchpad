@@ -26,7 +26,7 @@ export type LaunchReceipt = Partial<LaunchPreparationContext> & {
   image: string | null;
   signature: string | null;
   devBuyPercent: number;
-  mode?: 'bond' | 'creator' | 'community';
+  mode?: import('@/lib/launchModes').LaunchMode;
   registryStatus?: 'pending' | 'registered';
   wallet?: string;
 };

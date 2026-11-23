@@ -14,6 +14,7 @@ import {
   createBurnCheckedInstruction,
   createCloseAccountInstruction,
   createSyncNativeInstruction,
+  createTransferCheckedInstruction,
   getAssociatedTokenAddressSync,
   NATIVE_MINT,
   TOKEN_PROGRAM_ID,
@@ -87,6 +88,8 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
         'mint',
         'dbc_pool',
         'config_key',
+        'quote_mint',
+        'policy_version',
         'original_deployer',
         'mode',
         'recipient',
@@ -122,8 +125,9 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
       allowDisabled: true,
       allowLegacy: true,
     });
+    if (coin.quote_mint && coin.quote_mint !== config.quoteMint.toBase58()) throw new Error('Quote asset differs from immutable coin');
     const tokenAta = getAssociatedTokenAddressSync(mint, this.collector),
-      quoteAta = getAssociatedTokenAddressSync(NATIVE_MINT, this.collector);
+      quoteAta = getAssociatedTokenAddressSync(config.quoteMint, this.collector);
     for (const address of [tokenAta, quoteAta]) {
       const info = await this.rpc.getAccountInfo(address, 'finalized');
       if (!info) continue;
@@ -136,7 +140,7 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
         account.closeAuthority ||
         account.isFrozen ||
         !account.isInitialized ||
-        !account.mint.equals(address.equals(quoteAta) ? NATIVE_MINT : mint)
+        !account.mint.equals(address.equals(quoteAta) ? config.quoteMint : mint)
       )
         throw new Error('Collector token account is not exclusively controlled');
     }
@@ -154,7 +158,7 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
         this.collector,
         s.quoteAta,
         this.collector,
-        NATIVE_MINT
+        s.config.quoteMint
       ),
     ];
   }
@@ -186,7 +190,8 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
       kind,
       maximumFee,
       typeof expectations.tokenAta === 'string' ? new PublicKey(expectations.tokenAta) : undefined,
-      typeof expectations.quoteAta === 'string' ? new PublicKey(expectations.quoteAta) : undefined
+      typeof expectations.quoteAta === 'string' ? new PublicKey(expectations.quoteAta) : undefined,
+      coin.policy_version === 'mskd-v1'
     );
     const wire = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
     if (wire.length > 1232) throw new Error('Wallet execution exceeds the transaction size limit');
@@ -201,6 +206,7 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
       preparedSlot: latest.context.slot,
       expectations: {
         ...expectations,
+        ...(coin.quote_mint ? { quoteMint: coin.quote_mint } : {}),
         memo,
         maximumFeeLamports: maximumFee.toString(),
         operatingCostLamports: costs.operatingCostLamports.toString(),
@@ -260,7 +266,7 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
           meta(s.pool.poolState.baseVault, true),
           meta(quoteVault, true),
           meta(s.mint),
-          meta(NATIVE_MINT),
+          meta(s.config.quoteMint),
           meta(this.collector, false, true),
           meta(TOKEN_PROGRAM_ID),
           meta(TOKEN_PROGRAM_ID),
@@ -283,7 +289,8 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
       assertReleasedMigrationPolicy(
         loaded.state,
         s.mint,
-        coin.policy_version === 'bond-v1' ? 100 : 125
+        coin.policy_version === 'bond-v1' ? 100 : 125,
+        s.config.quoteMint
       );
       if (events[0]!.pool !== loaded.address.toBase58() || events.some((e) => e.phase !== 1))
         throw new Error('Invalid graduated collection route');
@@ -306,7 +313,7 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
           tokenAVault: loaded.state.tokenAVault,
           tokenBVault: quoteVault,
           tokenAMint: s.mint,
-          tokenBMint: NATIVE_MINT,
+          tokenBMint: s.config.quoteMint,
           positionNftAccount: position.nftAccount,
           signer: this.collector,
           tokenAProgram: TOKEN_PROGRAM_ID,
@@ -322,7 +329,7 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
       [
         ...this.accounts(s),
         ix,
-        createCloseAccountInstruction(s.quoteAta, this.collector, this.collector),
+        ...(s.config.quoteMint.equals(NATIVE_MINT) ? [createCloseAccountInstruction(s.quoteAta, this.collector, this.collector)] : []),
       ],
       {
         collector: this.collector.toBase58(),
@@ -360,7 +367,8 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
       assertReleasedMigrationPolicy(
         loaded.state,
         s.mint,
-        coin.policy_version === 'bond-v1' ? 100 : 125
+        coin.policy_version === 'bond-v1' ? 100 : 125,
+        s.config.quoteMint
       );
       const quote = await migratedSwap(
         this.rpc,
@@ -389,7 +397,7 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
           tokenAVault: baseVault,
           tokenBVault: quoteVault,
           tokenAMint: s.mint,
-          tokenBMint: NATIVE_MINT,
+          tokenBMint: s.config.quoteMint,
           payer: this.collector,
           tokenAProgram: TOKEN_PROGRAM_ID,
           tokenBProgram: TOKEN_PROGRAM_ID,
@@ -479,7 +487,7 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
       !job.recipient
     )
       throw new Error('Invalid reserved payout');
-    await this.state(coin);
+    const state = await this.state(coin);
     const recipient = new PublicKey(job.recipient),
       amount = BigInt(job.lamports);
     u64(amount);
@@ -493,6 +501,15 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
           : job.recipient;
     if (expected !== job.recipient || !PublicKey.isOnCurve(recipient.toBytes()))
       throw new Error('Payout beneficiary differs from the immutable mode');
+    if (!state.config.quoteMint.equals(NATIVE_MINT)) {
+      const mint = state.config.quoteMint;
+      const destination = getAssociatedTokenAddressSync(mint, recipient);
+      return this.prepared(coin, job.kind, [
+        createAssociatedTokenAccountIdempotentInstruction(this.collector, destination, recipient, mint),
+        createTransferCheckedInstruction(state.quoteAta, mint, destination, this.collector, amount, 9),
+      ], { collector: this.collector.toBase58(), pool: coin.dbc_pool, recipient: job.recipient,
+        quoteAta: destination.toBase58(), expectedLamports: amount.toString() });
+    }
     await assertWalletRecipientCredit(this.rpc, recipient, amount);
     return this.prepared(
       coin,

@@ -89,7 +89,7 @@ beforeEach(() => {
     publicKey: pool,
     account: { poolState: { config, activationPoint: { toString: () => '100' } } },
   });
-  mocks.config.mockResolvedValue({});
+  mocks.config.mockResolvedValue({ quoteMint: new PublicKey('So11111111111111111111111111111111111111112') });
   mocks.digest.mockResolvedValue(digest);
   mocks.reviewed.mockResolvedValue({
     policy_version: 'wallet-v1',

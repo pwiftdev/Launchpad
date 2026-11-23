@@ -395,14 +395,16 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
   }
 
   const numericAmount = Number(amount);
-  const available = side === 'buy' ? balance?.sol : balance?.tokens;
-  const unit = side === 'buy' ? 'SOL' : coin.symbol;
+  const quoteUnit = 'SOL';
+  const quoteBalance = balance?.quoteBalance ?? (quoteUnit === 'SOL' ? balance?.sol : undefined);
+  const available = side === 'buy' ? quoteBalance : balance?.tokens;
+  const unit = side === 'buy' ? quoteUnit : coin.symbol;
   const short = available !== undefined && numericAmount > available;
   const setFraction = (fraction: number) => {
     if (!balance) return;
     const value =
       side === 'buy'
-        ? Math.max(0, balance.sol * fraction - (fraction === 1 ? BUY_SOL_RESERVE : 0))
+        ? Math.max(0, (quoteBalance ?? 0) * fraction - (fraction === 1 && quoteUnit === 'SOL' ? BUY_SOL_RESERVE : 0))
         : balance.tokens * fraction;
     const rounded = Math.floor(value * 1e6) / 1e6;
     setAmount(rounded > 0 ? String(rounded) : '');
@@ -557,7 +559,7 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
           {short ? (
             <span className="text-rose">Insufficient balance</span>
           ) : side === 'buy' && price && numericAmount > 0 ? (
-            `≈ ${usd(numericAmount)}`
+            `≈ ${usd(numericAmount * (coin.quoteToSol ?? 1))}`
           ) : null}
         </p>
       </div>
@@ -574,7 +576,7 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
                   numericAmount === p && 'border-emerald/40 bg-emerald/10 text-emerald'
                 )}
               >
-                {p} SOL
+                {p} {quoteUnit}
               </button>
             ))
           : SELL_PRESETS.map((p) => (
@@ -603,7 +605,7 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
           <>
             <Row label="You receive">
               <span className="font-semibold text-foreground">
-                {formatReadableNumber(quote.amountOut)} {side === 'buy' ? coin.symbol : 'SOL'}
+                {formatReadableNumber(quote.amountOut)} {side === 'buy' ? coin.symbol : quoteUnit}
               </span>
               {side === 'sell' && price && (
                 <span className="ml-1.5 text-neutral-500">{usd(quote.amountOut)}</span>
@@ -613,7 +615,7 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
               label={taxed ? 'Snipe tax on this trade' : 'Fee on this trade'}
               labelClass={taxed ? 'font-semibold text-rose' : undefined}
               title={
-                quote.feeMint && quote.feeMint !== NATIVE_MINT.toBase58()
+                quote.feeMint && quote.feeMint !== (coin.quoteMint ?? NATIVE_MINT.toBase58())
                   ? `${formatReadableNumber(quote.feeAmount ?? 0)} ${coin.symbol} · SOL equivalent estimated`
                   : `${quote.feeSol.toFixed(quote.feeSol < 0.01 ? 5 : 3)} SOL`
               }

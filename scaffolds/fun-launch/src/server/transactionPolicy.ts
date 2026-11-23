@@ -42,15 +42,16 @@ type Creation = {
   mint: PublicKey;
   pool: PublicKey;
   config: PublicKey;
-  mode?: 'bond' | 'creator' | 'community';
+  mode?: import('@/lib/launchModes').LaunchMode;
   requiresVault: boolean;
+  quoteMint: PublicKey;
   tokenProgram: PublicKey;
 };
 
 /** The relay is a launch/trade endpoint, never an arbitrary signed-transaction RPC proxy. */
 export async function validateRelayTransaction(
   tx: Transaction,
-  options: { claimMint?: PublicKey } = {}
+  options: { claimMint?: PublicKey; onMode?: (mode: import('@/lib/launchModes').LaunchMode | undefined) => void } = {}
 ) {
   const payer = tx.feePayer;
   if (!payer) throw new Error('Missing fee payer');
@@ -62,9 +63,9 @@ export async function validateRelayTransaction(
   const claims = new Set<TransactionInstruction>();
   const addMint = (mint: PublicKey, program = TOKEN_PROGRAM_ID) =>
     tokens.set(mint.toBase58(), program);
-  const walletPair = (input: PublicKey, output: PublicKey, mint: PublicKey, program: PublicKey) => {
+  const walletPair = (input: PublicKey, output: PublicKey, mint: PublicKey, program: PublicKey, quoteMint: PublicKey) => {
     const base = getAssociatedTokenAddressSync(mint, payer, false, program),
-      quote = getAssociatedTokenAddressSync(NATIVE_MINT, payer);
+      quote = getAssociatedTokenAddressSync(quoteMint, payer);
     if (!(
       (input.equals(base) && output.equals(quote)) ||
       (input.equals(quote) && output.equals(base))
@@ -84,17 +85,18 @@ export async function validateRelayTransaction(
           config = key('config');
         if (
           !key('creator').equals(payer) ||
-          !key('payer').equals(payer) ||
-          !key('quote_mint').equals(NATIVE_MINT)
+          !key('payer').equals(payer)
         )
           throw new Error('Invalid launch payer or quote mint');
         const intent = process.env.DATABASE_URL
           ? await launchIntent(genesis, mint.toBase58())
           : null;
         const approved = await getLaunchConfig(intent?.mode);
+        options.onMode?.(intent?.mode);
+        const quoteMint = approved.config.quoteMint;
         if (
-          !config.equals(approved.key) ||
-          !pool.equals(deriveDbcPoolAddress(NATIVE_MINT, mint, config))
+          !key('quote_mint').equals(quoteMint) || !config.equals(approved.key) ||
+          !pool.equals(deriveDbcPoolAddress(quoteMint, mint, config))
         )
           throw new Error('Launch configuration or pool differs from the prepared transaction');
         if (
@@ -109,9 +111,11 @@ export async function validateRelayTransaction(
           pool,
           config,
           mode: intent?.mode,
+          quoteMint,
           requiresVault: approved.record?.policy_version === 'rinse-v1',
           tokenProgram: approved.config.tokenType === 1 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID,
         });
+        addMint(quoteMint);
         addMint(mint, approved.config.tokenType === 1 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID);
         validated.add(ix);
       } else if (decoded?.name === 'swap' || decoded?.name === 'swap2') {
@@ -120,16 +124,17 @@ export async function validateRelayTransaction(
           config = key('config');
         if (
           !key('payer').equals(payer) ||
-          !key('quote_mint').equals(NATIVE_MINT) ||
           !(await supportedConfig(config))
         )
           throw new Error('Invalid DBC swap authority or configuration');
         const creation = creations.get(pool.toBase58());
         let tokenProgram: PublicKey;
+        let quoteMint: PublicKey;
         if (creation) {
           if (!creation.mint.equals(mint) || !creation.config.equals(config))
             throw new Error('Bundled swap differs from launch');
           tokenProgram = creation.tokenProgram;
+          quoteMint = creation.quoteMint;
         } else {
           const found = await getCoin(mint.toBase58());
           if (
@@ -139,9 +144,13 @@ export async function validateRelayTransaction(
             !found.account.poolState.config.equals(config)
           )
             throw new Error('Unknown DBC trading pool');
+          options.onMode?.(found.coin.mode);
+          quoteMint = found.config.quoteMint;
           tokenProgram = found.config.tokenType === 1 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
         }
-        walletPair(key('input_token_account'), key('output_token_account'), mint, tokenProgram);
+        if (!key('quote_mint').equals(quoteMint)) throw new Error('Invalid DBC swap quote mint');
+        addMint(quoteMint);
+        walletPair(key('input_token_account'), key('output_token_account'), mint, tokenProgram, quoteMint);
         addMint(mint, tokenProgram);
         validated.add(ix);
       } else if (decoded?.name === 'migration_damm_v2' || decoded?.name === 'create_locker') {
@@ -161,6 +170,8 @@ export async function validateRelayTransaction(
           !key('pool').equals(migratedPoolAddress(found.config, mint))
         )
           throw new Error('Wrong graduation destination');
+        options.onMode?.(found.coin.mode);
+        addMint(found.config.quoteMint);
         addMint(mint);
         validated.add(ix);
       } else throw new Error('DBC management instructions cannot use the trading relay');
@@ -173,13 +184,18 @@ export async function validateRelayTransaction(
       if (!key('payer').equals(payer)) throw new Error('Invalid DAMM swap payer');
       const a = key('token_a_mint'),
         b = key('token_b_mint');
-      const mint = a.equals(NATIVE_MINT) ? b : b.equals(NATIVE_MINT) ? a : null;
-      if (!mint) throw new Error('Trading relay supports SOL pairs only');
+      // Reviewed non-SOL migrations store the launched token as token A.
+      const mint = a.equals(NATIVE_MINT) ? b : a;
       const found = await getCoin(mint.toBase58());
       if (!found?.coin.isMigrated || found.coin.migratedPool !== key('pool').toBase58())
         throw new Error('Unknown migrated pool');
       const tokenProgram = found.config?.tokenType === 1 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
-      walletPair(key('input_token_account'), key('output_token_account'), mint, tokenProgram);
+      const quoteMint = found.config.quoteMint;
+      if (!(a.equals(mint) && b.equals(quoteMint)) && !(b.equals(mint) && a.equals(quoteMint)))
+        throw new Error('Invalid graduated quote mint');
+      options.onMode?.(found.coin.mode);
+      addMint(quoteMint);
+      walletPair(key('input_token_account'), key('output_token_account'), mint, tokenProgram, quoteMint);
       addMint(mint, tokenProgram);
       validated.add(ix);
     }
@@ -285,7 +301,7 @@ export async function validateRelayTransaction(
       continue;
     }
     const candidate = [...creations.values()].find((create) => {
-      if (!create.requiresVault || !create.mode || create.mode === 'bond') return false;
+      if (!create.requiresVault || (create.mode !== 'creator' && create.mode !== 'community')) return false;
       const expected = registerCoinInstruction({
         programId: configuredVaultProgram(),
         mint: create.mint,

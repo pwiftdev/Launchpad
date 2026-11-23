@@ -11,7 +11,7 @@ import { migratedSwap } from '@/server/damm';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!apiGuard(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!(await allowTrading(res))) return;
+
   const parsed = swapSchema.safeParse(req.body);
   if (!parsed.success)
     return res.status(400).json({ error: 'Invalid swap fields or slippage (maximum 5%)' });
@@ -25,6 +25,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const found = await getCoin(mint.toBase58());
     if (!found) return res.status(404).json({ error: 'Coin not found on MSKD.fun' });
+    const mode = found.coin.mode;
+    if (!(await allowTrading(res, mode === 'creator' || mode === 'community' ? 'bond' : mode))) return;
     const config = found.config,
       units = tradeUnits(amount, side, found.coin.tokenDecimals ?? config.tokenDecimal);
     if (units === null) return res.status(400).json({ error: 'Amount is too small or too large' });

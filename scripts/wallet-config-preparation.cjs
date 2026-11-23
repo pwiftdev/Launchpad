@@ -5,13 +5,13 @@ const path = require('node:path');
 const app = createRequire(path.resolve(__dirname, '../scaffolds/fun-launch/package.json'));
 const sdk = app('@meteora-ag/dynamic-bonding-curve-sdk');
 const { buildWalletLaunchTemplate } = require('./wallet-launch-template.cjs');
-async function prepareWalletConfiguration({ rpc, genesis, collector, treasury, configKey }) {
+async function prepareWalletConfiguration({ rpc, genesis, collector, treasury, configKey, policyVersion = 'bond-v1', quoteMint, migrationQuoteThreshold }) {
   if ((await rpc.getGenesisHash()) !== genesis) throw Error('Preparation network mismatch');
   const client = new sdk.DynamicBondingCurveClient(rpc, 'finalized');
   const tx = await client.partner.createConfig({
     config: configKey,
     payer: collector,
-    ...buildWalletLaunchTemplate({ collector, treasury }),
+    ...buildWalletLaunchTemplate({ collector, treasury, policyVersion, quoteMint, migrationQuoteThreshold }),
   });
   if (
     tx.instructions.length !== 1 ||
@@ -33,7 +33,7 @@ async function prepareWalletConfiguration({ rpc, genesis, collector, treasury, c
     throw Error('Configuration cost/network unavailable');
   return {
     version: 1,
-    policy: 'bond-v1',
+    policy: policyVersion,
     networkGenesis: genesis,
     configKey: configKey.toBase58(),
     collector: collector.toBase58(),

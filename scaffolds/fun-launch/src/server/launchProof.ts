@@ -6,6 +6,8 @@ import {
 } from '@meteora-ag/dynamic-bonding-curve-sdk';
 import { registerCoinInstruction } from '@/lib/vault/client';
 
+import { isWalletPolicy, type LaunchPolicyVersion } from '@/lib/launchModes';
+
 const coder = new BorshCoder(DynamicBondingCurveIdl as unknown as Idl);
 const initialize = DynamicBondingCurveIdl.instructions.find(
   (ix) => ix.name === 'initialize_virtual_pool_with_spl_token'
@@ -23,17 +25,15 @@ export function proveLaunchCreation(
     intentExpiresAt: number;
     preparedSlot?: string;
     vaultProgram?: PublicKey;
-    mode?: 'bond' | 'creator' | 'community';
-    policyVersion?: 'bond-v1' | 'wallet-v1' | 'rinse-v1' | 'legacy-devnet';
+    mode?: import('@/lib/launchModes').LaunchMode;
+    policyVersion?: LaunchPolicyVersion;
   }
 ) {
   if (!tx.meta || tx.meta.err || typeof tx.blockTime !== 'number' || !initialize)
     throw new Error('A successful timestamped creation transaction is required');
   const createdMs = tx.blockTime * 1000;
   if (
-    (expected.vaultProgram ||
-      expected.policyVersion === 'wallet-v1' ||
-      expected.policyVersion === 'bond-v1') &&
+    (expected.vaultProgram || isWalletPolicy(expected.policyVersion ?? '')) &&
     (!expected.preparedSlot ||
       !/^\d+$/.test(expected.preparedSlot) ||
       BigInt(expected.preparedSlot) <= 0n ||
@@ -46,14 +46,13 @@ export function proveLaunchCreation(
   // Legacy native launches prove mode atomically. Confirmation time is not expiry.
   if (
     !expected.vaultProgram &&
-    expected.policyVersion !== 'wallet-v1' &&
-    expected.policyVersion !== 'bond-v1' &&
+    !isWalletPolicy(expected.policyVersion ?? '') &&
     (createdMs < expected.intentCreatedAt - 10_000 || createdMs > expected.intentExpiresAt)
   )
     throw new Error('Creation occurred outside the signed launch intent');
   const message = tx.transaction.message;
   if (
-    (expected.policyVersion === 'wallet-v1' || expected.policyVersion === 'bond-v1') &&
+    isWalletPolicy(expected.policyVersion ?? '') &&
     (!expected.mode || expected.vaultProgram)
   )
     throw new Error('Wallet policy requires the immutable signed mode without native registration');
@@ -83,7 +82,7 @@ export function proveLaunchCreation(
     )
       throw new Error('Creator and mint must sign the creation transaction');
     if (expected.vaultProgram) {
-      if (!expected.mode || expected.mode === 'bond')
+      if (expected.mode !== 'creator' && expected.mode !== 'community')
         throw new Error('A legacy signed launch mode is required for native custody');
       const register = registerCoinInstruction({
         programId: expected.vaultProgram,

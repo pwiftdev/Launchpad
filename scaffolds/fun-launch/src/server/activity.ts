@@ -43,5 +43,5 @@ export async function getCoinActivity(mint: string): Promise<CoinActivity | null
       9
     ).toString()
   );
-  return { coin, history, pot: computePot(history.trades, coin.launchedAt), launchPriceSol };
+  return { coin, history, pot: computePot(history.trades, coin.launchedAt), launchPriceSol: launchPriceSol * (coin.quoteToSol ?? 1) };
 }

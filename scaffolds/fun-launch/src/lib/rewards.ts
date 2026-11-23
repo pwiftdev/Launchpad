@@ -35,7 +35,7 @@ export type RewardsView = {
   request?: RewardPayout | null;
   networkGenesis?: string;
   status: 'ready' | 'unfunded' | 'unavailable';
-  mode: 'bond' | 'creator' | 'community' | null;
+  mode: import('@/lib/launchModes').LaunchMode | null;
   availableLamports: string;
   paidLamports?: string;
   creatorReceipts?: { lamports: string; signature: string; finalizedSlot: string }[];

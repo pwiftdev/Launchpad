@@ -1,5 +1,10 @@
 # Handoff: make MSKD.fun fully operational for a mainnet test
 
+> **Update 2026-11-23 (owner decision, supersedes hSOL):** MSKD mode **pairs to SOL** like the other
+> modes and **pays its 0.60% holder share in Monero (wXMR)**, with a planned option to cash out to
+> real XMR. hSOL is dropped (another launchpad, rings.run, already owns the hSOL / Helius Rings
+> story). Migration `026-mskd-sol-pair.sql` replaces 025's hSOL quote rule; all configs are SOL.
+
 You are taking over a Solana memecoin launchpad called **MASKED / MSKD.fun**. Your goal is to get it
 to the point where the owner can run a **small, controlled mainnet test** of all three launch modes,
 end to end: launch, trade, bond (migrate), claim fees, pay out. Work on devnet first. Mainnet only
@@ -46,7 +51,7 @@ with `migratedPoolFeeBps: 125` on DAMM v2.
 
 | Mode id | Policy version | Pair | 0.60% goes to |
 |---|---|---|---|
-| `mskd` | `mskd-v1` | **hSOL** (`he1iusmfkpAdwvxLNGV8Y1iSbj4rUy6yMhEA3fotn9A`, 9 decimals) | Holders, pro rata, paid in hSOL |
+| `mskd` | `mskd-v1` | SOL | Holders, pro rata, **paid in wXMR** (`WXMRyRZhsa19ety5erZhHg4N3xj3EVN92u94422teJp`, 12 decimals) |
 | `dev` | `dev-v1` | SOL | The creator |
 | `cashback` | `cashback-v1` | SOL | Holders, pro rata, paid in SOL |
 
@@ -92,19 +97,17 @@ the house wallet and routed off-chain by the ledger (that is the existing design
    (DBC pool, DAMM pool/LP, burn, house wallets), deterministic pro-rata allocation, double-payout
    protection, a minimum payout with rollover, and verifiable receipts. Push payouts or signed claims
    are both acceptable; write the design down and get the owner's OK before building it.
-5. **hSOL (non-SOL quote) support.** The economics code assumes SOL: the native SOL mint is
-   hardcoded in `walletAdapter.ts`, `walletWorker.ts`, `meteoraAdapter.ts`, `chainEvidence.ts`,
-   `dammRealization.ts`, `financialStore.ts`, `walletEvidence.ts`, `operatorSignerPolicy.ts`. Fee
-   claims for MSKD coins arrive as hSOL (an SPL token), so claims, balances, payouts and operating
-   costs must handle SPL amounts and token accounts. Also decide (ask the owner) what happens to
-   **base-token fees** from DAMM v2 after bonding. Buyers need hSOL: decide with the owner whether
-   the trade box routes SOL → hSOL (for example through Jupiter) or requires hSOL. Prices, market
-   caps and charts for MSKD coins must convert hSOL to SOL/USD.
-6. **Devnet configs.** hSOL doesn't exist on devnet. Create a mock 9-decimal mint, set
-   `MSKD_DEVNET_QUOTE_MINT`, build all three configs with the template, verify with
-   `audit:launch-config`, register with `register-launch-config.mjs`. Ask before signing anything.
-   **The MSKD bonding target is not confirmed.** The proposal is **68 hSOL** (about 80 SOL at
-   ~1.18 SOL per hSOL); confirm with the owner (`MSKD_MIGRATION_QUOTE_THRESHOLD`, whole hSOL).
+5. **Monero payouts for MSKD mode.** Fees are claimed in SOL for every mode. For MSKD, convert each
+   epoch's SOL holder budget to wXMR (`payoutMintFor('mskd', …)` in `src/lib/feeModes.ts`;
+   devnet mock via `MSKD_DEVNET_PAYOUT_MINT`, 12 decimals) with bounded quote age and slippage, an
+   idempotent swap job and a finalized receipt, then pay holders in wXMR (an SPL token: token
+   accounts, rent paid by the house in SOL). Check real SOL→wXMR market depth first; the wXMR market
+   has been thin. Phase 2 (owner wants it): optional **cash-out to native XMR** through the wXMR
+   bridge's redemption (0.1% fee, 0.1 XMR minimum per wxmr.io), batched. Also decide (ask the
+   owner) what happens to **base-token fees** from DAMM v2 after bonding.
+6. **Devnet configs.** All three modes use SOL with the 80 SOL bonding target. Build them with the
+   template, verify with `audit:launch-config`, register with `register-launch-config.mjs`. Ask
+   before signing anything. For MSKD payouts on devnet, create a mock 12-decimal wXMR mint.
 7. **Devnet end-to-end rehearsal for each mode:** launch (with and without dev buy), the 99% launch
    slot, trades, bonding/migration to DAMM v2 (`/api/launch/migrate`), fee claims pre- and
    post-bond, creator payout (dev), holder payouts (mskd, cashback), receipts. Record evidence in a

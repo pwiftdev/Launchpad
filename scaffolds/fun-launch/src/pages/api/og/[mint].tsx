@@ -109,7 +109,7 @@ const DIM = '#4d4d4d';
 const LINE = '#262626';
 // Dot matrix + a faint signal glow, the same texture as the app background
 const GRID = `radial-gradient(circle, rgba(255,255,255,0.09) 1.5px, transparent 1.6px)`;
-const GLOW = `radial-gradient(circle at 82% 40%, rgba(232,65,37,0.14), transparent 46%)`;
+const GLOW = `radial-gradient(circle at 82% 40%, rgba(255,102,0,0.14), transparent 46%)`;
 const BOND = `linear-gradient(90deg, #4d4d4d, #fafafa 58%, ${C.orange})`;
 
 /** Hairline frame with corner ticks, like a terminal viewport */

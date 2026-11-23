@@ -13,7 +13,7 @@ import { TOKEN_DECIMALS, TOTAL_SUPPLY } from '@/constants/launch';
 
 export type TokenContext = Pick<
   Coin,
-  'tokenDecimals' | 'tokenSupply' | 'migratedBaseIsA' | 'dbcCollectFeeMode'
+  'tokenDecimals' | 'tokenSupply' | 'migratedBaseIsA' | 'dbcCollectFeeMode' | 'quoteToSol'
 >;
 const TAG = Buffer.from('e445a52e51cb9a1d', 'hex');
 type Call = {

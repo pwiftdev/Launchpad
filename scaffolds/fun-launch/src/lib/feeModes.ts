@@ -4,12 +4,13 @@ import modePolicy from '@/constants/modePolicy.json';
 
 export type FeeModeId = keyof typeof modePolicy.modes;
 export type QuoteId = keyof typeof modePolicy.quotes;
+export type PayoutId = keyof typeof modePolicy.payouts;
 export type Beneficiary = 'creator' | 'holders';
 
 export const FEE_MODE_IDS = Object.keys(modePolicy.modes) as FeeModeId[];
 export const DEFAULT_FEE_MODE: FeeModeId = 'mskd';
 export const MODE_POLICY_VERSIONS = FEE_MODE_IDS.map((id) => modePolicy.modes[id].policyVersion);
-export type ModePolicyVersion = (typeof modePolicy.modes)[FeeModeId]['policyVersion'];
+export type ModePolicyVersion = `${FeeModeId}-v1`;
 
 export const SCHEDULE = modePolicy.schedule;
 export const SPLIT = modePolicy.split;
@@ -27,6 +28,8 @@ export const isModePolicyVersion = (value: unknown): value is ModePolicyVersion 
 export function feeMode(id: FeeModeId) {
   const mode = modePolicy.modes[id];
   const quote = modePolicy.quotes[mode.quote as QuoteId];
+  // A mode can pay its beneficiary in another asset than its pair (MSKD: SOL pair, Monero payouts)
+  const payout = 'payout' in mode ? modePolicy.payouts[mode.payout as PayoutId] : null;
   return {
     id,
     ...mode,
@@ -36,7 +39,9 @@ export function feeMode(id: FeeModeId) {
     /** Who receives the 0.60% */
     beneficiaryLabel: mode.beneficiary === 'creator' ? 'Creator' : 'Holders',
     /** What that share is paid in */
-    payoutSymbol: quote.symbol,
+    payoutSymbol: payout?.symbol ?? quote.symbol,
+    /** Human name of the payout asset, e.g. "Monero" */
+    payoutName: payout?.name ?? quote.symbol,
   };
 }
 
@@ -61,14 +66,20 @@ export const BENEFICIARY_NET_BPS = Math.round(
   (SPLIT.beneficiaryBps / (SPLIT.beneficiaryBps + SPLIT.houseBps)) * 10_000
 );
 
-/** Resolve the quote mint a mode pairs against on a network. Null when not configured. */
-export function quoteMintFor(
+/** The quote mint a mode pairs against. Every mode pairs to SOL. */
+export function quoteMintFor(id: FeeModeId): string {
+  return modePolicy.quotes[modePolicy.modes[id].quote as QuoteId].mint;
+}
+
+/** Mint the beneficiary share is paid in. Null when not configured (devnet without a mock). */
+export function payoutMintFor(
   id: FeeModeId,
   network: 'mainnet-beta' | 'devnet' | 'localnet',
   env: Record<string, string | undefined> = {}
 ): string | null {
-  const quote = modePolicy.quotes[modePolicy.modes[id].quote as QuoteId];
-  if ('mint' in quote) return quote.mint;
-  if (network === 'mainnet-beta') return quote.mainnetMint;
-  return env[quote.devnetMintEnv] || null;
+  const mode = modePolicy.modes[id];
+  if (!('payout' in mode)) return quoteMintFor(id);
+  const payout = modePolicy.payouts[mode.payout as PayoutId];
+  if (network === 'mainnet-beta') return payout.mainnetMint;
+  return env[payout.devnetMintEnv] || null;
 }

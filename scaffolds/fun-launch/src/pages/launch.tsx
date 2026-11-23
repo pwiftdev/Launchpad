@@ -46,11 +46,8 @@ export { requireAdminPage as getServerSideProps } from '@/server/adminPage';
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const TWEET_URL = /^https:\/\/(x|twitter)\.com\/[A-Za-z0-9_]{1,15}\/status\/\d+\/?(\?.*)?$/;
 
-// Registry mode sent with a launch. The MSKD modes below report canLaunch=false until their
-// configs and fee routing are registered, so submission can only ever use a reviewed policy.
-const mode = ACTIVE_LAUNCH_MODE;
 
-type DevBuyQuote = { tokens: number; costSol: number; feeSol: number };
+type DevBuyQuote = { tokens: number; costQuote: number; feeQuote: number; quoteSymbol: string };
 
 const EMPTY_LINKS: Record<SocialKind, string> = {
   website: '',
@@ -79,10 +76,11 @@ export default function Launch() {
   const [tweetUrl, setTweetUrl] = useState('');
   const [links, setLinks] = useState(EMPTY_LINKS);
   const [feeModeId, setFeeModeId] = useState<FeeModeId>(DEFAULT_FEE_MODE);
+  const mode = feeModeId;
   const selectedMode = feeMode(feeModeId);
   const availability = useLaunchAvailability(feeModeId);
   const [devBuyPercent, setDevBuyPercent] = useState(0);
-  const devBuy = useDevBuyQuote(devBuyPercent);
+  const devBuy = useDevBuyQuote(devBuyPercent, mode);
   const { usd, price } = useUsd();
 
   const [submitting, setSubmitting] = useState(false);
@@ -185,7 +183,7 @@ export default function Launch() {
   const socials = normalizeSocials(links);
   const isValid = !Object.values(errors).some(Boolean) && !Object.values(linkErrors).some(Boolean);
   const creationFee = availability.data?.poolCreationFeeSol ?? 0;
-  const totalCost = creationFee + (devBuyPercent > 0 ? (devBuy.data?.costSol ?? 0) : 0);
+  const totalCost = creationFee + (devBuyPercent > 0 ? (devBuy.data?.costQuote ?? 0) : 0);
 
   async function launch() {
     if (launchLock.current) return;
@@ -222,6 +220,7 @@ export default function Launch() {
         description: description.trim() || undefined,
         socials: hasSocials(socials) ? socials : undefined,
         burnShare: 0,
+        configKey: availability.data.configKey,
         mode,
       };
       const issuedAt = Date.now();
@@ -508,7 +507,7 @@ export default function Launch() {
                   <div className="flex gap-2">
                     <dt className="text-neutral-400">Dev buy</dt>
                     <dd className="font-mono">
-                      {devBuy.data ? `${devBuy.data.costSol.toFixed(4)} SOL` : '…'}
+                      {devBuy.data ? `${devBuy.data.costQuote.toFixed(4)} ${devBuy.data.quoteSymbol}` : '…'}
                     </dd>
                   </div>
                 )}
@@ -577,6 +576,8 @@ export default function Launch() {
 function useLaunchAvailability(mode: FeeModeId | typeof ACTIVE_LAUNCH_MODE) {
   const [data, setData] = useState<{
     canLaunch: boolean;
+    mode: string;
+    configKey?: string;
     poolCreationFeeSol: number;
     policyVersion: string;
     genesis: string;
@@ -606,7 +607,7 @@ function useLaunchAvailability(mode: FeeModeId | typeof ACTIVE_LAUNCH_MODE) {
       });
     return () => controller.abort();
   }, [mode]);
-  return { data, notice, loading };
+  return { data: data?.mode === mode ? data : null, notice, loading };
 }
 
 const inputClass =
@@ -815,16 +816,16 @@ const DevBuyPicker = ({
             percent === 0
               ? '0 SOL'
               : quote.data
-                ? `${quote.data.costSol.toFixed(4)} SOL`
+                ? `${quote.data.costQuote.toFixed(4)} ${quote.data.quoteSymbol}`
                 : quote.loading
                   ? '…'
                   : '—'
           }
-          sub={percent > 0 && quote.data && price ? usd(quote.data.costSol) : undefined}
+          sub={percent > 0 && quote.data?.quoteSymbol === 'SOL' && price ? usd(quote.data.costQuote) : undefined}
         />
         <Stat
           label="Fee"
-          value={percent === 0 ? '—' : quote.data ? `${quote.data.feeSol.toFixed(4)} SOL` : '…'}
+          value={percent === 0 ? '—' : quote.data ? `${quote.data.feeQuote.toFixed(4)} ${quote.data.quoteSymbol}` : '…'}
         />
       </div>
       <p className="mt-2 text-xs text-neutral-500">
@@ -876,7 +877,7 @@ function useLaunchCheck(name: string, symbol: string, sourceUrl: string): Launch
   return state;
 }
 
-function useDevBuyQuote(percent: number) {
+function useDevBuyQuote(percent: number, mode: FeeModeId) {
   const [data, setData] = useState<DevBuyQuote | null>(null);
   const [loading, setLoading] = useState(false);
   useEffect(() => {
@@ -888,11 +889,11 @@ function useDevBuyQuote(percent: number) {
     const controller = new AbortController();
     const id = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/dev-buy-quote?percent=${percent}`, {
+        const res = await fetch(`/api/dev-buy-quote?percent=${percent}&mode=${mode}`, {
           signal: controller.signal,
         });
         const body = await res.json();
-        setData(res.ok ? body : null);
+        if (!controller.signal.aborted) setData(res.ok ? body : null);
       } catch {
         // aborted by a newer input
       } finally {
@@ -903,8 +904,8 @@ function useDevBuyQuote(percent: number) {
       clearTimeout(id);
       controller.abort();
     };
-  }, [percent]);
-  return { data, loading };
+  }, [percent, mode]);
+  return { data: data?.quoteSymbol === 'SOL' ? data : null, loading };
 }
 
 const PreviewCard = ({

@@ -26,7 +26,8 @@ import {
   verifyConfigAccount,
   verifyLaunchConfig,
 } from './launchConfig';
-import { registeredCoin, type LaunchMode } from './launchRegistry';
+import { isFeeModeId } from '@/lib/feeModes';
+import { registeredConfigKeys, registeredCoin, type LaunchMode } from './launchRegistry';
 import { loadMigratedPool, migratedPrice } from './damm';
 import { hasSocials, SOCIAL_KINDS, type Socials } from '@/lib/socials';
 import { readDisplayClock } from './displayClock';
@@ -62,16 +63,21 @@ export async function getConfig(key: PublicKey = configKey(), fresh = false): Pr
   if (!fresh && cached && Date.now() - cached.at < 60_000) return cached.value;
   const digest = await verifyConfigAccount(connection, key);
   const value = await dbc.state.getPoolConfig(key);
-  if (!value || !value.quoteMint.equals(NATIVE_MINT))
-    throw new Error('Supported SOL pool config not found');
+  // Every launch mode pairs to SOL (MSKD pays holders in wXMR, but its curve is SOL)
+  if (!value || !value.quoteMint.equals(NATIVE_MINT)) throw new Error('Unsupported pool quote mint');
   if (configCache.size >= 128) configCache.delete(configCache.keys().next().value!);
   configCache.set(id, { at: Date.now(), value, digest });
   return value;
 }
 export async function getLaunchConfig(mode: LaunchMode = 'bond') {
-  const genesis = await networkGenesis(true),
-    key = configKey(),
-    config = await getConfig(key, true);
+  const genesis = await networkGenesis(true);
+  let key: PublicKey;
+  if (isFeeModeId(mode)) {
+    const keys = await registeredConfigKeys(genesis, `${mode}-v1`, true);
+    if (keys.length !== 1) throw new Error('A single enabled reviewed config is required for this mode');
+    key = new PublicKey(keys[0]!);
+  } else key = configKey();
+  const config = await getConfig(key, true);
   const cached = configCache.get(`${genesis}:${key.toBase58()}`);
   if (!cached) throw new Error('Configuration verification failed');
   const record = await verifyLaunchConfig(genesis, key, config, cached.digest, mode);
@@ -178,6 +184,8 @@ export async function toCoin(
   meta?: TokenMeta
 ): Promise<Coin> {
   const s = account.poolState;
+  // Every pool is SOL-quoted, so quote amounts are already SOL
+  const quoteToSol = 1;
   const quoteReserveSol = Number(s.quoteReserve.toString()) / LAMPORTS;
   const thresholdSol = Number(config.migrationQuoteThreshold.toString()) / LAMPORTS;
   let priceSol = Number(getPriceFromSqrtPrice(s.sqrtPrice as BN, mintData.decimals, 9).toString());
@@ -186,10 +194,11 @@ export async function toCoin(
   let migratedBaseIsA: boolean | undefined;
   if (isMigrated) {
     const migrated = await loadMigratedPool(connection, config, s.baseMint);
-    priceSol = migratedPrice(migrated.state, s.baseMint, mintData.decimals);
+    priceSol = migratedPrice(migrated.state, s.baseMint, mintData.decimals, config.quoteMint);
     migratedPool = migrated.address.toBase58();
     migratedBaseIsA = migrated.state.tokenAMint.equals(s.baseMint);
   }
+  priceSol *= quoteToSol;
   const mint = s.baseMint.toBase58();
   const registry = await registeredCoin(await networkGenesis(), mint);
   const supply = Number(mintData.supply) / 10 ** mintData.decimals;
@@ -201,6 +210,8 @@ export async function toCoin(
     mode: registry?.mode,
     configKey: s.config.toBase58(),
     feePolicyVersion: registry?.policy_version,
+    quoteMint: config.quoteMint.toBase58(),
+    quoteToSol,
     tokenDecimals: mintData.decimals,
     tokenSupply: supply,
     migratedPool,

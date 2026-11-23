@@ -18,7 +18,7 @@ export type LaunchMetadata = {
   extensions?: Socials;
   /** Legacy metadata is descriptive only; economic authority comes from the verified registry. */
   creatorMode?: { burnShare: number };
-  launchMode?: 'bond' | 'creator' | 'community';
+  launchMode?: import('@/lib/launchModes').LaunchMode;
 };
 
 export function buildLaunchMetadata(params: {
@@ -30,7 +30,7 @@ export function buildLaunchMetadata(params: {
   description?: string;
   socials?: Socials;
   burnShare: number;
-  mode?: 'bond' | 'creator' | 'community';
+  mode?: import('@/lib/launchModes').LaunchMode;
 }): LaunchMetadata {
   const socials = normalizeSocials(params.socials);
   return {

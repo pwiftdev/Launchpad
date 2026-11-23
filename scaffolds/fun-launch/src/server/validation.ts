@@ -56,12 +56,13 @@ export const uploadSchema = z.object({
     })
     .strict()
     .optional(),
-  mode: z.literal('bond'),
+  mode: z.enum(['bond','mskd','dev','cashback']),
+  configKey: address.optional(),
   // Retained in the signed payload for compatibility; no creator-selectable routing.
   burnShare: z.literal(0).default(0),
   issuedAt: z.number().int(),
   signature: z.string().max(100),
-});
+}).refine(data => data.mode === 'bond' ? data.configKey === undefined : !!data.configKey, { message: 'Signed config key required for this mode' });
 
 export const swapSchema = z.object({
   mint: address,

@@ -23,6 +23,7 @@ function runMigration(settings = {}) {
         async connect(){return{query:async sql=>{
           record(sql.trim().split(/\\s+/).slice(0,3).join(' '));
           if(process.env.TEST_MIGRATION_FAILURE==='true'&&sql.includes('CREATE TABLE'))throw new Error('private-provider-detail');
+          if(sql.startsWith('SELECT to_regclass')) return{rows:[{name:null}]};
           return{rows:[]};
         },release(){record('release');}};}
         async end(){record('end');}

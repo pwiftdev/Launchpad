@@ -1,5 +1,7 @@
 import { hasSocials, normalizeSocials, type Socials } from './socials';
 
+import { isFeeModeId } from './feeModes';
+
 export type LaunchPayload = {
   tokenLogo: string;
   tokenName: string;
@@ -12,7 +14,8 @@ export type LaunchPayload = {
   /** Project links written into the token metadata JSON. */
   socials?: Socials;
   burnShare: number;
-  mode?: 'bond' | 'creator' | 'community';
+  configKey?: string;
+  mode?: import('@/lib/launchModes').LaunchMode;
 };
 
 /** Same ordered payload in the browser and server; every upload field is signed. */
@@ -28,6 +31,7 @@ export async function launchPayloadDigest(payload: LaunchPayload): Promise<strin
     payload.burnShare,
     // Keep only legacy devnet messages byte-compatible; new modes are always signed explicitly.
     ...(payload.mode ? [payload.mode] : []),
+    ...(isFeeModeId(payload.mode) ? [{ version: 2, configKey: payload.configKey }] : []),
     // Preserve existing authorizations without a description. New copy is signed in full.
     ...(payload.description ? [{ description: payload.description }] : []),
     // Links are signed in canonical form and key order, and only when present.
@@ -42,5 +46,9 @@ export async function launchMessage(
   issuedAt: number
 ): Promise<string> {
   const digest = await launchPayloadDigest(payload);
+  if (isFeeModeId(payload.mode)) {
+    if (!payload.configKey) throw new Error('A reviewed configuration is required');
+    return `Authorize a token launch (v2) on ${origin}\nWallet: ${payload.userWallet}\nMint: ${payload.mint}\nLaunch mode: ${payload.mode}\nConfiguration: ${payload.configKey}\nIssued at: ${issuedAt}\nPayload SHA-256: ${digest}\nThis signature authorizes metadata upload only.`;
+  }
   return `Authorize a token launch on ${origin}\nWallet: ${payload.userWallet}\nMint: ${payload.mint}\nIssued at: ${issuedAt}\n${payload.mode ? `Launch mode: ${payload.mode === 'bond' ? 'Bond it.' : payload.mode === 'creator' ? 'Creator Fees' : 'Community'}\n` : ''}Payload SHA-256: ${digest}\nThis signature authorizes metadata upload only.`;
 }

@@ -6,6 +6,7 @@ export type RegisteredConfig = {
   network_genesis: string;
   config_key: string;
   policy_version: LaunchPolicyVersion;
+  quote_mint?: string;
   expected_fee_claimer: string;
   expected_leftover_receiver: string;
   config_digest: string;
@@ -21,6 +22,7 @@ export type RegisteredCoin = {
   mode: LaunchMode;
   recipient: string;
   policy_version: LaunchPolicyVersion;
+  quote_mint?: string;
   activation_point: string;
   /** Unix seconds; Bond it. activation_point itself is a slot. */
   activation_time?: string | null;
@@ -49,11 +51,12 @@ export async function registeredConfig(genesis: string, key: string) {
 }
 export async function registeredConfigKeys(
   genesis: string,
-  policyVersion?: LaunchPolicyVersion
+  policyVersion?: LaunchPolicyVersion,
+  enabledOnly = false
 ): Promise<string[]> {
   if (!process.env.DATABASE_URL) return [];
   const result = await database().query<{ config_key: string }>(
-    `SELECT config_key FROM launch_configs WHERE network_genesis=$1${policyVersion ? ' AND policy_version=$2' : ''} ORDER BY config_key`,
+    `SELECT config_key FROM launch_configs WHERE network_genesis=$1${policyVersion ? ' AND policy_version=$2' : ''}${enabledOnly ? ' AND enabled_for_launch' : ''} ORDER BY config_key`,
     policyVersion ? [genesis, policyVersion] : [genesis]
   );
   return result.rows.map((row) => row.config_key);
@@ -117,8 +120,8 @@ export async function reserveLaunchIntent(input: {
 export async function recordFinalizedLaunch(coin: RegisteredCoin): Promise<RegisteredCoin> {
   await database().query(
     `INSERT INTO launch_coins(network_genesis,mint,dbc_pool,config_key,original_deployer,mode,recipient,
-      policy_version,activation_point,creation_signature,finalized_slot,activation_time)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(network_genesis,mint) DO NOTHING`,
+      policy_version,activation_point,creation_signature,finalized_slot,activation_time,quote_mint)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,COALESCE($13,'So11111111111111111111111111111111111111112')) ON CONFLICT(network_genesis,mint) DO NOTHING`,
     [
       coin.network_genesis,
       coin.mint,
@@ -132,11 +135,12 @@ export async function recordFinalizedLaunch(coin: RegisteredCoin): Promise<Regis
       coin.creation_signature,
       coin.finalized_slot,
       coin.activation_time ?? null,
+      coin.quote_mint ?? null,
     ]
   );
   const saved = await registeredCoin(coin.network_genesis, coin.mint);
   if (
-    !saved ||
+    !saved || (coin.quote_mint && saved.quote_mint !== coin.quote_mint) ||
     [
       'dbc_pool',
       'config_key',
