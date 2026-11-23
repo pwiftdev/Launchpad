@@ -11,7 +11,7 @@
     "composite": false,
     "skipLibCheck": true,
     "jsx": "react-jsx",
-    "lib": ["dom", "dom.iterable", "es6"],
+    "lib": ["dom", "dom.iterable", "ES2022"],
     "allowJs": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,

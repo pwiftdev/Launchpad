@@ -33,8 +33,9 @@ export function checkEarlyExitFlags(): void {
 
   if (rawArgs.includes('--version') || rawArgs.includes('-v')) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const pkg = require('../../package.json') as { version?: string; name?: string };
+      const pkg = JSON.parse(
+        fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf8')
+      ) as { version?: string; name?: string };
       console.log(`${pkg.name ?? 'meteora-studio'} v${pkg.version ?? 'unknown'}`);
     } catch {
       console.log('meteora-studio (version unknown)');

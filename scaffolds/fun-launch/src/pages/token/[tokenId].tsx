@@ -1,101 +1,98 @@
-import { TokenPageMsgHandler } from '@/components/Token/TokenPageMsgHandler';
-import { TokenChart } from '@/components/TokenChart/TokenChart';
-import { TokenDetails } from '@/components/TokenHeader/TokenDetail';
-import { TokenHeader } from '@/components/TokenHeader/TokenHeader';
-import { TokenStats } from '@/components/TokenHeader/TokenStats';
-import { TokenBottomPanel } from '@/components/TokenTable';
+import Head from 'next/head';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import type { GetServerSideProps } from 'next';
 import Page from '@/components/ui/Page/Page';
-import { DataStreamProvider, useDataStream } from '@/contexts/DataStreamProvider';
-import { TokenChartProvider } from '@/contexts/TokenChartProvider';
-import { useTokenAddress, useTokenInfo } from '@/hooks/queries';
-import dynamic from 'next/dynamic';
-import { useEffect } from 'react';
+import { buttonVariants } from '@/components/ui/button';
+import { CoinPanel } from '@/components/coinpage/CoinPanel';
+import { LogoMark } from '@/components/brand/Logo';
+import { BRAND } from '@/constants/brand';
+import { useCoin } from '@/hooks/useCoins';
+import { parseKey } from '@/server/dbc';
+import { findCoin } from '@/server/activity';
+import { getDemoCoin } from '@/lib/demo';
+import { adminPageRedirect } from '@/server/adminPage';
 
-const Terminal = dynamic(() => import('@/components/Terminal'), { ssr: false });
+type ShareMeta = { mint: string; name: string; symbol: string; origin: string } | null;
 
-const SwapWidget = () => {
-  const tokenId = useTokenAddress();
-
-  if (!tokenId) {
-    return null;
-  }
-
-  return <Terminal mint={tokenId} />;
+/** Server-renders the link-preview tags so X/Telegram crawlers (no JS) see the coin's share card. */
+export const getServerSideProps: GetServerSideProps<{ share: ShareMeta }> = async (context) => {
+  const denied = adminPageRedirect(context);
+  if (denied) return denied;
+  const { params } = context;
+  const mint = String(params?.tokenId ?? '');
+  const coin =
+    getDemoCoin(mint) ?? (parseKey(mint) ? await findCoin(mint).catch((): null => null) : null);
+  if (!coin) return { notFound: true };
+  const origin = BRAND.url;
+  return {
+    props: { share: coin ? { mint, name: coin.name, symbol: coin.symbol, origin } : null },
+  };
 };
 
-export const TokenPageWithContext = () => {
-  const tokenId = useTokenAddress();
-  const { data: poolId } = useTokenInfo((data) => data?.id);
-  const { subscribeTxns, unsubscribeTxns, subscribePools, unsubscribePools } = useDataStream();
-
-  // Subscribe to token txns
-  useEffect(() => {
-    if (!tokenId) {
-      return;
-    }
-    subscribeTxns([tokenId]);
-    return () => {
-      unsubscribeTxns([tokenId]);
-    };
-  }, [tokenId, subscribeTxns, unsubscribeTxns]);
-
-  useEffect(() => {
-    if (!poolId) {
-      return;
-    }
-
-    subscribePools([poolId]);
-    return () => {
-      unsubscribePools([poolId]);
-    };
-    // dont track tokenId to prevent data mismatch
-  }, [poolId, subscribePools, unsubscribePools]);
+/** Full-page version of the coin panel, for shared links and new tabs. */
+export default function TokenPage({ share }: { share: ShareMeta }) {
+  const { query } = useRouter();
+  const mint = typeof query.tokenId === 'string' ? query.tokenId : undefined;
+  const { data: coin, status, error } = useCoin(mint);
+  const title = share ? `$${share.symbol} · ${share.name} | ${BRAND.name}` : BRAND.name;
 
   return (
-    <Page>
-      <TokenPageMsgHandler />
-
-      {/* On lg+ the page fits the viewport exactly (100vh minus 64px header,
-          12px top gutter and 32px bottom gutter) and panels scroll internally */}
-      <div className="flex flex-col lg:h-[calc(100vh-108px)]">
-        <div className="mb-4 flex shrink-0 rounded-lg border border-neutral-700 p-3">
-          <TokenHeader className="max-sm:order-1" />
+    <Page app>
+      <Head>
+        <title>{title}</title>
+        {share && (
+          <>
+            <meta key="og:title" property="og:title" content={title} />
+            <meta key="og:description" property="og:description" content={BRAND.description} />
+            <meta property="og:url" content={`${share.origin}/token/${share.mint}`} />
+            <meta
+              key="og:image"
+              property="og:image"
+              content={`${share.origin}/api/og/${share.mint}?v=${BRAND.shareImageVersion}`}
+            />
+            <meta key="og:image:width" property="og:image:width" content="1200" />
+            <meta key="og:image:height" property="og:image:height" content="630" />
+            <meta key="twitter:card" name="twitter:card" content="summary_large_image" />
+            <meta
+              key="twitter:image"
+              name="twitter:image"
+              content={`${share.origin}/api/og/${share.mint}?v=${BRAND.shareImageVersion}`}
+            />
+          </>
+        )}
+      </Head>
+      {coin ? (
+        <CoinPanel
+          coin={coin}
+          className="surface min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
+          headerActions={
+            <Link
+              href="/"
+              className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-900 hover:text-neutral-100"
+              aria-label="Back to the board"
+            >
+              <span className="iconify block h-5 w-5 ph--x" />
+            </Link>
+          }
+        />
+      ) : status === 'error' ? (
+        <div className="mx-auto mt-16 flex max-w-md flex-col items-center text-center">
+          <LogoMark className="h-14 w-16 opacity-50 grayscale" />
+          <h1 className="mt-4 text-lg font-semibold">Not on {BRAND.name}</h1>
+          <p className="mt-1 text-sm text-neutral-500">
+            {error instanceof Error ? error.message : 'Coin not found'}
+          </p>
+          <Link href="/" className={buttonVariants({ variant: 'secondary', className: 'mt-6' })}>
+            Back to the board
+          </Link>
         </div>
-
-        <div className="flex w-full flex-col gap-4 md:flex-row lg:min-h-0 lg:flex-1">
-          <div className="flex flex-col gap-4 max-lg:mb-8 max-sm:w-full max-sm:order-3 lg:min-w-[400px] lg:overflow-y-auto">
-            <TokenDetails />
-            <div>
-              <SwapWidget />
-            </div>
-          </div>
-
-          <div className="flex w-full flex-col border-neutral-850 max-sm:order-2 lg:min-h-0">
-            <div className="shrink-0">
-              <TokenStats key={`token-stats-${poolId}`} />
-            </div>
-
-            {/* Chart caps at 500px but shrinks on short screens so the tables keep room */}
-            <div className="flex h-[300px] w-full shrink-0 flex-col lg:h-[min(500px,55vh)]">
-              <TokenChartProvider>
-                <TokenChart />
-              </TokenChartProvider>
-            </div>
-
-            {/* Mobile: one screen tall; lg+: fills the space left under the chart.
-                Both ways the txns/holders tables scroll internally. */}
-            <TokenBottomPanel className="flex flex-col overflow-hidden max-lg:h-screen lg:min-h-0 lg:flex-1" />
-          </div>
+      ) : (
+        <div className="surface space-y-4 p-5" aria-busy>
+          <div className="h-10 w-1/3 animate-pulse rounded-lg bg-neutral-900" />
+          <div className="h-[420px] animate-pulse rounded-lg bg-neutral-900" />
         </div>
-      </div>
+      )}
     </Page>
-  );
-};
-
-export default function TokenPage() {
-  return (
-    <DataStreamProvider>
-      <TokenPageWithContext />
-    </DataStreamProvider>
   );
 }

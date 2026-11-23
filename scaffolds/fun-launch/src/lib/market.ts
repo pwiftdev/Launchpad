@@ -1,0 +1,78 @@
+import type { Trade } from './coin';
+import { tradeValueSol } from './pot';
+
+export type TokenMarket = {
+  points: number[];
+  changePercent: number | null;
+  volumeSol: number;
+  trades: number;
+  buys: number;
+  sells: number;
+  partial: boolean;
+};
+
+export type MarketStats = {
+  updatedAt: number;
+  network: { slot: number | null; tps: number | null; rpcMs: number | null };
+  tokens: Record<string, TokenMarket>;
+  volumeSol: number;
+  trades: number;
+  trackedPools: number;
+  totalPools: number;
+  partial: boolean;
+};
+
+/** Only actual observations enter the series; missing histories do not get invented movement. */
+export function summarizeMarket(
+  trades: Trade[],
+  currentCap: number,
+  partial = false,
+  now = Date.now() / 1000
+): TokenMarket {
+  const recent = trades
+    .filter(
+      (trade) =>
+        trade.ts >= now - 86400 &&
+        trade.ts <= now &&
+        Number.isFinite(trade.marketCapSol) &&
+        trade.marketCapSol > 0
+    )
+    .sort((a, b) => a.ts - b.ts);
+  const values = recent.map((trade) => trade.marketCapSol);
+  if (values.length && currentCap > 0) values.push(currentCap);
+  const points =
+    values.length >= 2
+      ? values.filter(
+          (_, i) => i === values.length - 1 || i % Math.max(1, Math.ceil(values.length / 40)) === 0
+        )
+      : [currentCap, currentCap];
+  const first = recent[0]?.marketCapSol;
+  return {
+    points,
+    changePercent:
+      recent.length >= 2 && first !== undefined && first > 0
+        ? (currentCap / first - 1) * 100
+        : null,
+    volumeSol: recent.reduce((sum, trade) => sum + Math.max(0, tradeValueSol(trade)), 0),
+    trades: recent.length,
+    buys: recent.filter((trade) => trade.side === 'buy').length,
+    sells: recent.filter((trade) => trade.side === 'sell').length,
+    partial,
+  };
+}
+
+/** Convert observations to a small SVG, including stable flat-line and invalid-input handling. */
+export function sparklinePaths(values: number[], width = 240, height = 90, padding = 6) {
+  const points = values.filter((value) => Number.isFinite(value) && value >= 0);
+  if (points.length < 2) return null;
+  const min = Math.min(...points);
+  const range = Math.max(...points) - min;
+  const positions = points.map((value, i): [number, number] => [
+    padding + (i / (points.length - 1)) * (width - padding * 2),
+    range ? height - padding - ((value - min) / range) * (height - padding * 2) : height / 2,
+  ]);
+  const line = positions
+    .map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(2)},${y.toFixed(2)}`)
+    .join(' ');
+  return { line, area: `${line} L${width - padding},${height} L${padding},${height} Z` };
+}

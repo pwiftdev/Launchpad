@@ -7,7 +7,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.27.0",
   "engines": {
-    "node": ">=22.12",
+    "node": "24.x",
     "pnpm": ">=10"
   },
   "scripts": {
@@ -28,7 +28,16 @@
     "studio:alpha-vault": "pnpm --filter @meteora-invent/studio run alpha-vault:*",
     "prepare": "husky install",
     "syncpack:check": "syncpack list-mismatches",
-    "syncpack:fix": "syncpack fix-mismatches"
+    "syncpack:fix": "syncpack fix-mismatches",
+    "heroku-postbuild": "node scripts/heroku-build.mjs",
+    "start": "node scripts/start.mjs",
+    "test:app": "pnpm --filter @meteora-invent/scaffold/fun-launch test",
+    "test:operations": "node scripts/test-operations.mjs",
+    "operator:build": "node scripts/build-financial-worker.mjs --standalone && node scripts/build-operator-start.mjs",
+    "operator:check": "node scripts/operator-artifact-smoke.mjs && node scripts/operator-start-smoke.mjs",
+    "audit:launch-config": "node scripts/audit-launch-config.mjs",
+    "mainnet:prepare": "node scripts/prepare-wallet-config.mjs",
+    "deployment:check": "node scripts/deployment-readiness.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
@@ -56,24 +65,39 @@
       "lodash": "^4.18.0",
       "minimatch@9": "^9.0.7",
       "postcss@8": "^8.5.25",
-      "next": "^15.5.24",
+      "next": "^15.5.28",
       "eslint-config-next>@typescript-eslint/eslint-plugin": "^8.65.0",
       "eslint-config-next>@typescript-eslint/parser": "^8.65.0",
-      "sharp": "^0.35.4",
+      "sharp": "^0.35.5",
       "ws@8": "^8.21.0",
       "uuid@8": "^11.1.1",
       "uuid@9": "^11.1.1",
       "bn.js@5": "^5.2.5",
       "node-fetch@2": "^2.7.0",
-      "toml": "^4.2.0",
-      "@meteora-ag/farming-sdk>@solana/web3.js": "^1.98.4"
+      "toml": "^5.0.1",
+      "@meteora-ag/farming-sdk>@solana/web3.js": "^1.98.4",
+      "js-yaml@3": "^3.15.2",
+      "js-yaml@4": "^4.3.2",
+      "nanoid@3": "^3.3.18",
+      "qs@6": "^6.16.0",
+      "brace-expansion@1": "^1.1.21",
+      "brace-expansion@2": "^2.1.7",
+      "axios@1": "^1.20.0",
+      "@grpc/grpc-js": "^1.14.5",
+      "source-map-js": "^1.2.2",
+      "proxy-addr": "^2.0.8",
+      "shell-quote": "^1.11.0",
+      "pbkdf2": "^3.1.7",
+      "follow-redirects": "^1.16.1",
+      "body-parser@1": "^1.20.9",
+      "postcss-selector-parser@6": "^6.1.5",
+      "image-size@2": "^2.0.3",
+      "metro>image-size": "^2.0.3",
+      "csv-parse": "^7.0.3"
     },
-    "auditConfig": {
-      "ignoreGhsas": [
-        "GHSA-3gc7-fjrx-p6mg",
-        "GHSA-848j-6mx2-7j84",
-        "GHSA-mh99-v99m-4gvg"
-      ]
+    "patchedDependencies": {
+      "bigint-buffer@1.1.5": "patches/bigint-buffer@1.1.5.patch",
+      "metro@0.82.5": "patches/metro@0.82.5.patch"
     }
   }
 }

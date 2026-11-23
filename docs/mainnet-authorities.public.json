@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "recordedOn": "2026-10-28",
+  "networkGenesis": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+  "controller": "project-owner",
+  "company": {
+    "recordedOn": "2026-10-31",
+    "collector": "3j4vUdPKF7HNqKoaWdezQoX9Hognn6Us7ua6thZZiaed",
+    "treasury": "GfgpgQa2ZqNm17rJ6fw2t5nBApKKPZBn5M5niWW3riZZ"
+  },
+  "legacyCompanyWallets": [
+    {
+      "policyVersion": "wallet-v1",
+      "collector": "5iskTyXpKn7HeqvNUFBFc1rv2C2EoFNBNyFmXgGFztgS",
+      "treasury": "GfgpgQa2ZqNm17rJ6fw2t5nBApKKPZBn5M5niWW3riZZ"
+    }
+  ],
+  "vault": {
+    "treasury": "GfgpgQa2ZqNm17rJ6fw2t5nBApKKPZBn5M5niWW3riZZ",
+    "governor": "5iskTyXpKn7HeqvNUFBFc1rv2C2EoFNBNyFmXgGFztgS",
+    "operator": "5iskTyXpKn7HeqvNUFBFc1rv2C2EoFNBNyFmXgGFztgS"
+  },
+  "upgradeAuthority": "5iskTyXpKn7HeqvNUFBFc1rv2C2EoFNBNyFmXgGFztgS",
+  "status": "owner-provided-intended-authorities",
+  "custodyVerified": false,
+  "productionSignerConfigured": false
+}

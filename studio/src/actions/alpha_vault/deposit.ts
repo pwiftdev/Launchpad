@@ -4,7 +4,7 @@ import { safeParseKeypairFromFile, getAlphaVaultConfig, parseCliArguments } from
 import { DEFAULT_COMMITMENT_LEVEL } from '../../utils/constants';
 import { deposit } from '../../lib/alpha_vault/participant';
 import { resolveAlphaVaultAddress } from '../../lib/alpha_vault/status';
-import { createCheckedConnection } from '../../helpers/connection';
+import { createCheckedConnection, safeRpcLabel } from '../../helpers/connection';
 
 async function main() {
   const config = await getAlphaVaultConfig();
@@ -13,7 +13,7 @@ async function main() {
   const keypair = await safeParseKeypairFromFile(config.keypairFilePath);
 
   console.log('\n> Initializing configuration...');
-  console.log(`- Using RPC URL ${config.rpcUrl}`);
+  console.log(`- Using RPC URL ${safeRpcLabel(config.rpcUrl)}`);
   console.log(`- Dry run = ${config.dryRun}`);
   console.log(`- Using wallet ${keypair.publicKey} for this action`);
 

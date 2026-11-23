@@ -14,19 +14,8 @@ export function assertNever(_arg: never, message = 'Unknown error occured.'): ne
 }
 
 export const getBaseUrl = () => {
-  if (process.env.NODE_ENV === 'development') {
-    return `http://localhost:3000`;
-  } else {
-    let url = process.env.NEXT_PUBLIC_VERCEL_BRANCH_URL;
-
-    if (url?.includes('vercel.app')) {
-      url = `https://${process.env.NEXT_PUBLIC_VERCEL_BRANCH_URL}`;
-    } else {
-      url = `https://jup.ag`;
-    }
-
-    return typeof window === 'undefined' ? url : window.location.origin;
-  }
+  if (typeof window !== 'undefined') return window.location.origin;
+  return process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 };
 
 /**

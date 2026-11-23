@@ -1,0 +1,1 @@
+operator: node --no-global-search-paths /opt/rinsed-operator/operator-start.cjs --config /run/config/rinsed-operator.json

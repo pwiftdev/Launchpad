@@ -1,0 +1,241 @@
+/* The supported footer attachment scopes these rules to the wallet kit's native dialog.
+   Keep selectors independent of Emotion's development/production class hashes. */
+dialog:has([data-plzzz-wallet]) {
+  /* Keep the native top-layer picker interactive above other modal surfaces. */
+  pointer-events: auto;
+  box-sizing: border-box;
+  max-width: 100%;
+  max-height: 100%;
+  margin: 0;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  border: 0;
+  background: rgb(0 0 0 / 0.82);
+  color: rgb(var(--foreground));
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  backdrop-filter: blur(10px);
+}
+
+dialog:has([data-plzzz-wallet])::backdrop {
+  background: transparent;
+}
+
+dialog:has([data-plzzz-wallet]) > div {
+  isolation: isolate;
+  max-width: 420px;
+  max-height: min(680px, calc(100dvh - 32px));
+  border: 1px solid rgb(var(--primary) / 0.22);
+  border-radius: 0;
+  /* The adapter uses !important for its stock surface color. */
+  background-color: rgb(var(--neutral-950)) !important;
+  background-image:
+    radial-gradient(ellipse at 5% 0%, rgb(var(--primary) / 0.12), transparent 55%),
+    radial-gradient(ellipse at 100% 100%, rgb(var(--accent) / 0.06), transparent 55%);
+  color: rgb(var(--foreground));
+  box-shadow:
+    0 32px 100px rgb(0 0 0 / 0.45),
+    0 0 40px rgb(var(--primary) / 0.06);
+}
+
+dialog:has([data-plzzz-wallet]) > div::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: var(--holo);
+  content: '';
+}
+
+/* Header and separator belong to the adapter; our brand sits above its title. */
+dialog:has([data-plzzz-wallet]) > div > div:first-of-type {
+  flex-shrink: 0;
+  padding: 88px 24px 20px;
+}
+
+dialog:has([data-plzzz-wallet]) > div > div:first-of-type > div > div:first-child {
+  font-family: var(--font-display), var(--font-sans), sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+}
+
+dialog:has([data-plzzz-wallet]) > div > div:first-of-type > div > div:nth-child(2) {
+  margin-top: 8px;
+  color: rgb(var(--neutral-400));
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+dialog:has([data-plzzz-wallet]) > div > div:nth-of-type(2) {
+  flex-shrink: 0;
+  border-color: rgb(var(--neutral-800));
+}
+
+dialog:has([data-plzzz-wallet]) .hideScrollbar {
+  min-height: 0;
+  padding: 20px 24px 24px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+dialog:has([data-plzzz-wallet]) .hideScrollbar > span {
+  color: rgb(var(--neutral-400));
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+dialog:has([data-plzzz-wallet]) button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid rgb(var(--neutral-750));
+  border-radius: 0;
+  background-color: rgb(var(--neutral-900));
+  color: rgb(var(--foreground));
+  font-family: inherit;
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+dialog:has([data-plzzz-wallet]) button:hover {
+  border-color: rgb(var(--primary) / 0.55);
+  background-color: rgb(var(--primary) / 0.1);
+  box-shadow: 0 0 18px rgb(var(--primary) / 0.06);
+}
+
+dialog:has([data-plzzz-wallet]) button:focus-visible,
+dialog:has([data-plzzz-wallet]) a:focus-visible {
+  outline: 2px solid rgb(var(--primary));
+  outline-offset: 3px;
+}
+
+dialog:has([data-plzzz-wallet]) > div > div:first-of-type > button {
+  top: 24px;
+  right: 24px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  place-items: center;
+  color: rgb(var(--neutral-300));
+}
+
+dialog:has([data-plzzz-wallet]) li > button {
+  min-height: 68px;
+  gap: 12px;
+  padding: 16px 14px;
+}
+
+/* Override the adapter's space-between rule as well as its base span styles. */
+dialog:has([data-plzzz-wallet]) li > button > span:not([hidden]) ~ span:not([hidden]) {
+  margin: 0;
+}
+
+dialog:has([data-plzzz-wallet]) li > button > span:last-child {
+  font-size: 13px;
+}
+
+dialog:has([data-plzzz-wallet]) a {
+  color: rgb(var(--primary));
+  text-underline-offset: 3px;
+}
+
+/* New-wallet onboarding uses the same primary action and rows as the rest of rinsed.fun. */
+dialog:has([data-plzzz-wallet]) .hideScrollbar > div:has(> img[src$='/new_user_onboarding.png']) {
+  position: relative;
+  padding: 28px 24px;
+}
+
+dialog:has([data-plzzz-wallet]) .hideScrollbar img[src$='/new_user_onboarding.png'] {
+  visibility: hidden;
+  width: 112px;
+  height: 96px;
+}
+
+dialog:has([data-plzzz-wallet])
+  .hideScrollbar
+  > div:has(> img[src$='/new_user_onboarding.png'])::before {
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  width: 112px;
+  height: 96px;
+  transform: translateX(-50%);
+  background: var(--brand-mark-image) center / contain no-repeat;
+  content: '';
+}
+
+dialog:has([data-plzzz-wallet]) .hideScrollbar > div:has(> img) > div:last-of-type > button {
+  min-height: 48px;
+  border-color: rgb(var(--primary));
+  background: rgb(var(--primary));
+  color: rgb(var(--primary-950));
+}
+
+dialog:has([data-plzzz-wallet]) .hideScrollbar a:has(img) {
+  border: 1px solid rgb(var(--neutral-750));
+  border-radius: 0;
+  background-color: rgb(var(--neutral-900));
+  color: rgb(var(--foreground));
+}
+
+dialog:has([data-plzzz-wallet]) .hideScrollbar a:has(img):hover {
+  border-color: rgb(var(--primary) / 0.55);
+  background-color: rgb(var(--primary) / 0.1);
+}
+
+.plzzz-wallet-brand {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.plzzz-wallet-footer {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  gap: 10px;
+  border-top: 1px solid rgb(var(--neutral-800));
+  padding: 16px 24px;
+  background: rgb(var(--primary) / 0.035);
+  color: rgb(var(--neutral-200));
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.plzzz-wallet-footer > .iconify {
+  margin-top: 2px;
+}
+
+@media (max-width: 380px) {
+  dialog:has([data-plzzz-wallet]) > div > div:first-of-type {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+
+  dialog:has([data-plzzz-wallet]) .hideScrollbar {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+
+  dialog:has([data-plzzz-wallet]) li > button {
+    gap: 8px;
+    padding: 14px 10px;
+  }
+
+  .plzzz-wallet-brand {
+    left: 20px;
+  }
+
+  .plzzz-wallet-footer {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+}

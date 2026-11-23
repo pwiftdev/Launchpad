@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -48,7 +48,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -70,7 +70,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -89,7 +89,54 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
 
       - name: Validate skill spec, links, version pins, config drift
         run: node .github/scripts/validate-skills.mjs
+
+  web-tests:
+    name: Web security regression tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @meteora-invent/scaffold/fun-launch type-check
+      - run: pnpm test:app
+      - run: node scripts/test-operations.mjs
+      - name: Audit the Bond it. template offline
+        env:
+          NEXT_PUBLIC_NETWORK: mainnet-beta
+          FEE_COLLECTOR_PUBLIC_KEY: 3j4vUdPKF7HNqKoaWdezQoX9Hognn6Us7ua6thZZiaed
+          TREASURY_PUBLIC_KEY: GfgpgQa2ZqNm17rJ6fw2t5nBApKKPZBn5M5niWW3riZZ
+        run: node scripts/audit-launch-config.mjs --template
+
+  heroku-artifact:
+    name: Heroku Linux artifact
+    runs-on: ubuntu-latest
+    env:
+      RPC_URL: https://api.devnet.solana.com
+      POOL_CONFIG_KEY: '11111111111111111111111111111111'
+      PINATA_JWT: ci-placeholder
+      NEXT_PUBLIC_NETWORK: devnet
+      NEXT_PUBLIC_SITE_URL: https://launch.example
+      HUSKY: '0'
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm heroku-postbuild
+      - run: node --test scripts/standalone-smoke.test.mjs
+      - run: node scripts/build-financial-worker.mjs --standalone
+      - run: node scripts/operator-artifact-smoke.mjs
+      - run: node scripts/build-operator-start.mjs
+      - run: node scripts/operator-start-smoke.mjs

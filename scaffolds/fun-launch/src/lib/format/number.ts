@@ -24,7 +24,7 @@ function getNumberSmallFormatter(decimals: number): Intl.NumberFormat {
     return intlNumberSmallFormatters[decimals];
   }
 
-  const formatter = new Intl.NumberFormat(undefined, {
+  const formatter = new Intl.NumberFormat('en-US', {
     minimumSignificantDigits: 3,
     maximumSignificantDigits: decimals,
     maximumFractionDigits: decimals,
@@ -34,76 +34,76 @@ function getNumberSmallFormatter(decimals: number): Intl.NumberFormat {
   return formatter;
 }
 
-const intlNumberCompact = new Intl.NumberFormat(undefined, {
+const intlNumberCompact = new Intl.NumberFormat('en-US', {
   notation: 'compact',
   compactDisplay: 'short',
   minimumSignificantDigits: 3,
   maximumSignificantDigits: 3,
 });
 
-const intlNumberLong = new Intl.NumberFormat(undefined, {
+const intlNumberLong = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
 const intlNumberSmall = getNumberSmallFormatter(SMALL_DECIMALS);
 
-const intlIntegerCompact = new Intl.NumberFormat(undefined, {
+const intlIntegerCompact = new Intl.NumberFormat('en-US', {
   ...intlNumberCompact.resolvedOptions(),
   minimumSignificantDigits: 1,
   minimumFractionDigits: 0,
   maximumFractionDigits: 0,
 });
 
-const intlIntegerLong = new Intl.NumberFormat(undefined, {
+const intlIntegerLong = new Intl.NumberFormat('en-US', {
   ...intlNumberLong.resolvedOptions(),
   minimumFractionDigits: 0,
   maximumFractionDigits: 0,
 });
 
-const intlIntegerSmall = new Intl.NumberFormat(undefined, {
+const intlIntegerSmall = new Intl.NumberFormat('en-US', {
   ...intlNumberSmall.resolvedOptions(),
   minimumSignificantDigits: 1,
   minimumFractionDigits: 0,
   maximumFractionDigits: 0,
 });
 
-const intlPctChange = new Intl.NumberFormat(undefined, {
+const intlPctChange = new Intl.NumberFormat('en-US', {
   style: 'percent',
   signDisplay: 'exceptZero',
   minimumFractionDigits: 0,
   maximumFractionDigits: 2,
 });
 
-const intlPctChangeOneDec = new Intl.NumberFormat(undefined, {
+const intlPctChangeOneDec = new Intl.NumberFormat('en-US', {
   style: 'percent',
   signDisplay: 'exceptZero',
   minimumFractionDigits: 0,
   maximumFractionDigits: 1,
 });
 
-const intlPctChangeZeroDec = new Intl.NumberFormat(undefined, {
+const intlPctChangeZeroDec = new Intl.NumberFormat('en-US', {
   style: 'percent',
   signDisplay: 'exceptZero',
   minimumFractionDigits: 0,
   maximumFractionDigits: 0,
 });
 
-const intlPctChangeNoSign = new Intl.NumberFormat(undefined, {
+const intlPctChangeNoSign = new Intl.NumberFormat('en-US', {
   style: 'percent',
   signDisplay: 'never',
   minimumFractionDigits: 0,
   maximumFractionDigits: 2,
 });
 
-const intlPctChangeNoSignOneDec = new Intl.NumberFormat(undefined, {
+const intlPctChangeNoSignOneDec = new Intl.NumberFormat('en-US', {
   style: 'percent',
   signDisplay: 'never',
   minimumFractionDigits: 0,
   maximumFractionDigits: 1,
 });
 
-const intlPctChangeNoSignZeroDec = new Intl.NumberFormat(undefined, {
+const intlPctChangeNoSignZeroDec = new Intl.NumberFormat('en-US', {
   style: 'percent',
   signDisplay: 'never',
   minimumFractionDigits: 0,

@@ -7,7 +7,7 @@ import {
   deriveCustomizablePermissionlessConstantProductPoolAddress,
 } from '@meteora-ag/dynamic-amm-sdk/dist/cjs/src/amm/utils';
 import { createDammV1Stake2EarnPool } from '../../lib/damm_v1/stake2earn';
-import { createCheckedConnection } from '../../helpers/connection';
+import { createCheckedConnection, safeRpcLabel } from '../../helpers/connection';
 
 async function main() {
   const config = await getDammV1Config();
@@ -16,7 +16,7 @@ async function main() {
   const keypair = await safeParseKeypairFromFile(config.keypairFilePath);
 
   console.log('\n> Initializing configuration...');
-  console.log(`- Using RPC URL ${config.rpcUrl}`);
+  console.log(`- Using RPC URL ${safeRpcLabel(config.rpcUrl)}`);
   console.log(`- Dry run = ${config.dryRun}`);
   console.log(`- Using payer ${keypair.publicKey} to execute commands`);
 

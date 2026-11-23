@@ -1,66 +1,50 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { Connection, Keypair, sendAndConfirmRawTransaction, Transaction } from '@solana/web3.js';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { PublicKey, Transaction } from '@solana/web3.js';
+import { connection } from '@/server/dbc';
+import { apiGuard, clientIp, takeLimit } from '@/server/apiGuard';
+import { allowTrading } from '@/server/tradingAccess';
+import { validateRelayTransaction } from '@/server/transactionPolicy';
 
-const RPC_URL = process.env.RPC_URL as string;
-
-if (!RPC_URL) {
-  throw new Error('Missing required environment variables');
-}
-
-type SendTransactionRequest = {
-  signedTransaction: string; // base64 encoded signed transaction
-  additionalSigners: Keypair[];
-};
+export const config = { api: { bodyParser: { sizeLimit: '8kb' } } };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (!apiGuard(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (!(await allowTrading(res))) return;
+  if (!takeLimit('relay:' + clientIp(req), 20, 60_000)) {
+    res.setHeader('Retry-After', '60');
+    return res.status(429).json({ error: 'Too many transaction requests' });
   }
-
-  console.log('req.body', req.body);
+  const signedTransaction = req.body?.signedTransaction;
+  if (
+    typeof signedTransaction !== 'string' ||
+    signedTransaction.length > 1644 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(signedTransaction)
+  ) {
+    return res.status(400).json({ error: 'Invalid signed transaction' });
+  }
+  let raw: Buffer;
   try {
-    const { signedTransaction, additionalSigners } = req.body as SendTransactionRequest;
-
-    if (!signedTransaction) {
-      return res.status(400).json({ error: 'Missing signed transaction' });
-    }
-
-    const connection = new Connection(RPC_URL, 'confirmed');
-    const transaction = Transaction.from(Buffer.from(signedTransaction, 'base64'));
-
-    // if (!transaction.recentBlockhash) {
-    //   const { blockhash } = await connection.getLatestBlockhash();
-    //   transaction.recentBlockhash = blockhash;
-    // }
-
-    // // Simulate transaction
-    // const simulation = await connection.simulateTransaction(transaction);
-    // if (simulation.value.err) {
-    //   throw new Error(`Transaction simulation failed: ${JSON.stringify(simulation.value.err)}`);
-    // }
-
-    // console.log('additionalSigners', additionalSigners);
-
-    // if (additionalSigners) {
-    //   additionalSigners.forEach((signer) => {
-    //     transaction.sign(signer);
-    //   });
-    // }
-
-    // Send transaction
-    const txSignature = await sendAndConfirmRawTransaction(connection, transaction.serialize(), {
-      commitment: 'confirmed',
+    raw = Buffer.from(signedTransaction, 'base64');
+    if (raw.length > 1232) throw new Error('Transaction too large');
+    const tx = Transaction.from(raw);
+    if (!tx.verifySignatures()) throw new Error('A fully signed transaction is required');
+    const claimMint = typeof req.body?.mint === 'string' ? new PublicKey(req.body.mint) : undefined;
+    await validateRelayTransaction(tx, { claimMint });
+  } catch {
+    return res.status(400).json({ error: 'A fully signed launch or swap transaction is required' });
+  }
+  // Confirm in the browser: waiting for chain confirmation can exceed Heroku's request timeout.
+  try {
+    const signature = await connection.sendRawTransaction(raw, {
+      skipPreflight: false,
+      maxRetries: 2,
     });
-
-    // Wait for confirmation
-    // await connection.confirmTransaction(signature, 'confirmed');
-
-    res.status(200).json({
-      success: true,
-      signature: txSignature,
-    });
-  } catch (error) {
-    console.error('Transaction error:', error);
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    return res.status(200).json({ success: true, signature });
+  } catch {
+    console.error('Transaction submission failed');
+    return res
+      .status(502)
+      .json({ error: 'Could not submit transaction. Check your wallet before retrying.' });
   }
 }

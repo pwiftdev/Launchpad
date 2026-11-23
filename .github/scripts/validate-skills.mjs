@@ -11,8 +11,9 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const repoRoot = path.resolve(new URL('.', import.meta.url).pathname, '../..');
+const repoRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../..');
 const skillsDir = path.join(repoRoot, 'skills');
 let failures = 0;
 
@@ -36,7 +37,7 @@ for (const dir of skillDirs) {
   const skillMd = path.join(skillPath, 'SKILL.md');
   if (!fs.existsSync(skillMd)) { fail(`${dir}: missing SKILL.md`); continue; }
   const raw = fs.readFileSync(skillMd, 'utf-8');
-  const lines = raw.split('\n');
+  const lines = raw.split(/\r?\n/);
 
   // 1. frontmatter
   if (lines[0] !== '---') fail(`${dir}: SKILL.md must start with '---' frontmatter`);

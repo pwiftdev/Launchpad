@@ -1,0 +1,86 @@
+name: Legacy vault evidence (manual)
+
+on:
+  # Historical source remains available, outside the active wallet-v1 release pipeline.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-and-elf:
+    name: Optional historical native and compiled ELF tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
+        working-directory: programs/rinsed-vault
+    env:
+      CARGO_BUILD_JOBS: '2'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUST_BACKTRACE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test Rust advisory scope guard
+        run: node --test ../../scripts/rust-advisory.test.cjs
+      - name: Install pinned native Rust
+        run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Install verified Agave and SBF toolchains
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/vault-agave" "$HOME/.cache/solana/v1.53/platform-tools"
+          agave_archive="$RUNNER_TEMP/vault-agave.tar.bz2"
+          platform_archive="$RUNNER_TEMP/vault-platform-tools.tar.bz2"
+          curl --fail --location --retry 3 https://github.com/anza-xyz/agave/releases/download/v2.3.13/solana-release-x86_64-unknown-linux-gnu.tar.bz2 --output "$agave_archive"
+          printf '%s  %s\n' 'c43539ebdf6942472e8b87635d6ea55f428a51e3d0219f7b6f720fc6b19fade0' "$agave_archive" | sha256sum --check --strict
+          tar -xjf "$agave_archive" -C "$RUNNER_TEMP/vault-agave"
+          curl --fail --location --retry 3 https://github.com/anza-xyz/platform-tools/releases/download/v1.53/platform-tools-linux-x86_64.tar.bz2 --output "$platform_archive"
+          printf '%s  %s\n' '876b5c294a38d41d40bed4592911091e92cc3f399dd17a0f9cac87b1df9ab120' "$platform_archive" | sha256sum --check --strict
+          tar -xjf "$platform_archive" -C "$HOME/.cache/solana/v1.53/platform-tools"
+          echo "$RUNNER_TEMP/vault-agave/solana-release/bin" >> "$GITHUB_PATH"
+      - name: Collect locked SBF runtime and separate native test graphs
+        run: |
+          set -euo pipefail
+          platform_rust="$HOME/.cache/solana/v1.53/platform-tools/rust/bin"
+          cargo +1.99.1 fetch --locked --target x86_64-unknown-linux-gnu
+          RUSTC="$platform_rust/rustc" "$platform_rust/cargo" fetch --locked --target sbpf-solana-solana
+          node ../../scripts/collect-rust-dependency-graph.mjs --manifest-path Cargo.toml --cargo "$platform_rust/cargo" --rustc "$platform_rust/rustc" --out "$RUNNER_TEMP/vault-rust-graph"
+      - name: Audit every locked Rust dependency and classify actual target exposure
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/vault-cargo-audit"
+          audit_archive="$RUNNER_TEMP/vault-cargo-audit.tgz"
+          curl --fail --location --retry 3 https://github.com/rustsec/rustsec/releases/download/cargo-audit/v0.22.2/cargo-audit-x86_64-unknown-linux-musl-v0.22.2.tgz --output "$audit_archive"
+          printf '%s  %s\n' '7fb9497f8594b389e5fce5ef9b92db08432996895b2e0c5a0167a69ed445c428' "$audit_archive" | sha256sum --check --strict
+          tar -xzf "$audit_archive" -C "$RUNNER_TEMP/vault-cargo-audit"
+          audit_bin="$RUNNER_TEMP/vault-cargo-audit/cargo-audit-x86_64-unknown-linux-musl-v0.22.2/cargo-audit"
+          set +e
+          "$audit_bin" audit --file Cargo.lock --format json > "$RUNNER_TEMP/vault-rust-audit.json"
+          audit_status=$?
+          set -e
+          if [ "$audit_status" -ne 0 ] && [ "$audit_status" -ne 1 ]; then exit "$audit_status"; fi
+          node ../../scripts/check-rust-advisories.mjs --manifest-path Cargo.toml --graph "$RUNNER_TEMP/vault-rust-graph" --audit "$RUNNER_TEMP/vault-rust-audit.json" --policy ../../scripts/rust-advisory-policy.json --out "$RUNNER_TEMP/vault-rust-classification.json"
+      - name: Preserve unfiltered audit and target classification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vault-rust-advisory-evidence
+          path: |
+            ${{ runner.temp }}/vault-rust-graph/
+            ${{ runner.temp }}/vault-rust-audit.json
+            ${{ runner.temp }}/vault-rust-classification.json
+      - name: Check all native targets
+        run: cargo +1.99.1 check --locked --all-targets
+      - name: Run native runtime tests
+        run: cargo +1.99.1 test --locked -- --test-threads=1
+      - name: Build the pinned SBF artifact
+        run: cargo +1.99.1 build-sbf --tools-version v1.53 -- --locked
+      - name: Execute the compiled ELF under the upgradeable loader
+        env:
+          RINSED_TEST_SBF: '1'
+        run: SBF_OUT_DIR="$PWD/target/deploy" cargo +1.99.1 test --locked -- --test-threads=1

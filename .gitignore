@@ -62,3 +62,18 @@ studio/keypair.json
 studio/baseMintKeypair.json
 studio/data/kv_proofs/
 studio/data/whitelist_wallet.csv
+
+# [BRAND] secrets: never commit env files, keypairs or keys
+.env*
+!.env.example
+**/keypair.json
+*.key
+
+# Local deployment helpers and state
+.local/
+
+# Rust build output contains ephemeral local program deployment keypairs.
+**/target/
+
+# Generated operator bundle; rebuild from reviewed source.
+**/.worker/

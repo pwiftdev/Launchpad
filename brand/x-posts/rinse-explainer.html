@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>rinsed.fun RINSE explainer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&family=Rubik:wght@800;900&display=block" rel="stylesheet" />
+<style>
+  /* 1080x1350 (4:5) X post. Numbers mirror src/constants/launchPolicy.json: 90% start, x(1 - 0.3782) every 3s, 9 steps. */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; height: 1350px; overflow: hidden; background: #080C18; }
+  .post { position: relative; width: 1080px; height: 1350px; overflow: hidden; padding: 0 70px;
+    font-family: Inter, sans-serif; color: #F2F5FF;
+    background:
+      radial-gradient(560px 360px at 18% 4%, rgba(157,115,250,0.20), transparent 70%),
+      radial-gradient(640px 420px at 60% 50%, rgba(247,49,186,0.08), transparent 70%),
+      radial-gradient(620px 360px at 80% 100%, rgba(22,217,245,0.10), transparent 70%),
+      #080C18; }
+  .post > *:not(.float) { position: relative; z-index: 1; }
+  .float { position: absolute; }
+  .float.soft { filter: blur(3px); opacity: .4; }
+  .grad { background: linear-gradient(90deg, #F731BA 0%, #9D73FA 50%, #16D9F5 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  .lockup { display: flex; align-items: center; gap: 16px; padding-top: 56px; }
+  .lockup img.m { width: 60px; height: 60px; }
+  .lockup img.w { width: 300px; height: auto; }
+
+  h1 { margin-top: 34px; font: 900 88px/0.95 Rubik, sans-serif; letter-spacing: -3px; text-transform: uppercase; }
+  .sub { margin-top: 18px; max-width: 900px; font: 500 30px/1.4 Inter, sans-serif; color: #A9B2CC; }
+  .sub b { color: #F2F5FF; font-weight: 700; }
+
+  /* Tax chart */
+  .chart { position: relative; margin-top: 40px; height: 360px; }
+  .bars { position: absolute; left: 0; right: 0; bottom: 40px; height: 290px; display: flex; align-items: flex-end; gap: 14px; }
+  .bar { position: relative; flex: 1; border-radius: 12px 12px 4px 4px; }
+  .bar span { position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%);
+    font: 800 25px Inter, sans-serif; white-space: nowrap; letter-spacing: -0.5px; }
+  .xl { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 14px; }
+  .xl div { flex: 1; text-align: center; font: 600 21px Inter, sans-serif; color: #6F7A99; }
+  /* Blocks 0-10 = first ~4.4s: all of bar 1 and ~47% of bar 2 */
+  .zone { position: absolute; left: -12px; bottom: 30px; height: 340px; width: 148px; border-radius: 18px;
+    border: 3px dashed rgba(247,49,186,.75); background: rgba(247,49,186,.07); }
+  .zone-tag { position: absolute; left: 160px; top: -4px; padding: 10px 18px; border-radius: 12px;
+    background: #F731BA; color: #fff; font: 800 24px Inter, sans-serif; letter-spacing: .5px;
+    box-shadow: 0 14px 34px -10px rgba(247,49,186,.7); }
+  .zone-tag small { display: block; font: 600 19px Inter, sans-serif; letter-spacing: 0; opacity: .9; }
+  .clean-tag { position: absolute; right: -6px; bottom: 116px; text-align: right; font: 700 22px/1.3 Inter, sans-serif; color: #16D9F5; }
+
+  /* Where the tax goes */
+  .h2 { margin-top: 30px; font: 900 44px/1 Rubik, sans-serif; letter-spacing: -1px; text-transform: uppercase; }
+  .cards { margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { display: flex; gap: 18px; align-items: flex-start; padding: 18px 22px; border-radius: 20px;
+    background: rgba(14,20,36,.85); border: 1.5px solid rgba(157,115,250,.25); }
+  .card.wide { grid-column: 1 / -1; border-color: rgba(247,49,186,.45);
+    background: linear-gradient(90deg, rgba(247,49,186,.14), rgba(14,20,36,.85) 60%); }
+  .icon { flex: none; width: 54px; height: 54px; border-radius: 14px; display: grid; place-items: center; }
+  .icon svg { width: 30px; height: 30px; }
+  .card h3 { font: 800 27px/1.15 Inter, sans-serif; letter-spacing: -0.3px; }
+  .card h3 em { font-style: normal; font: 700 18px Inter, sans-serif; letter-spacing: 1.5px; text-transform: uppercase; color: #F731BA; display: block; margin-bottom: 6px; }
+  .card p { margin-top: 6px; font: 500 21px/1.4 Inter, sans-serif; color: #A9B2CC; }
+  .pick { grid-column: 1 / -1; margin: 4px 0 -4px 4px; font: 700 18px Inter, sans-serif; letter-spacing: 1.5px; text-transform: uppercase; color: #9D73FA; }
+
+  .foot { position: absolute !important; left: 70px; right: 70px; bottom: 32px; display: flex; justify-content: space-between;
+    font: 600 20px Inter, sans-serif; color: #6F7A99; }
+  .foot b { color: #F2F5FF; }
+</style>
+</head>
+<body>
+<div class="post">
+  <img class="float" src="../../scaffolds/fun-launch/public/brand/mark.png" style="width:230px;left:900px;top:-60px" alt="" />
+  <img class="float soft" src="../../scaffolds/fun-launch/public/brand/mark.png" style="width:80px;left:860px;top:210px" alt="" />
+  <img class="float soft" src="../../scaffolds/fun-launch/public/brand/mark.png" style="width:120px;left:-50px;top:330px" alt="" />
+  <img class="float soft" src="../../scaffolds/fun-launch/public/brand/mark.png" style="width:60px;left:1010px;top:1240px" alt="" />
+
+  <div class="lockup">
+    <img class="m" src="../../scaffolds/fun-launch/public/brand/mark.png" alt="" />
+    <img class="w" src="../../scaffolds/fun-launch/public/brand/wordmark.png" alt="rinsed.fun" />
+  </div>
+
+  <h1>We RINSE<br /><span class="grad">blocks 0–10.</span></h1>
+  <p class="sub">Snipers can’t ape the first blocks. Every launch starts with a <b>90% tax</b> that drops every 3 seconds, down to <b>1.25%</b>.</p>
+
+  <div class="chart">
+    <div class="zone"></div>
+    <div class="zone-tag">BLOCKS 0–10<small>Snipers pay 56–90%</small></div>
+    <div class="bars">
+      <div class="bar" style="height:258px;background:linear-gradient(180deg,#F731BA,#c41f8f);box-shadow:0 0 40px rgba(247,49,186,.45)"><span>90%</span></div>
+      <div class="bar" style="height:161px;background:linear-gradient(180deg,#E83FC6,#b52a9a);box-shadow:0 0 30px rgba(247,49,186,.3)"><span>56%</span></div>
+      <div class="bar" style="height:100px;background:linear-gradient(180deg,#D24FD8,#9e37ad)"><span>35%</span></div>
+      <div class="bar" style="height:62px;background:linear-gradient(180deg,#B95FE9,#8a45bd)"><span>22%</span></div>
+      <div class="bar" style="height:39px;background:linear-gradient(180deg,#9D73FA,#7454c9)"><span>13%</span></div>
+      <div class="bar" style="height:24px;background:linear-gradient(180deg,#7E8BF8,#5d67c6)"><span>8.4%</span></div>
+      <div class="bar" style="height:16px;background:linear-gradient(180deg,#5FA2F7,#4679c4)"><span>5.2%</span></div>
+      <div class="bar" style="height:11px;background:linear-gradient(180deg,#40B8F6,#2f8ac0)"><span>3.2%</span></div>
+      <div class="bar" style="height:9px;background:linear-gradient(180deg,#2BC8F5,#1f97bd)"><span>2.0%</span></div>
+      <div class="bar" style="height:8px;background:#16D9F5;box-shadow:0 0 24px rgba(22,217,245,.6)"><span style="color:#16D9F5">1.25%</span></div>
+    </div>
+    <div class="clean-tag">Everyone else<br />pays 1.25%</div>
+    <div class="xl"><div>0s</div><div>3s</div><div>6s</div><div>9s</div><div>12s</div><div>15s</div><div>18s</div><div>21s</div><div>24s</div><div>27s+</div></div>
+  </div>
+
+  <div class="h2">Where the <span class="grad">tax</span> goes</div>
+  <div class="cards">
+    <div class="card wide">
+      <div class="icon" style="background:rgba(247,49,186,.18)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#F731BA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5c.8 3.2 4.8 5.3 4.8 10.1a4.8 4.8 0 0 1-9.6 0c0-2.3 1.1-3.8 2.3-4.9.1 1.9.9 3.1 2.1 3.4-.4-3-.2-5.9.4-8.6z"/></svg>
+      </div>
+      <div>
+        <h3><em>During the RINSE</em>Buy back &amp; burn</h3>
+        <p>Tax from the RINSE funds buybacks of the coin, and every bought token is burned. Each burn links to its on-chain transaction.</p>
+      </div>
+    </div>
+    <div class="pick">After the RINSE, the creator picks a mode</div>
+    <div class="card">
+      <div class="icon" style="background:rgba(157,115,250,.18)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#9D73FA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1.3-3.6 4.1-5.5 7.5-5.5s6.2 1.9 7.5 5.5"/></svg>
+      </div>
+      <div>
+        <h3>Creator</h3>
+        <p>Fees go to the creator’s wallet.</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="icon" style="background:rgba(22,217,245,.15)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#16D9F5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.5"/><path d="M2.5 20c1-3.2 3.4-5 6.5-5s5.5 1.8 6.5 5"/><circle cx="17" cy="7.5" r="2.8"/><path d="M17.5 13.2c2.2.3 3.5 1.8 4.2 4.3"/></svg>
+      </div>
+      <div>
+        <h3>Community</h3>
+        <p>Hourly SOL rewards for holders.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot"><span><b>rinsed.fun</b> · Snipers get rinsed.</span><span>1 Solana block ≈ 0.4s</span></div>
+</div>
+</body>
+</html>

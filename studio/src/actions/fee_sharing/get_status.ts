@@ -2,13 +2,13 @@ import { PublicKey } from '@solana/web3.js';
 import { safeParseKeypairFromFile, getFeeSharingConfig, parseCliArguments } from '../../helpers';
 import { DEFAULT_COMMITMENT_LEVEL } from '../../utils/constants';
 import { getStatus } from '../../lib/fee_sharing/status';
-import { createCheckedConnection } from '../../helpers/connection';
+import { createCheckedConnection, safeRpcLabel } from '../../helpers/connection';
 
 async function main() {
   const config = await getFeeSharingConfig();
 
   console.log('\n> Initializing configuration...');
-  console.log(`- Using RPC URL ${config.rpcUrl}`);
+  console.log(`- Using RPC URL ${safeRpcLabel(config.rpcUrl)}`);
 
   const connection = await createCheckedConnection(config.rpcUrl, DEFAULT_COMMITMENT_LEVEL);
 

@@ -1,35 +1,27 @@
-import Header from '@/components/Header';
+import { AppShell } from '@/components/shell/AppShell';
 import { cn } from '@/lib/utils';
 
 interface IProps {
   containerClassName?: string;
-  pageClassName?: string;
+  /** Board-style layout: fills the viewport, panels scroll on their own */
+  app?: boolean;
 }
 
-const Page: React.FC<React.PropsWithChildren<IProps>> = ({
-  containerClassName,
-  children,
-  pageClassName,
-}) => {
-  return (
-    <div
-      className={cn(
-        'flex min-h-screen flex-col justify-between bg-background text-foreground',
-        pageClassName
-      )}
-    >
-      <Header />
-      {/* Full-width content with a modest gutter around it */}
+const Page: React.FC<React.PropsWithChildren<IProps>> = ({ containerClassName, children, app }) => (
+  <AppShell fill={app}>
+    {app ? (
+      children
+    ) : (
       <div
         className={cn(
-          'flex flex-1 flex-col items-center px-2 pt-3 pb-8 md:px-4',
+          'mx-auto w-full max-w-6xl px-4 pb-16 pt-6 md:px-8 md:pt-8',
           containerClassName
         )}
       >
-        <div className="flex w-full flex-1 flex-col">{children}</div>
+        {children}
       </div>
-    </div>
-  );
-};
+    )}
+  </AppShell>
+);
 
 export default Page;

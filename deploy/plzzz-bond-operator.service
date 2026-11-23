@@ -1,0 +1,28 @@
+[Unit]
+Description=plzzz.bond private fee collection, buybacks and payouts
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=plzzz-bond
+Group=plzzz-bond
+WorkingDirectory=/var/lib/plzzz-bond
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/plzzz-bond/operator.env
+# Example execution limits: at most 0.1 SOL per buyback, at most 1% slippage.
+# Match the independently configured signer limits before starting this service.
+ExecStart=/usr/bin/node --no-global-search-paths /opt/plzzz-bond/ops.cjs run --execute --automatic --cycles 1000 --interval-ms 15000 --maximum-coins 20 --maximum-jobs 20 --max-spend-lamports 100000000 --slippage-bps 100 --signer-config /etc/plzzz-bond/signer-command.json
+Restart=always
+RestartSec=10
+KillSignal=SIGTERM
+TimeoutStopSec=40
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/plzzz-bond
+
+[Install]
+WantedBy=multi-user.target

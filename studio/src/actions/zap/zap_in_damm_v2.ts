@@ -3,7 +3,7 @@ import { Wallet } from '@coral-xyz/anchor';
 import { safeParseKeypairFromFile, getZapConfig, parseCliArguments } from '../../helpers';
 import { DEFAULT_COMMITMENT_LEVEL } from '../../utils/constants';
 import { zapInDammV2 } from '../../lib/zap';
-import { createCheckedConnection } from '../../helpers/connection';
+import { createCheckedConnection, safeRpcLabel } from '../../helpers/connection';
 
 async function main() {
   const config = await getZapConfig();
@@ -12,7 +12,7 @@ async function main() {
   const keypair = await safeParseKeypairFromFile(config.keypairFilePath);
 
   console.log('\n> Initializing configuration...');
-  console.log(`- Using RPC URL ${config.rpcUrl}`);
+  console.log(`- Using RPC URL ${safeRpcLabel(config.rpcUrl)}`);
   console.log(`- Dry run = ${config.dryRun}`);
   console.log(`- Using wallet ${keypair.publicKey} for this action`);
 

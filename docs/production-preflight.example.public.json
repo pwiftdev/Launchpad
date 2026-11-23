@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "networkGenesis": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+  "siteOrigin": "https://REPLACE_WITH_REVIEWED_SITE_ORIGIN",
+  "programs": {
+    "dbc": {
+      "address": "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN",
+      "upgradeAuthority": "REQUIRED_REVIEWED_PUBLIC_AUTHORITY_OR_NULL",
+      "deployedDataSha256": "REQUIRED_REVIEWED_EXECUTABLE_PAYLOAD_SHA256"
+    },
+    "damm": {
+      "address": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+      "upgradeAuthority": "REQUIRED_REVIEWED_PUBLIC_AUTHORITY_OR_NULL",
+      "deployedDataSha256": "REQUIRED_REVIEWED_EXECUTABLE_PAYLOAD_SHA256"
+    },
+    "metadata": {
+      "address": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s",
+      "upgradeAuthority": "REQUIRED_REVIEWED_PUBLIC_AUTHORITY_OR_NULL",
+      "deployedDataSha256": "REQUIRED_REVIEWED_EXECUTABLE_PAYLOAD_SHA256"
+    }
+  },
+  "config": {
+    "address": "REQUIRED_REVIEWED_DBC_CONFIG_ADDRESS",
+    "digest": "REQUIRED_REVIEWED_FULL_CONFIG_DATA_SHA256",
+    "feeClaimer": "REQUIRED_REVIEWED_COMPANY_COLLECTOR_PUBLIC_WALLET",
+    "leftoverReceiver": "REQUIRED_REVIEWED_TREASURY_PUBLIC_ADDRESS",
+    "registryEnabled": false,
+    "migrationConfig": {
+      "address": "A8gMrEPJkacWkcb3DGwtJwTe16HktSEfvwtuDh2MCtck",
+      "digest": "REQUIRED_REVIEWED_FULL_MIGRATION_CONFIG_DATA_SHA256"
+    }
+  },
+  "schemaContractSha256": "REQUIRED_REVIEWED_SCHEMA_CONTRACT_FILE_SHA256",
+  "worker": {
+    "operatorArtifactSha256": "REQUIRED_REVIEWED_WORKER_OPS_FILE_SHA256",
+    "schedulerArtifactSha256": "REQUIRED_REVIEWED_UNSIGNED_SCHEDULER_FILE_SHA256",
+    "maxHeartbeatAgeSeconds": 180
+  },
+  "company": {
+    "collector": "REQUIRED_REVIEWED_COMPANY_COLLECTOR_PUBLIC_WALLET",
+    "treasury": "REQUIRED_REVIEWED_COMPANY_TREASURY_PUBLIC_WALLET"
+  }
+}

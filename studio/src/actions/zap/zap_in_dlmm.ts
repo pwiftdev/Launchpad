@@ -4,7 +4,7 @@ import { config as loadEnv } from 'dotenv';
 import { safeParseKeypairFromFile, getZapConfig, parseCliArguments } from '../../helpers';
 import { DEFAULT_COMMITMENT_LEVEL } from '../../utils/constants';
 import { zapInDlmm } from '../../lib/zap';
-import { createCheckedConnection } from '../../helpers/connection';
+import { createCheckedConnection, safeRpcLabel } from '../../helpers/connection';
 
 // Loads studio/.env so JUPITER_API_KEY / JUPITER_API_URL (read by lib/zap's zapInDlmm) are
 // honored — same dotenv pattern as actions/settings/generate_keypair.ts.
@@ -17,7 +17,7 @@ async function main() {
   const keypair = await safeParseKeypairFromFile(config.keypairFilePath);
 
   console.log('\n> Initializing configuration...');
-  console.log(`- Using RPC URL ${config.rpcUrl}`);
+  console.log(`- Using RPC URL ${safeRpcLabel(config.rpcUrl)}`);
   console.log(`- Dry run = ${config.dryRun}`);
   console.log(`- Using wallet ${keypair.publicKey} for this action`);
 

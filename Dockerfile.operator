@@ -1,0 +1,26 @@
+FROM node:24.22.1-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c AS build
+ENV CI=true HUSKY=0 NEXT_TELEMETRY_DISABLED=1
+WORKDIR /build
+RUN npm install --global --ignore-scripts --no-audit --no-fund pnpm@10.27.0 && test "$(pnpm --version)" = 10.27.0
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY patches ./patches
+COPY packages ./packages
+COPY scaffolds/fun-launch ./scaffolds/fun-launch
+COPY studio/package.json ./studio/package.json
+COPY scripts ./scripts
+COPY docs/mainnet-authorities.public.json ./docs/mainnet-authorities.public.json
+RUN pnpm install --frozen-lockfile --filter @meteora-invent/scaffold/fun-launch... --network-concurrency=4 --child-concurrency=1
+RUN node scripts/build-financial-worker.mjs --standalone && node scripts/operator-artifact-smoke.mjs && node scripts/build-operator-start.mjs
+RUN node scripts/operator-start-smoke.mjs
+
+FROM node:24.22.1-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c AS runtime
+ENV NODE_ENV=production
+WORKDIR /opt/rinsed-operator
+RUN mkdir -p /var/lib/rinsed-operator/exports && chown node:node /var/lib/rinsed-operator/exports && chmod 0700 /var/lib/rinsed-operator/exports
+COPY --from=build /build/scaffolds/fun-launch/.worker/ops.cjs /build/scaffolds/fun-launch/.worker/scheduler.cjs /build/scaffolds/fun-launch/.worker/operator-start.cjs /build/scaffolds/fun-launch/.worker/runtime-manifest.json /build/scaffolds/fun-launch/.worker/private-package-manifest.json ./
+RUN chmod 0444 /opt/rinsed-operator/*
+USER node
+VOLUME ["/var/lib/rinsed-operator/exports"]
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["node", "--no-global-search-paths", "/opt/rinsed-operator/operator-start.cjs"]
+CMD ["--config", "/run/config/rinsed-operator.json"]

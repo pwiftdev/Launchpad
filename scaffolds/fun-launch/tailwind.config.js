@@ -18,6 +18,30 @@ export default {
         xs: '390px',
       },
 
+      fontFamily: {
+        sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)', 'var(--font-sans)', 'ui-sans-serif', 'sans-serif'],
+        // Numbers and addresses use Inter with tabular figures: equal-width digits like a mono font,
+        // without the dotted zero that reads as an 8 at small sizes
+        mono: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        // Terminal face for labels, buttons, headings and the boot log
+        term: ['var(--font-term)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        pixel: ['var(--font-pixel)', 'ui-monospace', 'monospace'],
+        code: ['var(--font-code)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+      },
+
+      // Brutalist: no rounded corners anywhere. Only rounded-full survives, for status dots.
+      borderRadius: {
+        none: '0',
+        sm: '0',
+        DEFAULT: '0',
+        md: '0',
+        lg: '0',
+        xl: '0',
+        '2xl': '0',
+        '3xl': '0',
+      },
+
       fontSize: {
         '2xs': ['0.625rem', { lineHeight: '0.75rem' }],
         xxs: ['0.5rem', { lineHeight: '0.625rem' }],
@@ -40,16 +64,45 @@ export default {
           from: { backgroundPosition: '200% center' },
           to: { backgroundPosition: '-200% center' },
         },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-6px)' },
+        },
+        // Name kept for existing call sites; now a short glitch jitter
+        pray: {
+          '0%, 100%': { transform: 'translate(0, 0)' },
+          '20%': { transform: 'translate(-1px, 1px)' },
+          '40%': { transform: 'translate(1px, -1px)' },
+          '60%': { transform: 'translate(-1px, 0)' },
+          '80%': { transform: 'translate(1px, 1px)' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 0.15s ease-out forwards',
         'fade-out': 'fade-out 0.15s ease-in forwards',
         'shine-reverse': 'shine 3s linear infinite reverse',
+        float: 'float 3.5s ease-in-out infinite',
+        pray: 'pray 0.35s steps(2) infinite',
       },
 
       colors: {
         background: themeVar('background'),
         foreground: themeVar('foreground'),
+        accent: themeVar('accent'),
+
+        // MASKED: signal yellow is the only accent. `signal` is the raw yellow for fills
+        // (same in both themes); `acid` is the accent as text (yellow on black, deep gold on white).
+        signal: themeVar('signal'),
+        // Solid panel fill: every surface that sits on the background
+        panel: themeVar('panel'),
+        acid: themeVar('lime'),
+        // Legacy brand names, now monochrome (see globals.css)
+        cobalt: themeVar('cobalt'),
+        cyan: themeVar('cyan'),
+        'brand-violet': themeVar('violet'),
+        soap: themeVar('primary'),
+        bubble: themeVar('accent'),
+        ink: '#000000',
 
         // Theme-aware scales (inverted between light and dark mode)
         neutral: {

@@ -3,7 +3,7 @@ import { safeParseKeypairFromFile, getDammV1Config, parseCliArguments } from '..
 import { Wallet } from '@coral-xyz/anchor';
 import { DEFAULT_COMMITMENT_LEVEL } from '../../utils/constants';
 import { swap as dammV1Swap } from '../../lib/damm_v1/trading';
-import { createCheckedConnection } from '../../helpers/connection';
+import { createCheckedConnection, safeRpcLabel } from '../../helpers/connection';
 
 async function main() {
   const config = await getDammV1Config();
@@ -12,7 +12,7 @@ async function main() {
   const keypair = await safeParseKeypairFromFile(config.keypairFilePath);
 
   console.log('\n> Initializing configuration...');
-  console.log(`- Using RPC URL ${config.rpcUrl}`);
+  console.log(`- Using RPC URL ${safeRpcLabel(config.rpcUrl)}`);
   console.log(`- Dry run = ${config.dryRun}`);
   console.log(`- Using wallet ${keypair.publicKey} for this action`);
 

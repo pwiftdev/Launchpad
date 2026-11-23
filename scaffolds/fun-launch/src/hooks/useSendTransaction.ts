@@ -48,13 +48,9 @@ export function useSendTransaction() {
         throw new Error(`Transaction simulation failed: ${JSON.stringify(simulation.value.err)}`);
       }
 
-      // Sign and send transaction
+      // Add every non-wallet signature first; sign() would discard existing signatures.
+      if (options.additionalSigners?.length) transaction.partialSign(...options.additionalSigners);
       const signedTransaction = await signTransaction(transaction);
-      if (options.additionalSigners) {
-        options.additionalSigners.forEach((signer) => {
-          transaction.sign(signer);
-        });
-      }
 
       const txSignature = await sendAndConfirmRawTransaction(
         connection,
@@ -65,8 +61,8 @@ export function useSendTransaction() {
       setSignature(txSignature);
       options.onSuccess?.(txSignature);
       return txSignature;
-    } catch (error: any) {
-      const errorMessage = error?.message || 'Unknown error';
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setError(new Error(errorMessage));
       options.onError?.(`Transaction failed: ${errorMessage}`);
       return null;

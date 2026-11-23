@@ -1,0 +1,18 @@
+{
+  "version": "bond-v1",
+  "mode": "bond",
+  "label": "Bond it.",
+  "startingFeeBps": 9900,
+  "endingFeeBps": 125,
+  "baseFeeMode": 0,
+  "periods": 1,
+  "stepSeconds": 0,
+  "reductionBps": 9775,
+  "activationType": 0,
+  "periodSlots": 1,
+  "enableFirstSwapWithMinFee": true,
+  "migrationFeeBps": 100,
+  "preBondBuybackNetBps": 9500,
+  "postBondCreatorNetBps": 6250,
+  "operatingReserveLamports": "10000000"
+}

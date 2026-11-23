@@ -1,0 +1,89 @@
+{
+  "name": "plzzz-bond",
+  "description": "plzzz.bond — Meteora-powered Solana launchpad with one Bond it. mode. See docs/LIVE-DEPLOYMENT.md.",
+  "stack": "heroku-24",
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "env": {
+    "NODE_ENV": {
+      "value": "production"
+    },
+    "NEXT_TELEMETRY_DISABLED": {
+      "value": "1"
+    },
+    "HUSKY": {
+      "value": "0"
+    },
+    "RPC_URL": {
+      "description": "Private HTTPS Solana RPC endpoint for the chosen network"
+    },
+    "PINATA_JWT": {
+      "description": "Pinata JWT restricted to the upload permissions needed by the app"
+    },
+    "POOL_CONFIG_KEY": {
+      "description": "Existing DBC pool config address on the chosen network"
+    },
+    "NEXT_PUBLIC_NETWORK": {
+      "value": "devnet"
+    },
+    "NEXT_PUBLIC_SITE_URL": {
+      "description": "Exact HTTPS app origin, e.g. https://your-app.herokuapp.com, without a trailing slash"
+    },
+    "SITE_ALLOWED_ORIGINS": {
+      "required": false,
+      "description": "Optional additional exact HTTPS origins, comma-separated; keep the canonical URL separate"
+    },
+    "IPFS_GATEWAY_URL": {
+      "value": "https://gateway.pinata.cloud"
+    },
+    "WHITELIST_ENABLED": {
+      "value": "true"
+    },
+    "LAUNCHPAD_PUBLIC": {
+      "value": "false"
+    },
+    "NEXT_PUBLIC_WHITELIST_ENABLED": {
+      "value": "true"
+    },
+    "WHITELIST_SECRET": {
+      "generator": "secret"
+    },
+    "MAINNET_TRADING_ENABLED": {
+      "value": "false"
+    },
+    "ADMIN_KEY_HASH": {
+      "required": false,
+      "description": "Set privately with scripts/setup-admin.mjs; absent keeps the launchpad locked"
+    },
+    "ADMIN_SESSION_SECRET": {
+      "generator": "secret",
+      "description": "Independent secret for launch receipt recovery and optional admin sessions; required for Bond it. launches"
+    },
+    "LAUNCH_POLICY_VERSION": {
+      "value": "bond-v1"
+    },
+    "NEXT_PUBLIC_DEMO_LAUNCHES": {
+      "value": "false"
+    },
+    "FEE_COLLECTOR_PUBLIC_KEY": {
+      "required": true,
+      "description": "Reviewed public fee collector address; keep its signing keys in the separate private signer."
+    },
+    "TREASURY_PUBLIC_KEY": {
+      "required": true,
+      "description": "Reviewed public treasury address."
+    },
+    "LEGACY_POOL_CONFIG_KEYS": {
+      "required": false,
+      "description": "Optional comma-separated historical config addresses; never eligible for new launches."
+    }
+  },
+  "addons": [
+    {
+      "plan": "heroku-postgresql:essential-0"
+    }
+  ]
+}

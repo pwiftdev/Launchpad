@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
   [
-    'inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold transition-colors',
+    'inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md font-term font-semibold uppercase tracking-wide transition-colors active:scale-[0.98]',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
     'disabled:pointer-events-none disabled:opacity-50',
   ],
@@ -12,14 +12,15 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: 'bg-primary text-primary-950 hover:bg-primary-300',
+        holo: 'btn-holo rounded-md font-bold',
         secondary: 'border border-neutral-800 bg-neutral-900 text-neutral-100 hover:bg-neutral-850',
         outline: 'border border-neutral-750 bg-transparent text-neutral-200 hover:bg-neutral-900',
         ghost: 'text-neutral-300 hover:bg-neutral-900 hover:text-neutral-100',
       },
       size: {
         sm: 'h-8 px-3 text-xs',
-        default: 'h-9 px-4 text-xs md:h-10 md:px-6 md:text-sm',
-        lg: 'h-11 px-8 text-sm md:text-base',
+        default: 'h-9 px-4 text-sm',
+        lg: 'h-11 px-6 text-sm',
         icon: 'h-9 w-9',
       },
     },

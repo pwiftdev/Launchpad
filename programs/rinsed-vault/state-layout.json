@@ -1,0 +1,40 @@
+{
+  "abiVersion": 1,
+  "encoding": "Borsh, little endian, fixed-size fields, no padding; offsets include 8-byte magic",
+  "settings": {
+    "magic": "RSET0001", "size": 107,
+    "fields": { "version": 8, "bump": 9, "paused": 10, "governor": 11, "operator": 43, "treasury": 75 }
+  },
+  "configApproval": {
+    "magic": "RCONF001", "size": 74,
+    "fields": { "version": 8, "bump": 9, "config": 10, "digest": 42 }
+  },
+  "coin": {
+    "magic": "RCOIN001", "size": 347,
+    "fields": {
+      "version": 8, "bump": 9, "mode": 10, "mint": 11, "pool": 43, "config": 75,
+      "creator": 107, "activation": 139, "buyback": 147, "creatorBudget": 155,
+      "community": 163, "platform": 171, "nonce": 179, "burned": 187,
+      "migratedPool": 195, "position": 227, "nftAccount": 259, "configHash": 291,
+      "rinseNet": 323, "postNet": 331, "unallocatedCollected": 339
+    }
+  },
+  "funding": {
+    "magic": "RFUND001", "size": 138,
+    "fields": {
+      "version": 8, "bump": 9, "coin": 10, "fundingId": 42, "commitment": 74,
+      "total": 106, "slot": 114, "rinseNetBefore": 122, "postNetBefore": 130
+    }
+  },
+  "epoch": {
+    "magic": "REPOCH01", "size": 138,
+    "fields": {
+      "version": 8, "bump": 9, "coin": 10, "epoch": 42, "root": 50,
+      "snapshotSlot": 82, "snapshotDigest": 90, "total": 122, "remaining": 130
+    }
+  },
+  "claim": {
+    "magic": "RCLAIM01", "size": 82,
+    "fields": { "version": 8, "bump": 9, "epoch": 10, "wallet": 42, "amount": 74 }
+  }
+}

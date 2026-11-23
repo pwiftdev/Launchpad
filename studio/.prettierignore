@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+.turbo
+# Generated validator snapshots and key fixtures are data, not source formatting targets.
+src/tests/artifacts
+src/tests/keys
+# Local signing material is never a formatting target.
+keypair.json
+baseMintKeypair.json

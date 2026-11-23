@@ -1,0 +1,131 @@
+{
+  "tool": "Built-in image_gen",
+  "promptTemplate": "Create one polished square illustration for a playful fictional memecoin avatar named {slug}. Subject: {subject}. Bold charming silhouette, whimsical editorial mascot art, crisp painted shapes with subtle dimensional shading and tactile grain. Tight portrait composition, centered face and upper body, full-bleed colored background. Recognizable at 48 pixels. Original character, no brand imitation, no typography, no letters, no watermark. This is a final website asset.",
+  "subjects": [
+    {
+      "slug": "bubble-cat",
+      "subject": "a cheerful lavender cat peeking out of iridescent soap bubbles against a periwinkle background",
+      "asset": "scaffolds/fun-launch/public/demo/coins/bubble-cat.webp"
+    },
+    {
+      "slug": "rinse-frog",
+      "subject": "a lime-green frog wearing tiny yellow swimming goggles, with a turquoise watery background",
+      "asset": "scaffolds/fun-launch/public/demo/coins/rinse-frog.webp"
+    },
+    {
+      "slug": "soap-dog",
+      "subject": "a fluffy cream shiba inu with soap suds on its head, against a warm coral background",
+      "asset": "scaffolds/fun-launch/public/demo/coins/soap-dog.webp"
+    },
+    {
+      "slug": "moon-duck",
+      "subject": "a white duck wearing a tiny silver astronaut helmet against a midnight purple space background",
+      "asset": "scaffolds/fun-launch/public/demo/coins/moon-duck.webp"
+    },
+    {
+      "slug": "cosmic-capy",
+      "subject": "a relaxed caramel capybara floating in a lilac swim ring among pale stars on deep blue",
+      "asset": "scaffolds/fun-launch/public/demo/coins/cosmic-capy.webp"
+    },
+    {
+      "slug": "mint-otter",
+      "subject": "a sea otter holding a bright mint-green bar of soap on an aqua background",
+      "asset": "scaffolds/fun-launch/public/demo/coins/mint-otter.webp"
+    },
+    {
+      "slug": "peach-panda",
+      "subject": "a peach-colored sleepy red panda curled around a peach on a pale apricot background",
+      "asset": "scaffolds/fun-launch/public/demo/coins/peach-panda.webp"
+    },
+    {
+      "slug": "disco-shrimp",
+      "subject": "a bright pink shrimp with oversized teal sunglasses and a tiny disco ball on an indigo background",
+      "asset": "scaffolds/fun-launch/public/demo/coins/disco-shrimp.webp"
+    },
+    {
+      "slug": "tiny-whale",
+      "subject": "a smiling round blue whale splashing a small heart-shaped fountain on a pastel sky background",
+      "asset": "scaffolds/fun-launch/public/demo/coins/tiny-whale.webp"
+    },
+    {
+      "slug": "cloud-bunny",
+      "subject": "a fluffy white rabbit sitting on a lilac cloud with rosy ears on lavender",
+      "asset": "scaffolds/fun-launch/public/demo/coins/cloud-bunny.webp"
+    },
+    {
+      "slug": "pixel-pigeon",
+      "subject": "a cheeky plump gray pigeon in a green hoodie, charming pixel art portrait on a pale green background",
+      "asset": "scaffolds/fun-launch/public/demo/coins/pixel-pigeon.webp"
+    },
+    {
+      "slug": "rocket-raccoon",
+      "subject": "a raccoon wearing vintage round aviator goggles in a tiny red rocket cockpit on burnt orange",
+      "asset": "scaffolds/fun-launch/public/demo/coins/rocket-raccoon.webp"
+    },
+    {
+      "slug": "lucky-lobster",
+      "subject": "a smiling coral-red lobster holding a golden lucky coin, on a cream yellow background",
+      "asset": "scaffolds/fun-launch/public/demo/coins/lucky-lobster.webp"
+    },
+    {
+      "slug": "jelly-jam",
+      "subject": "a translucent pink jellyfish in a tiny sailor cap above violet waves on a lavender background",
+      "asset": "scaffolds/fun-launch/public/demo/coins/jelly-jam.webp"
+    },
+    {
+      "slug": "turbo-turtle",
+      "subject": "a green turtle wearing a little racing helmet, orange speed accents on a petrol blue background",
+      "asset": "scaffolds/fun-launch/public/demo/coins/turbo-turtle.webp"
+    },
+    {
+      "slug": "noodle-dragon",
+      "subject": "a tiny orange noodle-shaped dragon slurping a noodle from a small bowl, on warm cream",
+      "asset": "scaffolds/fun-launch/public/demo/coins/noodle-dragon.webp"
+    },
+    {
+      "slug": "soda-sloth",
+      "subject": "a relaxed lavender sloth hugging a fizzy lime soda can with no text or label, on a mint background",
+      "asset": "scaffolds/fun-launch/public/demo/coins/soda-sloth.webp"
+    },
+    {
+      "slug": "honey-bear",
+      "subject": "a round golden bear with a drop of honey on its nose and a tiny bee, on amber",
+      "asset": "scaffolds/fun-launch/public/demo/coins/honey-bear.webp"
+    },
+    {
+      "slug": "cactus-club",
+      "subject": "a cheerful mint-green cactus with tiny pink sunglasses and a terracotta pot, on pale pink",
+      "asset": "scaffolds/fun-launch/public/demo/coins/cactus-club.webp"
+    },
+    {
+      "slug": "sushi-shark",
+      "subject": "a friendly slate-blue shark wearing a salmon nigiri hat with a dark seaweed stripe, on blush coral",
+      "asset": "scaffolds/fun-launch/public/demo/coins/sushi-shark.webp"
+    },
+    {
+      "slug": "sleepy-sun",
+      "subject": "a sleepy golden sun with rosy cheeks tucked behind a small cloud, on dusty periwinkle",
+      "asset": "scaffolds/fun-launch/public/demo/coins/sleepy-sun.webp"
+    },
+    {
+      "slug": "orbit-owl",
+      "subject": "a turquoise owl with gold round spectacles and a tiny orbiting moon, on midnight teal",
+      "asset": "scaffolds/fun-launch/public/demo/coins/orbit-owl.webp"
+    },
+    {
+      "slug": "velvet-fox",
+      "subject": "a russet-orange fox with a lush fluffy tail and small cream star, on muted grape purple",
+      "asset": "scaffolds/fun-launch/public/demo/coins/velvet-fox.webp"
+    },
+    {
+      "slug": "mango-moth",
+      "subject": "a big-eyed moth with mango-orange wings and cream moon markings, on midnight navy",
+      "asset": "scaffolds/fun-launch/public/demo/coins/mango-moth.webp"
+    },
+    {
+      "slug": "neon-newt",
+      "subject": "a tiny pink-and-aqua axolotl with feathery gills and a happy expression, on vibrant ultramarine",
+      "asset": "scaffolds/fun-launch/public/demo/coins/neon-newt.webp"
+    }
+  ]
+}

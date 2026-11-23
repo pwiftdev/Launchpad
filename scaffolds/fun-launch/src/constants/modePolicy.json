@@ -1,0 +1,57 @@
+{
+  "version": "modes-v1",
+  "schedule": {
+    "startingFeeBps": 9900,
+    "endingFeeBps": 125,
+    "baseFeeMode": 0,
+    "periods": 1,
+    "periodSlots": 1,
+    "reductionBps": 9775,
+    "activationType": 0,
+    "enableFirstSwapWithMinFee": true,
+    "migrationFeeBps": 125
+  },
+  "split": {
+    "meteoraBps": 25,
+    "houseBps": 40,
+    "beneficiaryBps": 60
+  },
+  "quotes": {
+    "sol": {
+      "symbol": "SOL",
+      "decimals": 9,
+      "mint": "So11111111111111111111111111111111111111112",
+      "migrationQuoteThreshold": "80000000000"
+    },
+    "hsol": {
+      "symbol": "hSOL",
+      "decimals": 9,
+      "mainnetMint": "he1iusmfkpAdwvxLNGV8Y1iSbj4rUy6yMhEA3fotn9A",
+      "devnetMintEnv": "MSKD_DEVNET_QUOTE_MINT",
+      "migrationQuoteThresholdEnv": "MSKD_MIGRATION_QUOTE_THRESHOLD"
+    }
+  },
+  "modes": {
+    "mskd": {
+      "policyVersion": "mskd-v1",
+      "label": "MSKD",
+      "tagline": "Paired to hSOL. Holders earn in hSOL.",
+      "quote": "hsol",
+      "beneficiary": "holders"
+    },
+    "dev": {
+      "policyVersion": "dev-v1",
+      "label": "Regular · Dev",
+      "tagline": "Paired to SOL. The creator earns.",
+      "quote": "sol",
+      "beneficiary": "creator"
+    },
+    "cashback": {
+      "policyVersion": "cashback-v1",
+      "label": "Regular · Cashback",
+      "tagline": "Paired to SOL. Holders earn.",
+      "quote": "sol",
+      "beneficiary": "holders"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "purpose": "rinsed-private-wallet-operator",
+  "reviewed": false,
+  "network": "devnet",
+  "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "mainnetTradingEnabled": false,
+  "poolConfigKey": "",
+  "collectorPublicKey": "",
+  "treasuryPublicKey": "",
+  "configSha256": "",
+  "schemaCatalogSha256": "",
+  "artifacts": {
+    "opsSha256": "",
+    "schedulerSha256": "",
+    "startupSha256": ""
+  },
+  "files": {
+    "rpcUrl": "/run/secrets/rinsed-operator/rpc-url",
+    "databaseUrl": "/run/secrets/rinsed-operator/database-url",
+    "databaseCa": "/run/secrets/rinsed-operator/database-ca.pem"
+  },
+  "exportsDirectory": "/var/lib/rinsed-operator/exports",
+  "scheduler": {
+    "cycles": 1,
+    "intervalMs": 15000,
+    "maximumCoins": 20,
+    "maximumJobs": 20,
+    "maximumRuntimeSeconds": 900,
+    "shutdownGraceSeconds": 35,
+    "buyback": null
+  }
+}

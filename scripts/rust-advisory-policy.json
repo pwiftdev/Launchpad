@@ -1,0 +1,328 @@
+{
+  "version": 1,
+  "lockSha256": "59885d7e4796bac9d067917c52d81b572992b42654daeb1ef2f03f9f2725b99a",
+  "recheckBefore": "2026-11-27T00:00:00Z",
+  "note": "Technical scope classification only, not owner risk acceptance or independent audit. No runtime vulnerability/unsoundness can be waived by this file.",
+  "classifications": [
+    {
+      "id": "RUSTSEC-2024-0344",
+      "package": "curve25519-dalek",
+      "version": "3.2.0",
+      "kind": "vulnerability",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2022-0093",
+      "package": "ed25519-dalek",
+      "version": "1.0.1",
+      "kind": "vulnerability",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0258",
+      "package": "h2",
+      "version": "0.3.27",
+      "kind": "vulnerability",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0346",
+      "package": "rustls",
+      "version": "0.21.12",
+      "kind": "vulnerability",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0349",
+      "package": "rustls",
+      "version": "0.21.12",
+      "kind": "vulnerability",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0098",
+      "package": "rustls-webpki",
+      "version": "0.101.7",
+      "kind": "vulnerability",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0099",
+      "package": "rustls-webpki",
+      "version": "0.101.7",
+      "kind": "vulnerability",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0104",
+      "package": "rustls-webpki",
+      "version": "0.101.7",
+      "kind": "vulnerability",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0382",
+      "package": "rustls-webpki",
+      "version": "0.101.7",
+      "kind": "vulnerability",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0381",
+      "package": "webpki-roots",
+      "version": "0.24.0",
+      "kind": "vulnerability",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0381",
+      "package": "webpki-roots",
+      "version": "0.25.4",
+      "kind": "vulnerability",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0391",
+      "package": "zstd",
+      "version": "0.13.3",
+      "kind": "vulnerability",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0398",
+      "package": "zstd-safe",
+      "version": "7.3.0",
+      "kind": "vulnerability",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0403",
+      "package": "zstd-safe",
+      "version": "7.3.0",
+      "kind": "vulnerability",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2024-0375",
+      "package": "atty",
+      "version": "0.2.14",
+      "kind": "unmaintained",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2025-0141",
+      "package": "bincode",
+      "version": "1.3.3",
+      "kind": "unmaintained",
+      "scope": "sbf-runtime",
+      "reason": "Unmaintained informational warning with no patched release; canonical upgradeable-loader state decoding plus pinned upstream Solana serialization. Requires maintenance review; no owner risk acceptance is implied."
+    },
+    {
+      "id": "RUSTSEC-2026-0247",
+      "package": "bitmaps",
+      "version": "2.1.0",
+      "kind": "unmaintained",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2024-0388",
+      "package": "derivative",
+      "version": "2.2.0",
+      "kind": "unmaintained",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0248",
+      "package": "im",
+      "version": "15.1.0",
+      "kind": "unmaintained",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2025-0161",
+      "package": "libsecp256k1",
+      "version": "0.6.0",
+      "kind": "unmaintained",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2025-0119",
+      "package": "number_prefix",
+      "version": "0.4.0",
+      "kind": "unmaintained",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2024-0436",
+      "package": "paste",
+      "version": "1.0.15",
+      "kind": "unmaintained",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0173",
+      "package": "proc-macro-error2",
+      "version": "2.0.1",
+      "kind": "unmaintained",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2025-0134",
+      "package": "rustls-pemfile",
+      "version": "1.0.4",
+      "kind": "unmaintained",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0251",
+      "package": "sized-chunks",
+      "version": "0.6.5",
+      "kind": "unmaintained",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2021-0145",
+      "package": "atty",
+      "version": "0.2.14",
+      "kind": "unsound",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2023-0126",
+      "package": "im",
+      "version": "15.1.0",
+      "kind": "unsound",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0186",
+      "package": "memmap2",
+      "version": "0.5.10",
+      "kind": "unsound",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0097",
+      "package": "rand",
+      "version": "0.7.3",
+      "kind": "unsound",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0255",
+      "package": "sized-chunks",
+      "version": "0.6.5",
+      "kind": "unsound",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0395",
+      "package": "zstd-safe",
+      "version": "7.3.0",
+      "kind": "unsound",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0396",
+      "package": "zstd-safe",
+      "version": "7.3.0",
+      "kind": "unsound",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0397",
+      "package": "zstd-safe",
+      "version": "7.3.0",
+      "kind": "unsound",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0399",
+      "package": "zstd-safe",
+      "version": "7.3.0",
+      "kind": "unsound",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0400",
+      "package": "zstd-safe",
+      "version": "7.3.0",
+      "kind": "unsound",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0401",
+      "package": "zstd-safe",
+      "version": "7.3.0",
+      "kind": "unsound",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0402",
+      "package": "zstd-safe",
+      "version": "7.3.0",
+      "kind": "unsound",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0404",
+      "package": "zstd-safe",
+      "version": "7.3.0",
+      "kind": "unsound",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0405",
+      "package": "zstd-safe",
+      "version": "7.3.0",
+      "kind": "unsound",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    },
+    {
+      "id": "RUSTSEC-2026-0406",
+      "package": "zstd-safe",
+      "version": "7.3.0",
+      "kind": "unsound",
+      "scope": "native-test",
+      "reason": "Absent from the conservative SBF normal closure and independent runtime/build trees; present only in native SDK/program-test graph. Tests use isolated fixtures and no production signing credentials. Native/tooling exposure remains and must be rechecked."
+    }
+  ]
+}

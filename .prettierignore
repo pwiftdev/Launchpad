@@ -2,6 +2,11 @@
 node_modules
 .pnp
 .pnp.js
+.local
+**/target
+**/.worker
+studio/src/tests/artifacts
+studio/src/tests/keys
 
 # Production
 build
@@ -22,3 +27,4 @@ yarn.lock
 # Generated files
 *.min.js
 *.min.css
+**/next-env.d.ts

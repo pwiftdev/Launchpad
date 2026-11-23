@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>rinsed.fun X banner</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500&family=Rubik:wght@900&display=block" rel="stylesheet" />
+<style>
+  /* 1500x500 X header. Content sits centered and slightly high, clear of the profile photo (bottom-left). */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1500px; height: 500px; overflow: hidden; background: #06090f; }
+  .banner {
+    width: 1500px; height: 500px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding-bottom: 30px;
+    background: radial-gradient(700px 300px at 50% 45%, rgba(62,199,255,0.08), transparent 70%), #06090f;
+    color: #ecf1fa;
+  }
+  .brand { display: flex; align-items: center; gap: 28px; }
+  .brand svg { width: 128px; height: 112px; }
+  .wordmark { font-family: Rubik, sans-serif; font-weight: 900; font-size: 104px; line-height: 1; letter-spacing: -2px; }
+  .wordmark span { color: #3ec7ff; }
+  .motto { margin-top: 28px; font-family: Inter, sans-serif; font-weight: 500; font-size: 34px; letter-spacing: -0.3px; color: #a0aec7; }
+  .motto span { color: #ecf1fa; }
+</style>
+</head>
+<body>
+<div class="banner">
+  <div class="brand">
+    <svg viewBox="0 0 128 112" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5FD3FF"/><stop offset="1" stop-color="#1CB4F5"/></linearGradient>
+        <linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF6AAA"/><stop offset="1" stop-color="#FF3F8E"/></linearGradient>
+        <clipPath id="c"><rect x="8" y="34" width="92" height="52" rx="26"/></clipPath>
+      </defs>
+      <g transform="rotate(-16 54 60)">
+        <g clip-path="url(#c)">
+          <rect x="8" y="34" width="92" height="52" fill="url(#s)"/>
+          <rect x="8" y="34" width="92" height="31" rx="15.5" fill="url(#t)"/>
+          <rect x="8" y="34" width="92" height="22" fill="url(#t)"/>
+        </g>
+        <path d="M22 54c2-7 7-10 14-10h42" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+      </g>
+      <g stroke="#1CB4F5" stroke-width="5">
+        <circle cx="96" cy="18" r="10" fill="#fff"/>
+        <circle cx="117" cy="36" r="6.5" fill="#fff"/>
+        <path d="M86 102c-11 0-19-8-19-18 0-8 5-14 12-17-1-9 6-17 15-17 7 0 13 5 14 12 8 1 14 8 14 16 0 10-8 17-17 17-3 4-9 7-15 7h-4z" fill="#fff" stroke-linejoin="round"/>
+      </g>
+      <path d="M96 13a6 6 0 0 1 5 6M78 82a12 12 0 0 0 9 12" stroke="#BDE9FF" stroke-width="3.5" stroke-linecap="round"/>
+    </svg>
+    <div class="wordmark">RINSED<span>.FUN</span></div>
+  </div>
+  <div class="motto">Snipers get rinsed. <span>Holders get paid.</span></div>
+</div>
+</body>
+</html>

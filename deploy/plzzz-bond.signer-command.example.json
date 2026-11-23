@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "executable": "/usr/bin/node",
+  "argv": [
+    "--no-global-search-paths",
+    "/opt/plzzz-bond/wallet-signer.cjs",
+    "--config",
+    "/run/secrets/plzzz-bond/signer-policy.json"
+  ],
+  "timeoutMs": 30000
+}

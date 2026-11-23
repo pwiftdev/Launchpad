@@ -1,0 +1,8 @@
+{
+  "startingFeeBps": 9000,
+  "endingFeeBps": 125,
+  "periods": 9,
+  "stepSeconds": 3,
+  "reductionBps": 3782,
+  "migrationFeeBps": 125
+}

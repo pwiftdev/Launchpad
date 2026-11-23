@@ -1,0 +1,14 @@
+diff --git a/src/Assets.js b/src/Assets.js
+index a94d722574aab457395814e858fcf36741714feb..e6335404165cfb8fe96665649d2e7ac36d08d48a 100644
+--- a/src/Assets.js
++++ b/src/Assets.js
+@@ -3,7 +3,8 @@
+ const AssetPaths = require("./node-haste/lib/AssetPaths");
+ const crypto = require("crypto");
+ const fs = require("fs");
+-const getImageSize = require("image-size");
++// image-size 2 keeps the buffer API as a named export.
++const { imageSize: getImageSize } = require("image-size");
+ const path = require("path");
+ function isAssetTypeAnImage(type) {
+   return (

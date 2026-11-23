@@ -7,6 +7,15 @@
 
 import { Connection, Commitment } from '@solana/web3.js';
 
+/** Provider credentials can appear in URL paths, query strings or userinfo. */
+export function safeRpcLabel(value: string): string {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return '[invalid endpoint]';
+  }
+}
+
 /**
  * Create a Solana Connection and verify it is reachable with a quick
  * getLatestBlockhash() call.  Throws a human-friendly error on failure.
@@ -36,9 +45,9 @@ export async function createCheckedConnection(
     try {
       await connection.getLatestBlockhash();
     } catch (err: unknown) {
-      const cause = err instanceof Error ? err.message : String(err);
+      const cause = err instanceof Error ? err.name : 'RPC request failed';
       throw new Error(
-        `Failed to connect to RPC endpoint: ${rpcUrl}\n` +
+        `Failed to connect to RPC endpoint: ${safeRpcLabel(rpcUrl)}\n` +
           `Cause: ${cause}\n\n` +
           `Possible fixes:\n` +
           `  1. Check that the URL is correct in your config file (rpcUrl field).\n` +

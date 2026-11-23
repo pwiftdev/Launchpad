@@ -1,3 +1,5 @@
+import { BRAND } from '@/constants/brand';
+
 export type ChartThemeColors = {
   /** Chart pane background */
   bg: string;
@@ -9,13 +11,13 @@ export type ChartThemeColors = {
 
 export const CHART_THEME_COLORS: Record<'dark' | 'light', ChartThemeColors> = {
   dark: {
-    bg: '#0b0e13', // neutral-950
-    grid: '#182430', // neutral-850
-    accent: '#c7f284', // primary
+    bg: BRAND.colors.surface,
+    grid: '#1a1a1a',
+    accent: BRAND.colors.orange,
   },
   light: {
     bg: '#ffffff',
-    grid: '#e2e8f0',
-    accent: '#4d7c0f', // primary
+    grid: '#e5e5e5',
+    accent: BRAND.colors.black,
   },
 };

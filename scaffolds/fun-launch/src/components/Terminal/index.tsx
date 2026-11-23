@@ -1,6 +1,7 @@
 import { useUnifiedWalletContext, useWallet } from '@jup-ag/wallet-adapter';
 import { useEffect, useState } from 'react';
 import { Skeleton } from '../ui/Skeleton';
+import Script from 'next/script';
 
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
 const PLUGIN_CONTAINER_ID = 'jupiter-plugin';
@@ -78,6 +79,7 @@ export function TerminalComponent({ mint }: { mint: string }) {
 
   return (
     <div className="flex h-full w-full flex-col">
+      <Script src="https://plugin.jup.ag/plugin-v1.js" strategy="afterInteractive" />
       {!isReady ? (
         <div className="flex w-full flex-col items-center justify-start gap-y-2">
           <Skeleton className="h-20 w-full" />

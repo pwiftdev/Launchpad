@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "purpose": "rinsed-wallet-signer",
+  "keyFile": "/run/secrets/collector-keypair.json",
+  "environment": {
+    "RPC_URL": "https://REPLACE_WITH_PRIVATE_RPC_ENDPOINT",
+    "DATABASE_URL": "postgresql://REPLACE_WITH_PRIVATE_DATABASE",
+    "DATABASE_SSL_CA": "/run/secrets/database-ca.pem",
+    "NEXT_PUBLIC_NETWORK": "mainnet-beta",
+    "FEE_COLLECTOR_PUBLIC_KEY": "3j4vUdPKF7HNqKoaWdezQoX9Hognn6Us7ua6thZZiaed",
+    "TREASURY_PUBLIC_KEY": "GfgpgQa2ZqNm17rJ6fw2t5nBApKKPZBn5M5niWW3riZZ",
+    "WALLET_WORKER_ENABLED": "false",
+    "MAINNET_TRADING_ENABLED": "false"
+  },
+  "limits": {
+    "maximumBuybackLamports": "REQUIRED_POSITIVE_LAMPORT_CAP",
+    "maximumPayoutLamports": "REQUIRED_POSITIVE_LAMPORT_CAP",
+    "maximumOperatingCostLamports": "REQUIRED_POSITIVE_LAMPORT_CAP"
+  }
+}

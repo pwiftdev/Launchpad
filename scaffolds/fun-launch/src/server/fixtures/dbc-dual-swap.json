@@ -1,0 +1,16 @@
+{
+  "source": "Isolated validator using the real DBC binary; legacy and V2 events represent one swap.",
+  "pool": "9gcH9i98J24ia2gUUho8BZEfCaMBr1r1eKMN9YLb1aXQ",
+  "signature": "2gNCbuFbcMSWB1ZoFPurJJ77TnogBEW3fu5CVXbtDkGi6HhC5T7coDLMHN21MVfKEfMnoKvzA2ggzHbMd3UZPWr3",
+  "blockTime": 1793144325,
+  "events": [
+    {
+      "name": "EvtSwap",
+      "data": "2ioXo9nkAt26bphRv6PYrqWhFpEvPycnYLqzwQYyehDy6hpqYQ3QErLpzGcmcLS54z4tXGHfN9jWQYqwpv73oa2mVrvYoWURo19Vbe766TwgqQ2ySbHcZvCLQ2Z3q239c81peykstHw9YskS2WfcwJQrhMmRHMpRBo8Q7APMKLrBRzPkyQATPx22R5cugw5Xs4Z9UAajjy1f7FWhXiWD6aMDoNR1kWQG3nztjPhWX"
+    },
+    {
+      "name": "EvtSwap2",
+      "data": "44FY2SKwMbUFWgV1yoKm6d2uQwdmwzmRcg9ovnNfjCuMRbzd1NGZNLVU5Jq8eutvBvaXUd5mNdjpbEtBALZpVhgEcHWNqVGgFCjHGNJsuQLFmLpoG9KA7ai8U28SgoFaH2qJNuFGZkYSAc4YCbGefXSpFDg5h5n47kDLdFJKCcyBws5nKvB1UbtdE7n1f9NwHsE1mWNjexiJvBbShbNd7w8i32FZ7rtRQA7yJ8SmHxo4eNfpdfEFzau7GbnWJ6NVAZU7io66p6j"
+    }
+  ]
+}

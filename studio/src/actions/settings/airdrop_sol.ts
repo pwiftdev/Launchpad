@@ -5,7 +5,7 @@ import path from 'path';
 import { getNetworkConfig, parseCliArguments, displayHelp } from '../../helpers/cli';
 import { airdropSol } from '../../helpers/utils';
 import { AIRDROP_SOL_COMMAND_OPTIONS } from '../../utils/constants';
-import { createCheckedConnection } from '../../helpers/connection';
+import { createCheckedConnection, safeRpcLabel } from '../../helpers/connection';
 
 config();
 
@@ -29,7 +29,7 @@ async function main() {
 
     const networkConfig = getNetworkConfig(network);
     console.log(`\n>> Using network: ${network.toUpperCase()}`);
-    console.log(`>> RPC URL: ${networkConfig.rpcUrl}`);
+    console.log(`>> RPC URL: ${safeRpcLabel(networkConfig.rpcUrl)}`);
 
     const keypairPath = path.join(__dirname, '../../../keypair.json');
 
