@@ -10,7 +10,8 @@ exports.databaseConfig = function databaseConfig(env = process.env) {
   return {
     connectionString: url.href,
     ssl: { rejectUnauthorized: true, ca: fs.readFileSync(certificate, 'utf8') },
-    max: 4,
+    // Web requests, the live listener and an in-process indexer share this pool.
+    max: Number(env.DATABASE_POOL_MAX) > 0 ? Number(env.DATABASE_POOL_MAX) : 8,
     connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 30000,
     statement_timeout: 5000,

@@ -13,14 +13,14 @@ it('logs separate counters per method in a batch without logging parameters', ()
   const info = vi.spyOn(console, 'info').mockImplementation(() => {});
   const transaction = { method: 'getTransaction', params: ['private-signature'] };
   recordRpcUsage('web', JSON.stringify([transaction, transaction]));
-  recordRpcUsage('mobula', JSON.stringify({ method: 'private-unrecognized-method' }));
-  recordRpcUsage('mobula');
+  recordRpcUsage('fallback', JSON.stringify({ method: 'private-unrecognized-method' }));
+  recordRpcUsage('fallback');
   expect(info).not.toHaveBeenCalled();
   vi.advanceTimersByTime(60_000);
   expect(info).toHaveBeenCalledExactlyOnceWith(
     JSON.stringify({
       event: 'rpc_usage',
-      calls: { 'web:getTransaction': 2, mobula: 2 },
+      calls: { 'web:getTransaction': 2, fallback: 2 },
     })
   );
 });

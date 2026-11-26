@@ -84,3 +84,40 @@ describe('browser live transport lifecycle', () => {
     expect(f.sources).toHaveLength(1);
   });
 });
+
+describe('pushed coin updates', () => {
+  it('applies a pushed coin and merges newest trades without refetching', async () => {
+    const { applyUpdate } = await import('./liveCoinClient');
+    const cache = new Map<string, unknown>([
+      ['trades', { trades: [{ id: 'old', ts: 1 }], complete: true }],
+    ]);
+    const client = {
+      setQueryData: vi.fn((key: string[], value: unknown) => {
+        const next =
+          typeof value === 'function'
+            ? (value as (current: unknown) => unknown)(cache.get(key[0]!))
+            : value;
+        cache.set(key[0]!, next);
+      }),
+    } as unknown as QueryClient;
+    const coin = { mint: 'mint', marketCapSol: 2 };
+    expect(applyUpdate(client, 'mint', { kind: 'coin', coin: coin as never })).toBe(true);
+    expect(cache.get('coin')).toEqual(coin);
+    expect(
+      applyUpdate(client, 'mint', {
+        kind: 'trades',
+        coin: coin as never,
+        trades: [
+          { id: 'new', ts: 2 },
+          { id: 'old', ts: 1 },
+        ] as never,
+      })
+    ).toBe(true);
+    expect((cache.get('trades') as { trades: { id: string }[] }).trades.map((t) => t.id)).toEqual([
+      'new',
+      'old',
+    ]);
+    expect(applyUpdate(client, 'mint', { kind: 'holders' })).toBe(false);
+    expect(applyUpdate(client, 'mint', null)).toBe(false);
+  });
+});

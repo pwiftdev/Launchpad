@@ -145,11 +145,21 @@
     {
       "file": "036-masked-launch.sql",
       "sha256": "b15412df30f192f93e3590eb05b93d4ba1eb8c34687e8e391ce2b75fabffe9e0"
+    },
+    {
+      "file": "037-display-index.sql",
+      "sha256": "24e8495925c9bea172a4ee97c4b35882a14fb8368038bdb79a2003b7628b29a2"
     }
   ],
   "catalog": {
     "tables": [
       "confidential_otc_offers",
+      "display_coins",
+      "display_holder_scans",
+      "display_holders",
+      "display_indexer_status",
+      "display_pool_cursors",
+      "display_trades",
       "financial_balances",
       "financial_claim_attempts",
       "financial_collected_reserves",
@@ -281,6 +291,516 @@
         "table_name": "confidential_otc_offers",
         "column_name": "ciphertext",
         "udt_name": "bytea",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_coins",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_coins",
+        "column_name": "mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_coins",
+        "column_name": "pool",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_coins",
+        "column_name": "migrated_pool",
+        "udt_name": "varchar",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_coins",
+        "column_name": "coin",
+        "udt_name": "jsonb",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_coins",
+        "column_name": "launched_at",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "display_coins",
+        "column_name": "market_cap_sol",
+        "udt_name": "float8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 53,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_coins",
+        "column_name": "is_migrated",
+        "udt_name": "bool",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_coins",
+        "column_name": "updated_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": "now()",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_holder_scans",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_holder_scans",
+        "column_name": "mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_holder_scans",
+        "column_name": "slot",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "display_holder_scans",
+        "column_name": "decimals",
+        "udt_name": "int2",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 16,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "display_holder_scans",
+        "column_name": "supply",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 39,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "display_holder_scans",
+        "column_name": "excluded",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 39,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "display_holder_scans",
+        "column_name": "holder_count",
+        "udt_name": "int4",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "display_holder_scans",
+        "column_name": "scanned_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": "now()",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_holders",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_holders",
+        "column_name": "mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_holders",
+        "column_name": "owner",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_holders",
+        "column_name": "amount",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 39,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "display_indexer_status",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_indexer_status",
+        "column_name": "heartbeat_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_indexer_status",
+        "column_name": "slot",
+        "udt_name": "int8",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "display_indexer_status",
+        "column_name": "chain_time",
+        "udt_name": "int8",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "display_indexer_status",
+        "column_name": "tps",
+        "udt_name": "float8",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 53,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_indexer_status",
+        "column_name": "rpc_ms",
+        "udt_name": "int4",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "display_pool_cursors",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_pool_cursors",
+        "column_name": "pool",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_pool_cursors",
+        "column_name": "mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_pool_cursors",
+        "column_name": "newest_signature",
+        "udt_name": "varchar",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": 88,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_pool_cursors",
+        "column_name": "backfill_before",
+        "udt_name": "varchar",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": 88,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_pool_cursors",
+        "column_name": "backfill_complete",
+        "udt_name": "bool",
+        "is_nullable": "NO",
+        "column_default": "false",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_pool_cursors",
+        "column_name": "updated_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": "now()",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "signature",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 88,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "instruction_index",
+        "udt_name": "int4",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "event_index",
+        "udt_name": "int4",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "pool",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "slot",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "ts",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "side",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "wallet",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "wallet_role",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "quote_amount",
+        "udt_name": "float8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 53,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "tokens",
+        "udt_name": "float8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 53,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "fee_quote",
+        "udt_name": "float8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 53,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "fee_is_estimate",
+        "udt_name": "bool",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "price_quote",
+        "udt_name": "float8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 53,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_trades",
+        "column_name": "route",
+        "udt_name": "text",
         "is_nullable": "NO",
         "column_default": null,
         "character_maximum_length": null,
@@ -5898,6 +6418,188 @@
         "definition": "UNIQUE (token_hash)"
       },
       {
+        "table_name": "display_coins",
+        "name": "check:4e57c5827d48af0a2d8122096d3812c76f30e0fca53a2969bbdba812ac3bf018",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((market_cap_sol >= (0)::double precision))"
+      },
+      {
+        "table_name": "display_coins",
+        "name": "check:800bbdc285140ed7842239196f96d0f94a8ec7452ae7cb8884a1eabde28d08cc",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((jsonb_typeof(coin) = 'object'::text))"
+      },
+      {
+        "table_name": "display_coins",
+        "name": "check:8ddfc3dacb82cb34a3ab61cb1b6c259c12bbf0e0a876da28bca6275f344897e6",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((launched_at >= 0))"
+      },
+      {
+        "table_name": "display_coins",
+        "name": "display_coins_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (network_genesis, mint)"
+      },
+      {
+        "table_name": "display_holder_scans",
+        "name": "check:0fb532ec1b9182bc9efaa55190a256a2b006062b352513e0f4eee5dfabb3036a",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((holder_count >= 0))"
+      },
+      {
+        "table_name": "display_holder_scans",
+        "name": "check:16f77566c9fefbee88f1b0852dafcc27e451419dcc89d66f051d5ab9f60a608c",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((slot >= 0))"
+      },
+      {
+        "table_name": "display_holder_scans",
+        "name": "check:3d82e4b17c7928df762b33603f3b569932183f5fa5b53917548e79ffea702e21",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((excluded >= (0)::numeric) AND (excluded <= supply)))"
+      },
+      {
+        "table_name": "display_holder_scans",
+        "name": "check:c53b8b308d233a5caaa0383bd6bd415c98fffae30b98372bf83f411fc7f35ed2",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((supply >= (0)::numeric))"
+      },
+      {
+        "table_name": "display_holder_scans",
+        "name": "check:fd92986456a972a93dc815ab8acb0f64175c6d78c3903918b059f6b54b4634bd",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((decimals >= 0) AND (decimals <= 18)))"
+      },
+      {
+        "table_name": "display_holder_scans",
+        "name": "display_holder_scans_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (network_genesis, mint)"
+      },
+      {
+        "table_name": "display_holders",
+        "name": "check:5ddec6c010bb05cab4730df9c64e0ba3b0ce5f8e8aaa49704e17c02d4f55bb8d",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((amount > (0)::numeric))"
+      },
+      {
+        "table_name": "display_holders",
+        "name": "display_holders_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (network_genesis, mint, owner)"
+      },
+      {
+        "table_name": "display_indexer_status",
+        "name": "display_indexer_status_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (network_genesis)"
+      },
+      {
+        "table_name": "display_pool_cursors",
+        "name": "display_pool_cursors_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (network_genesis, pool)"
+      },
+      {
+        "table_name": "display_trades",
+        "name": "check:0e60ad1c06f8eda6b3278ea852c79d24a008881d12e5acaca5ce221fbc70de4d",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((fee_quote >= (0)::double precision))"
+      },
+      {
+        "table_name": "display_trades",
+        "name": "check:15748f9959fe0a4b91cee340bab6e85d9eb2e3a33f5a38df9c5cc57f54321f42",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((price_quote > (0)::double precision))"
+      },
+      {
+        "table_name": "display_trades",
+        "name": "check:16f77566c9fefbee88f1b0852dafcc27e451419dcc89d66f051d5ab9f60a608c",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((slot >= 0))"
+      },
+      {
+        "table_name": "display_trades",
+        "name": "check:655570f4698c28da72bd6ce150d91cfe6d812ae018605daef23877797ae3fdd5",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((tokens >= (0)::double precision))"
+      },
+      {
+        "table_name": "display_trades",
+        "name": "check:7bcef780a2823c9f9f78d6afdec7de7356dc592a9c7757e62cd06c45c928c289",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((event_index >= 0))"
+      },
+      {
+        "table_name": "display_trades",
+        "name": "check:8a6546851c1bca9a3f96ec7d039b7b4cb77637403877ea30e38f90eba50d40e2",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((route = ANY (ARRAY['dbc'::text, 'damm-v2'::text])))"
+      },
+      {
+        "table_name": "display_trades",
+        "name": "check:be2e19a2d81e3b5077593e2b8fc77190f5c80244a7ffc54fd35bd1240486a431",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((wallet_role = ANY (ARRAY['token-owner'::text, 'swap-authority'::text])))"
+      },
+      {
+        "table_name": "display_trades",
+        "name": "check:c98d695540d80e1c6d0a35463cc7e5a6c7adec5f7ebea7e0b688e1e434750d93",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((ts >= 0))"
+      },
+      {
+        "table_name": "display_trades",
+        "name": "check:cffd75159e61eaea9f68aba39e3fd35582d540119d0faaa845dd5f91e524fd74",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((quote_amount >= (0)::double precision))"
+      },
+      {
+        "table_name": "display_trades",
+        "name": "check:d164b21c4573a2902f0d45792bda8aa2553c51e46baae7301eb02365e7ed8cf2",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((instruction_index >= 0))"
+      },
+      {
+        "table_name": "display_trades",
+        "name": "check:d86a95db919f7b83da5a5752f8a05078d607b643c732e1e246a0cfb4c83732a6",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((side = ANY (ARRAY['buy'::text, 'sell'::text])))"
+      },
+      {
+        "table_name": "display_trades",
+        "name": "display_trades_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (network_genesis, signature, instruction_index, event_index)"
+      },
+      {
         "table_name": "financial_balances",
         "name": "check:0e02fbd4ca9785908d8edb975a41e9d2ab888a7a9113ac7232e4102904a7a0c8",
         "type": "c",
@@ -8529,6 +9231,56 @@
         "table_name": "confidential_otc_offers",
         "name": "confidential_otc_offers_token_hash_key",
         "definition": "CREATE UNIQUE INDEX confidential_otc_offers_token_hash_key ON public.confidential_otc_offers USING btree (token_hash)"
+      },
+      {
+        "table_name": "display_coins",
+        "name": "display_coins_launched",
+        "definition": "CREATE INDEX display_coins_launched ON public.display_coins USING btree (network_genesis, launched_at DESC)"
+      },
+      {
+        "table_name": "display_coins",
+        "name": "display_coins_pkey",
+        "definition": "CREATE UNIQUE INDEX display_coins_pkey ON public.display_coins USING btree (network_genesis, mint)"
+      },
+      {
+        "table_name": "display_holder_scans",
+        "name": "display_holder_scans_pkey",
+        "definition": "CREATE UNIQUE INDEX display_holder_scans_pkey ON public.display_holder_scans USING btree (network_genesis, mint)"
+      },
+      {
+        "table_name": "display_holders",
+        "name": "display_holders_amount",
+        "definition": "CREATE INDEX display_holders_amount ON public.display_holders USING btree (network_genesis, mint, amount DESC)"
+      },
+      {
+        "table_name": "display_holders",
+        "name": "display_holders_pkey",
+        "definition": "CREATE UNIQUE INDEX display_holders_pkey ON public.display_holders USING btree (network_genesis, mint, owner)"
+      },
+      {
+        "table_name": "display_indexer_status",
+        "name": "display_indexer_status_pkey",
+        "definition": "CREATE UNIQUE INDEX display_indexer_status_pkey ON public.display_indexer_status USING btree (network_genesis)"
+      },
+      {
+        "table_name": "display_pool_cursors",
+        "name": "display_pool_cursors_pkey",
+        "definition": "CREATE UNIQUE INDEX display_pool_cursors_pkey ON public.display_pool_cursors USING btree (network_genesis, pool)"
+      },
+      {
+        "table_name": "display_trades",
+        "name": "display_trades_mint",
+        "definition": "CREATE INDEX display_trades_mint ON public.display_trades USING btree (network_genesis, mint, ts DESC, slot DESC)"
+      },
+      {
+        "table_name": "display_trades",
+        "name": "display_trades_pkey",
+        "definition": "CREATE UNIQUE INDEX display_trades_pkey ON public.display_trades USING btree (network_genesis, signature, instruction_index, event_index)"
+      },
+      {
+        "table_name": "display_trades",
+        "name": "display_trades_recent",
+        "definition": "CREATE INDEX display_trades_recent ON public.display_trades USING btree (network_genesis, ts DESC)"
       },
       {
         "table_name": "financial_balances",

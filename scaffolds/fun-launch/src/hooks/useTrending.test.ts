@@ -3,6 +3,7 @@ const mocks = vi.hoisted(() => ({ query: vi.fn(), sync: vi.fn(), client: vi.fn()
 vi.mock('@tanstack/react-query', () => ({ useQuery: mocks.query, useQueryClient: mocks.client }));
 vi.mock('./useDemoMode', () => ({ useDemoMode: () => ({ visible: false }) }));
 vi.mock('./useNow', () => ({ syncServerClock: mocks.sync }));
+vi.mock('./useBoardLive', () => ({ useBoardLive: () => ({ connected: false }) }));
 vi.mock('./useLiveCoin', () => ({
   useLiveCoin: () => ({ connected: false }),
   invalidateCoinQueries: vi.fn(),

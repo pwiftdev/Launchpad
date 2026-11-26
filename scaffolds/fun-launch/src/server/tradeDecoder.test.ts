@@ -17,7 +17,7 @@ import {
 import dualFixture from './fixtures/dbc-dual-swap.json';
 const rpc = vi.hoisted(() => ({ getSignaturesForAddress: vi.fn(), getTransactions: vi.fn() }));
 vi.mock('./dbc', () => ({ connection: rpc }));
-import { decodeTrade, decodeTrades, getTradeHistory, invalidateTradeHistory } from './trades';
+import { decodeTrade, decodeTrades } from './tradeDecoder';
 
 const coder = new BorshCoder(CpAmmIdl as unknown as Idl),
   pool = Keypair.generate().publicKey;
@@ -159,7 +159,7 @@ describe('graduated trade display', () => {
       sponsor.toBase58()
     );
   });
-  it('keeps distinct identical swaps in one router transaction and exposes every row in history', async () => {
+  it('keeps distinct identical swaps in one router transaction', () => {
     const ownPool = new PublicKey(dualFixture.pool),
       one = swapInstruction(DYNAMIC_BONDING_CURVE_PROGRAM_ID, ownPool),
       two = swapInstruction(DYNAMIC_BONDING_CURVE_PROGRAM_ID, ownPool);
@@ -212,20 +212,10 @@ describe('graduated trade display', () => {
       one.keys[payerIndex]!.pubkey.toBase58(),
       two.keys[payerIndex]!.pubkey.toBase58(),
     ]);
-    rpc.getSignaturesForAddress.mockResolvedValueOnce([{ signature: 'two-swaps', err: null }]);
-    rpc.getTransactions.mockResolvedValueOnce([tx]);
-    const history = await getTradeHistory(dualFixture.pool, { tokenSupply: 987654321 });
-    expect(history.complete).toBe(true);
-    expect(history.trades.map((trade) => trade.id)).toEqual(['two-swaps:0:4', 'two-swaps:0:1']);
-    // Missing execution data must not silently present a complete one-row history.
+    // Missing execution data must not silently present a one-row result.
     tx.meta!.innerInstructions![0]!.instructions =
       tx.meta!.innerInstructions![0]!.instructions.slice(0, 4);
-    rpc.getSignaturesForAddress.mockResolvedValueOnce([{ signature: 'two-swaps', err: null }]);
-    rpc.getTransactions.mockResolvedValueOnce([tx]);
-    invalidateTradeHistory(dualFixture.pool);
-    const incomplete = await getTradeHistory(dualFixture.pool, { tokenSupply: 987654322 });
-    expect(incomplete).toMatchObject({ complete: false, pendingCount: 1 });
-    expect(incomplete.trades).toHaveLength(2);
+    expect(() => decodeTrades(tx, dualFixture.pool)).toThrow('missing its executed event');
   });
   it('reads the real DBC dual-event transaction once and supports a genuinely legacy-only event', () => {
     const tx = response(
@@ -293,164 +283,6 @@ describe('graduated trade display', () => {
   });
 });
 
-describe('bounded live history refresh', () => {
-  it('keeps same-second provider signature order when parallel RPC batches finish in either order', async () => {
-    const sample = fixture();
-    const signatures = Array.from({ length: 30 }, (_, index) => `batch-swap-${index}`);
-    const rows = signatures.map((signature) => ({
-      ...sample,
-      transaction: { ...sample.transaction, signatures: [signature] },
-    }));
-    for (const finishSecondFirst of [true, false]) {
-      let first: ((value: typeof rows) => void) | undefined;
-      let second: ((value: typeof rows) => void) | undefined;
-      rpc.getSignaturesForAddress.mockResolvedValueOnce(
-        signatures.map((signature) => ({ signature, err: null as null }))
-      );
-      rpc.getTransactions
-        .mockImplementationOnce(
-          () =>
-            new Promise((resolve) => {
-              first = resolve;
-            })
-        )
-        .mockImplementationOnce(
-          () =>
-            new Promise((resolve) => {
-              second = resolve;
-            })
-        );
-      const pending = getTradeHistory(pool.toBase58(), {
-        migratedBaseIsA: true,
-        tokenDecimals: finishSecondFirst ? 10 : 11,
-      });
-      await vi.waitFor(() => {
-        expect(first).toBeTypeOf('function');
-        expect(second).toBeTypeOf('function');
-      });
-      if (finishSecondFirst) {
-        second!(rows.slice(20));
-        await Promise.resolve();
-        first!(rows.slice(0, 20));
-      } else {
-        first!(rows.slice(0, 20));
-        await Promise.resolve();
-        second!(rows.slice(20));
-      }
-      const history = await pending;
-      expect(history.trades.map((trade) => trade.sig)).toEqual(signatures);
-      expect(history).toMatchObject({ complete: true, pendingCount: 0 });
-    }
-  });
-  it('restores a temporarily missing same-second transaction to its original discovered position', async () => {
-    let now = 50000;
-    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
-    try {
-      const sample = fixture();
-      const signatures = ['same-second-newest', 'same-second-middle', 'same-second-oldest'];
-      const rows = signatures.map((signature) => ({
-        ...sample,
-        transaction: { ...sample.transaction, signatures: [signature] },
-      }));
-      rpc.getSignaturesForAddress.mockResolvedValueOnce(
-        signatures.map((signature) => ({ signature, err: null as null }))
-      );
-      rpc.getTransactions.mockResolvedValueOnce([rows[0], null, rows[2]]);
-      const token = { migratedBaseIsA: true, tokenDecimals: 12 };
-      const first = await getTradeHistory(pool.toBase58(), token);
-      expect(first.trades.map((trade) => trade.sig)).toEqual([signatures[0], signatures[2]]);
-      expect(first.pendingCount).toBe(1);
-      now += 2100;
-      rpc.getSignaturesForAddress.mockResolvedValueOnce([]);
-      rpc.getTransactions.mockResolvedValueOnce([rows[1]]);
-      const recovered = await getTradeHistory(pool.toBase58(), token);
-      expect(recovered.trades.map((trade) => trade.sig)).toEqual(signatures);
-      expect(recovered).toMatchObject({ complete: true, pendingCount: 0 });
-    } finally {
-      clock.mockRestore();
-    }
-  });
-  it('retries temporarily missing confirmed transactions after the signature cursor advances', async () => {
-    let now = 10000;
-    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
-    const tx = fixture();
-    rpc.getSignaturesForAddress.mockResolvedValueOnce([{ signature: 'swap', err: null }]);
-    rpc.getTransactions.mockResolvedValueOnce([null]);
-    const first = await getTradeHistory(pool.toBase58(), {
-      migratedBaseIsA: true,
-      tokenDecimals: 7,
-    });
-    expect(first).toMatchObject({ trades: [], complete: false, pendingCount: 1 });
-    now += 2100;
-    rpc.getSignaturesForAddress.mockResolvedValueOnce([]);
-    rpc.getTransactions.mockResolvedValueOnce([tx]);
-    const second = await getTradeHistory(pool.toBase58(), {
-      migratedBaseIsA: true,
-      tokenDecimals: 7,
-    });
-    expect(second.trades).toHaveLength(1);
-    expect(second).toMatchObject({ complete: true, pendingCount: 0 });
-    expect(rpc.getTransactions.mock.calls.at(-1)![1]).toMatchObject({
-      maxSupportedTransactionVersion: 1,
-    });
-    clock.mockRestore();
-  });
-  it('keeps good data on provider failure and shares one in-flight refresh across viewers', async () => {
-    let now = 20000;
-    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
-    const tx = fixture();
-    rpc.getSignaturesForAddress.mockResolvedValueOnce([{ signature: 'swap', err: null }]);
-    rpc.getTransactions.mockResolvedValueOnce([tx]);
-    const first = await getTradeHistory(pool.toBase58(), {
-      migratedBaseIsA: true,
-      tokenDecimals: 8,
-      tokenSupply: 100,
-    });
-    now += 2100;
-    rpc.getSignaturesForAddress.mockRejectedValueOnce(new Error('provider unavailable'));
-    const [a, b] = await Promise.all([
-      getTradeHistory(pool.toBase58(), {
-        migratedBaseIsA: true,
-        tokenDecimals: 8,
-        tokenSupply: 80,
-      }),
-      getTradeHistory(pool.toBase58(), {
-        migratedBaseIsA: true,
-        tokenDecimals: 8,
-        tokenSupply: 80,
-      }),
-    ]);
-    expect(a.stale).toBe(true);
-    expect(b).toEqual(a);
-    expect(a.trades).toHaveLength(1);
-    expect(a.trades[0]!.marketCapSol).toBeCloseTo(first.trades[0]!.priceSol * 80);
-    clock.mockRestore();
-  });
-  it('loads one recent page first and backfills older pages on later refreshes with honest partial status', async () => {
-    let now = 30000;
-    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
-    const signatures = Array.from({ length: 100 }, (_, i) => ({
-      signature: `failed-${i}`,
-      err: { InstructionError: [0, 'failed'] },
-    }));
-    rpc.getSignaturesForAddress.mockResolvedValueOnce(signatures);
-    const first = await getTradeHistory(pool.toBase58(), {
-      migratedBaseIsA: true,
-      tokenDecimals: 9,
-    });
-    expect(first.complete).toBe(false);
-    expect(rpc.getSignaturesForAddress.mock.calls.at(-1)![1].limit).toBe(100);
-    now += 2100;
-    rpc.getSignaturesForAddress.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-    const next = await getTradeHistory(pool.toBase58(), {
-      migratedBaseIsA: true,
-      tokenDecimals: 9,
-    });
-    expect(next.complete).toBe(true);
-    expect(rpc.getSignaturesForAddress.mock.calls.at(-1)![1].before).toBe('failed-99');
-    clock.mockRestore();
-  });
-});
 import { Connection } from '@solana/web3.js';
 import versionOneFixture from './fixtures/mainnet-v1-swap.json';
 it('reads a real mainnet version-1 swap through the supported SDK JSON parser', async () => {

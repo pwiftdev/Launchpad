@@ -6,6 +6,7 @@ import { summarizeMarket, totalPoolReserves } from '@/lib/market';
 import { getDemoCoins, getDemoTrades } from '@/lib/demo';
 import type { SolanaMarket } from '@/lib/solanaMarket';
 import { useDemoMode } from './useDemoMode';
+import { useBoardLive } from './useBoardLive';
 
 const demoCache = new Map<string, TokenMarket>();
 function demoMarket(coin: Coin): TokenMarket {
@@ -24,6 +25,7 @@ function demoMarket(coin: Coin): TokenMarket {
 }
 
 export function useMarketStats() {
+  const live = useBoardLive();
   return useQuery<MarketStats>({
     queryKey: ['market-stats'],
     queryFn: async () => {
@@ -31,8 +33,8 @@ export function useMarketStats() {
       if (!response.ok) throw new Error('Market statistics unavailable');
       return response.json();
     },
-    staleTime: 30_000,
-    refetchInterval: (data) => (data?.updatedAt ? 60_000 : 3000),
+    staleTime: 10_000,
+    refetchInterval: (data) => (!data?.updatedAt ? 5000 : live.connected ? 120_000 : 60_000),
     retry: 1,
   });
 }

@@ -129,6 +129,7 @@ describe('public launchpad admission', () => {
       '/api/send-transaction',
       '/api/transaction-status',
       '/api/rewards',
+      '/api/live',
       '/api/upload',
       '/api/dev-buy-quote',
       '/api/launch/status',

@@ -7,7 +7,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { ImageResponse } from 'next/og';
 import sharp from 'sharp';
 import { parseKey, chainTime } from '@/server/dbc';
-import { getCoinActivity } from '@/server/activity';
+import { displayStore } from '@/server/display';
 import { getSolPrice } from '@/server/solPrice';
 import { taxStateAt, formatTaxPercent, hasCurrentTaxSchedule } from '@/lib/launchTax';
 import { BRAND } from '@/constants/brand';
@@ -154,7 +154,12 @@ const Frame = () => (
 
 async function renderCard(mint: string): Promise<ImageResponse> {
   const key = parseKey(mint);
-  const activity = key ? await getCoinActivity(key.toBase58()).catch((): null => null) : null;
+  const indexed = key
+    ? await displayStore()
+        ?.coin(key.toBase58())
+        .catch((): null => null)
+    : null;
+  const activity = indexed ? { coin: indexed } : null;
   const [fonts, logo, wordmark] = await Promise.all([loadFonts(), loadLogo(), loadWordmark()]);
   const term = fonts.some((f) => f.name === 'Geist Mono') ? 'Geist Mono' : undefined;
   const body = fonts.some((f) => f.name === 'Geist') ? 'Geist' : undefined;

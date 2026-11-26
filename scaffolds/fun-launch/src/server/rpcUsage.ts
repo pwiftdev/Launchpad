@@ -28,10 +28,7 @@ const METHODS = new Set([
 const counts = new Map<string, number>();
 let timer: ReturnType<typeof setTimeout> | undefined;
 
-export function recordRpcUsage(
-  scope: 'web' | 'mobula',
-  body?: unknown
-) {
+export function recordRpcUsage(scope: 'web' | 'fallback' | 'indexer', body?: unknown) {
   if (process.env.RPC_USAGE_LOG !== 'true') return;
   let calls: unknown = null;
   if (typeof body === 'string') {

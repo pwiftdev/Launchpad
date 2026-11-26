@@ -47,13 +47,32 @@ import { recordRpcUsage } from './rpcUsage';
 const RPC_URL = process.env.RPC_URL as string;
 const POOL_CONFIG_KEY = process.env.POOL_CONFIG_KEY as string;
 
+/**
+ * Reads go to RPC_URL. When it fails or rate-limits and RPC_FALLBACK_URL is set, the same
+ * request is retried once against the fallback provider. Sent transactions are never retried here:
+ * a timeout does not prove the first provider dropped them.
+ */
+export async function rpcFetch(input: Parameters<typeof fetch>[0], init?: RequestInit) {
+  recordRpcUsage('web', init?.body);
+  const fallback = process.env.RPC_FALLBACK_URL;
+  const send = (url: Parameters<typeof fetch>[0]) =>
+    fetch(url, { ...init, signal: AbortSignal.timeout(8000) });
+  const retryable = !fallback || !/"method":"sendTransaction"/.test(String(init?.body ?? ''));
+  try {
+    const response = await send(input);
+    if (!fallback || !retryable || (response.status !== 429 && response.status < 500))
+      return response;
+  } catch (error) {
+    if (!fallback || !retryable) throw error;
+  }
+  recordRpcUsage('fallback', init?.body);
+  return send(fallback);
+}
+
 export const connection = new Connection(RPC_URL || 'http://127.0.0.1:8899', {
   commitment: 'confirmed',
   disableRetryOnRateLimit: true,
-  fetch: (input, init) => {
-    recordRpcUsage('web', init?.body);
-    return fetch(input, { ...init, signal: AbortSignal.timeout(8000) });
-  },
+  fetch: rpcFetch,
 });
 export const dbc = new DynamicBondingCurveClient(connection, 'confirmed');
 export const configKey = () => new PublicKey(POOL_CONFIG_KEY);
@@ -266,6 +285,14 @@ async function toCoin(
     isMigrated,
     priceSol,
     marketCapSol: priceSol * supply,
+    launchPriceSol:
+      Number(
+        getPriceFromSqrtPrice(
+          config.sqrtStartPrice as BN,
+          mintData.decimals,
+          asset.decimals
+        ).toString()
+      ) * quoteToSol,
   };
 }
 
@@ -290,6 +317,19 @@ export function invalidateCoinDiscovery(mint: string) {
   displayPools.invalidate();
   coinsGeneration++;
   coinsCache = null;
+}
+
+/** Every coin read again from chain now, for the display indexer. */
+export async function freshCoins(): Promise<Coin[]> {
+  coinsGeneration++;
+  coinsCache = null;
+  return listCoins();
+}
+
+/** One coin's display state read again from chain now, for the display indexer. */
+export async function freshCoin(mint: string): Promise<Coin | null> {
+  invalidateCoinDisplay(mint);
+  return (await getCoin(mint, { fresh: false }))?.coin ?? null;
 }
 
 /** All pools on our config, newest first. */

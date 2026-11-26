@@ -90,6 +90,7 @@ export function validateEnv(env = process.env) {
     'WALLET_WORKER_ENABLED',
     'MAINNET_TRADING_ENABLED',
     'LAUNCHPAD_PUBLIC',
+    'DISPLAY_INDEXER',
   ])
     if (env[key] !== undefined && !['true', 'false'].includes(env[key]))
       throw new Error(`Invalid ${key}`);
@@ -148,6 +149,10 @@ export function validateEnv(env = process.env) {
   }
   if (env.NEXT_PUBLIC_NETWORK === 'mainnet-beta' && env.NEXT_PUBLIC_DEMO_LAUNCHES === 'true')
     throw new Error('Demo launches must be disabled on mainnet');
+  if (env.DISPLAY_INDEXER === 'true' && !/^postgres(?:ql)?:\/\//.test(env.DATABASE_URL || ''))
+    throw new Error('The display indexer requires a Postgres database');
+  if (env.RPC_FALLBACK_URL && new URL(env.RPC_FALLBACK_URL).protocol !== 'https:' && !localValidator)
+    throw new Error('RPC_FALLBACK_URL must use HTTPS');
   if (env.MAINNET_TRADING_ENABLED === 'true' && env.NEXT_PUBLIC_NETWORK !== 'mainnet-beta')
     throw new Error('MAINNET_TRADING_ENABLED requires the explicitly selected mainnet network');
   if (

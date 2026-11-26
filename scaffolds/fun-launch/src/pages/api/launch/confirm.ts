@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { apiGuard } from '@/server/apiGuard';
 import { connection, networkGenesis, getConfig, invalidateCoinDiscovery } from '@/server/dbc';
 import { launchIntent, registeredCoin, recordFinalizedLaunch } from '@/server/launchRegistry';
+import { touchDisplayIndex } from '@/server/display';
 import {
   configuredVaultProgram,
   verifyConfigAccount,
@@ -129,6 +130,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       creator_share_bps: intent.creator_share_bps ?? null,
     });
     invalidateCoinDiscovery(saved.mint);
+    await touchDisplayIndex(saved.mint);
     return res.status(200).json({
       status: 'registered',
       genesis,

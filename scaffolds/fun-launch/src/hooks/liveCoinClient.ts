@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import type { Coin, Trade, TradesResponse } from '@/lib/coin';
 type Source = Pick<EventSource, 'addEventListener' | 'close'> & {
   onerror: ((event: Event) => unknown) | null;
 };
@@ -80,21 +81,30 @@ export function watchLiveCoin(
           for (const activeClient of created.clients.keys())
             invalidateCoinQueries(activeClient, mint, holders);
         };
-      let holdersAt = 0;
+      // Updates carry the changed coin and its newest trades, so viewers apply them without a
+      // request. Only a new holder scan, or an update the page cannot apply, triggers a refetch.
       source.addEventListener('ready', () => {
         if (!created.users) return;
         status(true);
-        holdersAt = Date.now();
         invalidate(true);
       });
-      source.addEventListener('update', () => {
-        if (created.timer || !created.users) return;
+      let holders = false;
+      source.addEventListener('update', (event?: Event) => {
+        if (!created.users) return;
+        const update = parseUpdate(event);
+        let applied = true;
+        for (const activeClient of created.clients.keys())
+          applied = applyUpdate(activeClient, mint, update) && applied;
+        if (applied) return;
+        // Bursts of updates the page cannot apply collapse into one refetch.
+        if (update?.kind === 'holders') holders = true;
+        if (created.timer) return;
         created.timer = setTimeout(() => {
           created.timer = undefined;
           if (!created.users) return;
-          const holders = Date.now() - holdersAt >= 15_000;
-          if (holders) holdersAt = Date.now();
-          invalidate(holders);
+          const withHolders = holders;
+          holders = false;
+          invalidate(withHolders);
         }, 350);
       });
       source.onerror = () => status(false);
@@ -115,4 +125,39 @@ export function watchLiveCoin(
     env.window.removeEventListener('offline', availability);
     disconnect(false);
   };
+}
+
+type LiveUpdate = { kind?: string; coin?: Coin; trades?: Trade[] };
+function parseUpdate(event?: Event): LiveUpdate | null {
+  try {
+    const data = (event as MessageEvent<string> | undefined)?.data;
+    return data ? (JSON.parse(data) as LiveUpdate) : null;
+  } catch {
+    return null;
+  }
+}
+const MAX_TRADES = 2000;
+/** Applies a pushed update to the cache. Returns false when the page must refetch instead. */
+export function applyUpdate(client: QueryClient, mint: string, update: LiveUpdate | null) {
+  if (!update || (update.kind !== 'coin' && update.kind !== 'trades')) return false;
+  if (update.coin?.mint === mint) client.setQueryData<Coin>(['coin', mint], update.coin);
+  if (update.kind === 'trades') {
+    const pushed = update.trades ?? [];
+    client.setQueryData<TradesResponse>(['trades', mint], (current) => {
+      if (!current) return current;
+      const seen = new Set<string>();
+      const trades = [...pushed, ...current.trades]
+        .filter((trade) => {
+          const id =
+            trade.id ?? `${trade.sig}:${trade.instructionIndex ?? 0}:${trade.eventIndex ?? 0}`;
+          if (seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        })
+        .sort((a, b) => b.ts - a.ts)
+        .slice(0, MAX_TRADES);
+      return { ...current, trades };
+    });
+  }
+  return true;
 }

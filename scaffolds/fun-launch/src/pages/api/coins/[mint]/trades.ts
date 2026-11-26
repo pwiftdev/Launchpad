@@ -1,11 +1,11 @@
 import { apiGuard } from '@/server/apiGuard';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { parseKey } from '@/server/dbc';
-import { getCoinActivity } from '@/server/activity';
+import { displayStore } from '@/server/display';
 import type { TradesResponse } from '@/lib/coin';
 
-// The panel shows the latest trades; totals still cover the full history
-const RETURNED_TRADES = 500;
+// The panel and chart show the latest trades; fee totals cover the full indexed history.
+const RETURNED_TRADES = 2000;
 
 export default async function handler(
   req: NextApiRequest,
@@ -15,19 +15,25 @@ export default async function handler(
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const mint = parseKey(req.query.mint);
   if (!mint) return res.status(400).json({ error: 'Invalid mint address' });
+  const store = displayStore();
+  if (!store) return res.status(503).json({ error: 'Trade history is unavailable' });
   try {
-    const activity = await getCoinActivity(mint.toBase58());
-    if (!activity) return res.status(404).json({ error: 'Coin not found on MSKD.fun' });
+    const coin = await store.coin(mint.toBase58());
+    if (!coin) return res.status(404).json({ error: 'Coin not found on MSKD.fun' });
+    const [history, pot, status] = await Promise.all([
+      store.trades(coin, RETURNED_TRADES),
+      store.pot(coin),
+      store.status(),
+    ]);
     res.setHeader('Cache-Control', 'private, no-store');
     res.status(200).json({
-      trades: activity.history.trades.slice(0, RETURNED_TRADES),
-      launchPriceSol: activity.launchPriceSol,
-      quoteToSol: activity.coin.quoteToSol,
-      pot: activity.pot,
-      complete: activity.history.complete && activity.history.trades.length <= RETURNED_TRADES,
-      stale: activity.history.stale,
-      updatedAt: activity.history.updatedAt,
-      pendingCount: activity.history.pendingCount,
+      trades: history.trades,
+      launchPriceSol: coin.launchPriceSol ?? history.trades.at(-1)?.priceSol ?? coin.priceSol,
+      quoteToSol: coin.quoteToSol,
+      pot,
+      complete: history.complete,
+      stale: status.stale,
+      updatedAt: Math.floor(Date.now() / 1000),
     });
   } catch {
     console.error('Trades request failed');

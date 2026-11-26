@@ -16,6 +16,7 @@ import {
 } from '@/lib/demo';
 import { useDemoMode } from './useDemoMode';
 import { useLiveCoin } from './useLiveCoin';
+import { useBoardLive } from './useBoardLive';
 export { invalidateCoinQueries } from './useLiveCoin';
 
 async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
@@ -36,6 +37,7 @@ const fetchHolders = (mint: string, signal?: AbortSignal) =>
 
 export function useCoins() {
   const { visible } = useDemoMode();
+  const live = useBoardLive();
   const query = useQuery({
     queryKey: ['coins'],
     queryFn: async ({ signal }) => {
@@ -43,8 +45,9 @@ export function useCoins() {
       if (!data.clockStale) syncServerClock(data.serverTime);
       return data;
     },
-    refetchInterval: 8_000,
-    staleTime: 4_000,
+    // Live updates refetch on change; the timer only covers a dropped stream.
+    refetchInterval: live.connected ? 60_000 : 10_000,
+    staleTime: 2_000,
   });
   const coins = visible ? [...getDemoCoins(), ...(query.data?.coins ?? [])] : query.data?.coins;
   return {
@@ -76,7 +79,7 @@ export function useCoin(mint: string | undefined) {
     enabled: !!mint,
     initialData: () => getDemoCoin(mint) ?? fromBoard(client, mint),
     initialDataUpdatedAt: 0,
-    refetchInterval: live.connected ? 10000 : 4000,
+    refetchInterval: live.connected ? 60_000 : 10_000,
     retry: (count, error) => count < 2 && !String(error).includes('not found'),
   });
 }
@@ -88,7 +91,7 @@ export function useTrades(mint: string | undefined) {
     queryKey: ['trades', mint],
     queryFn: ({ signal }) => (demo ? getDemoTrades(demo) : fetchTrades(mint!, signal)),
     enabled: !!mint,
-    refetchInterval: demo ? false : live.connected ? 6000 : 3000,
+    refetchInterval: demo ? false : live.connected ? 60_000 : 10_000,
     staleTime: 2_000,
     retry: 1,
   });
@@ -101,7 +104,7 @@ export function useHolders(mint: string | undefined) {
     queryKey: ['holders', mint],
     queryFn: ({ signal }) => (demo ? getDemoHolders(demo) : fetchHolders(mint!, signal)),
     enabled: !!mint,
-    refetchInterval: demo ? false : live.connected ? 30_000 : 20_000,
+    refetchInterval: demo ? false : live.connected ? 120_000 : 30_000,
     staleTime: 15_000,
     retry: 1,
   });
@@ -109,6 +112,7 @@ export function useHolders(mint: string | undefined) {
 
 export function useTrending(enabled = true) {
   const { visible } = useDemoMode();
+  const live = useBoardLive(enabled);
   const query = useQuery({
     queryKey: ['trending'],
     enabled,
@@ -117,8 +121,8 @@ export function useTrending(enabled = true) {
       if (!data.clockStale) syncServerClock(data.serverTime);
       return data;
     },
-    refetchInterval: 30_000,
-    staleTime: 15_000,
+    refetchInterval: live.connected ? 120_000 : 30_000,
+    staleTime: 5_000,
   });
   if (!visible) return query;
   const data: TrendingResponse = {

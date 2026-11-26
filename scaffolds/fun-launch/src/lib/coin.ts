@@ -43,6 +43,8 @@ export type Coin = {
   isMigrated: boolean;
   priceSol: number;
   marketCapSol: number;
+  /** Curve start price, SOL per token, for the first candle. */
+  launchPriceSol?: number;
 };
 
 export type CoinsResponse = {
@@ -78,6 +80,8 @@ export type HoldersResponse = {
   tokenSupply?: number;
   excludedSupply?: number;
   scope?: 'largest-token-accounts';
+  /** Every holder in the latest full scan; the list may show only the largest. */
+  holderCount?: number;
   sampledAccounts?: number;
   partial?: boolean;
   snapshotSlot?: number;

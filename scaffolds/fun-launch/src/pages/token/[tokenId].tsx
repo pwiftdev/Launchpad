@@ -9,7 +9,7 @@ import { LogoMark } from '@/components/brand/Logo';
 import { BRAND } from '@/constants/brand';
 import { useCoin } from '@/hooks/useCoins';
 import { parseKey } from '@/server/dbc';
-import { findCoin } from '@/server/activity';
+import { displayCoin } from '@/server/display';
 import { getDemoCoin } from '@/lib/demo';
 import { adminPageRedirect } from '@/server/adminPage';
 
@@ -22,7 +22,7 @@ export const getServerSideProps: GetServerSideProps<{ share: ShareMeta }> = asyn
   const { params } = context;
   const mint = String(params?.tokenId ?? '');
   const coin =
-    getDemoCoin(mint) ?? (parseKey(mint) ? await findCoin(mint).catch((): null => null) : null);
+    getDemoCoin(mint) ?? (parseKey(mint) ? await displayCoin(mint).catch((): null => null) : null);
   if (!coin) return { notFound: true };
   const origin = BRAND.url;
   return {
