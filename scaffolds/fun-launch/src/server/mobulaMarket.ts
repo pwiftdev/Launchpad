@@ -8,6 +8,7 @@ import { recordRpcUsage } from './rpcUsage';
 const DAY_SECONDS = 86_400;
 const POOL_RETRY_MS = 5 * 60_000;
 const TIMEOUT_MS = 650;
+const PROVIDER_FAILURES = new Set([401, 403, 429]);
 const tradeSample = z.object({
   data: z.array(
     z.object({
@@ -100,10 +101,10 @@ export async function mobulaMarketSample(coin: Coin, limit: number, now: number)
     });
     if (!response.ok) {
       await response.body?.cancel().catch(() => {});
-      if (response.status !== 404) providerRetryAt = Date.now() + 60_000;
+      if (PROVIDER_FAILURES.has(response.status)) providerRetryAt = Date.now() + 60_000;
     } else body = JSON.parse((await readLimited(response, 256 * 1024)).toString('utf8'));
   } catch {
-    providerRetryAt = Date.now() + 60_000;
+    body = null;
   }
 
   const sample = tradeSample.safeParse(body);

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import type { Coin } from '@/lib/coin';
 import type { MarketStats, TokenMarket } from '@/lib/market';
-import { summarizeMarket } from '@/lib/market';
+import { summarizeMarket, totalPoolReserves } from '@/lib/market';
 import { getDemoCoins, getDemoTrades } from '@/lib/demo';
 import type { SolanaMarket } from '@/lib/solanaMarket';
 import { useDemoMode } from './useDemoMode';
@@ -56,14 +56,11 @@ export function useLaunchpadMarket(coins: Coin[] | undefined) {
     : data?.trackedPools
       ? data.trades
       : null;
-  const liquidity = useMemo(
-    () => coins?.reduce((sum, coin) => sum + (coin.isMigrated ? 0 : coin.quoteReserveSol), 0),
-    [coins]
-  );
+  const liquidity = useMemo(() => (coins ? totalPoolReserves(coins) : undefined), [coins]);
   const coverage = preview
     ? 'Simulated sample activity. No real funds or trading.'
-    : 'Recent swaps within 24 hours, sampled across up to 8 pools. ' +
-      (data ? `${data.trackedPools} of ${data.totalPools} pools tracked.` : 'Loading.');
+    : 'Recent swap samples within 24 hours. ' +
+      (data ? `${data.trackedPools} of ${data.totalPools} pools sampled.` : 'Loading.');
   return { data, isFetching, preview, volume, swaps, liquidity, coverage };
 }
 

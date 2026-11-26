@@ -5,6 +5,7 @@ import { useNow } from '@/hooks/useNow';
 import { NETWORK, NETWORK_LABEL } from '@/constants/network';
 import { formatUsd, useUsd } from '@/hooks/useUsd';
 import { useLaunchpadMarket } from '@/hooks/useMarket';
+import { POOL_RESERVES_DESCRIPTION } from '@/lib/market';
 import { cn } from '@/lib/utils';
 
 const number = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
@@ -68,9 +69,9 @@ export const StatusBar = () => {
           title={coverage}
         />
         <Stat
-          label={preview ? 'Preview liquidity' : 'In curves'}
+          label={preview ? 'Preview reserves' : 'Pool reserves'}
           value={liquidity === undefined ? '?' : usd(liquidity)}
-          title="Quote reserves in unbonded curves on this board"
+          title={POOL_RESERVES_DESCRIPTION}
         />
         <Stat
           label="TPS"

@@ -36,7 +36,7 @@ import {
   type LaunchMode,
   type RegisteredCoin,
 } from './launchRegistry';
-import { loadMigratedPool, migratedPrice } from './damm';
+import { loadMigratedPool, migratedPrice, migratedQuoteReserve } from './damm';
 import { hasSocials, SOCIAL_KINDS, type Socials } from '@/lib/socials';
 import { readDisplayClock } from './displayClock';
 import { allowsMskdIdentity } from './officialMskd';
@@ -216,11 +216,14 @@ async function toCoin(
   );
   const isMigrated = Number(s.isMigrated) === 1;
   let migratedPool: string | undefined;
+  let migratedQuoteReserveSol: number | undefined;
   let migratedBaseIsA: boolean | undefined;
   if (isMigrated) {
     const migrated = await loadMigratedPool(connection, config, s.baseMint);
     priceSol = migratedPrice(migrated.state, s.baseMint, mintData.decimals, config.quoteMint);
     migratedPool = migrated.address.toBase58();
+    const reserve = migratedQuoteReserve(migrated.state, config.quoteMint);
+    if (reserve !== undefined) migratedQuoteReserveSol = reserve * quoteToSol;
     migratedBaseIsA = migrated.state.tokenAMint.equals(s.baseMint);
   }
   priceSol *= quoteToSol;
@@ -238,6 +241,7 @@ async function toCoin(
     tokenDecimals: mintData.decimals,
     tokenSupply: supply,
     migratedPool,
+    migratedQuoteReserveSol,
     migratedBaseIsA,
     dbcCollectFeeMode: config.collectFeeMode,
     name,

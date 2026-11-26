@@ -1,4 +1,4 @@
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import {
   NATIVE_MINT,
   unpackMint,
@@ -8,6 +8,7 @@ import {
 import {
   CpAmm,
   CP_AMM_PROGRAM_ID,
+  getLiquidityHandler,
   getTokenProgram,
   decodePodAlignedFeeTimeScheduler,
   type PoolState,
@@ -95,6 +96,19 @@ export function migratedPrice(
   );
   if (!Number.isFinite(price) || price <= 0) throw new Error('Invalid graduated pool price');
   return baseIsA ? price : 1 / price;
+}
+
+export function migratedQuoteReserve(state: PoolState, quote: PublicKey) {
+  const quoteIsA = state.tokenAMint.equals(quote);
+  if (!quoteIsA && !state.tokenBMint.equals(quote)) return undefined;
+  const reserves =
+    state.layoutVersion === 1
+      ? [state.tokenAAmount, state.tokenBAmount]
+      : state.layoutVersion === 0
+        ? getLiquidityHandler(state).getReservesAmount()
+        : [];
+  const reserve = reserves[quoteIsA ? 0 : 1];
+  return reserve && !reserve.isNeg() ? Number(reserve.toString()) / LAMPORTS_PER_SOL : undefined;
 }
 
 /** Quotes and builds only the deterministic migrated pool belonging to this DBC launch. */

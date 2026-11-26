@@ -5,6 +5,8 @@ import { useLocalSetting } from '@/hooks/useLocalSetting';
 import { useLaunchpadMarket } from '@/hooks/useMarket';
 import { useUsd } from '@/hooks/useUsd';
 import { SCHEDULE, pct } from '@/lib/feeModes';
+import { formatReadableNumber } from '@/lib/format/number';
+import { POOL_RESERVES_DESCRIPTION } from '@/lib/market';
 import { cn } from '@/lib/utils';
 import { LogoMark } from '../brand/Logo';
 import { Decrypt } from '../brand/Decrypt';
@@ -62,7 +64,7 @@ function OverviewStats({
   bonded?: number;
 }) {
   const market = useLaunchpadMarket(coins);
-  const { usd } = useUsd();
+  const { usd, price } = useUsd();
   return (
     <div className="grid min-w-0 auto-rows-fr gap-4 sm:grid-cols-2 lg:gap-5">
       <section aria-label="Launchpad statistics" className="flex min-w-0 flex-col gap-2">
@@ -72,9 +74,14 @@ function OverviewStats({
             <Tile label="Launched" value={total === undefined ? '—' : count.format(total)} />
             <Tile label="Bonded" value={bonded === undefined ? '—' : count.format(bonded)} accent />
             <Tile
-              label="In curves"
+              label="Pool reserves"
               value={market.liquidity === undefined ? '—' : usd(market.liquidity)}
-              title="Total quote reserves in unbonded curves"
+              detail={
+                price && market.liquidity !== undefined
+                  ? `${formatReadableNumber(market.liquidity)} SOL eq.`
+                  : undefined
+              }
+              title={POOL_RESERVES_DESCRIPTION}
             />
             <Tile
               label={market.preview ? 'Sample volume' : 'Volume · 24h'}
@@ -150,12 +157,14 @@ function BoardIntro() {
 function Tile({
   label,
   value,
+  detail,
   title,
   accent,
   wide,
 }: {
   label: string;
   value: string;
+  detail?: string;
   title?: string;
   accent?: boolean;
   wide?: boolean;
@@ -176,6 +185,7 @@ function Tile({
       >
         {value}
       </dd>
+      {detail && <dd className="mt-1 font-mono text-[10px] text-neutral-400">{detail}</dd>}
     </div>
   );
 }

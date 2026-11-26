@@ -8,13 +8,22 @@ import { summarizeMarket, type MarketStats, type TokenMarket } from '@/lib/marke
 import type { Coin, Trade } from '@/lib/coin';
 
 const TTL_MS = 60_000;
-const POOL_LIMIT = 8;
+const QUIET_POOL_TTL_SECONDS = 300;
+const POOL_CONCURRENCY = 4;
 const TX_LIMIT = 24;
-const samplesByPool = new Map<string, Map<string, Trade[]>>();
+type PoolSample = {
+  decoded: Map<string, Trade[]>;
+  quiet?: { until: number; reserve: number; price: number };
+};
+const samplesByPool = new Map<string, PoolSample>();
 let cached: MarketStats | null = null;
 let pending: Promise<MarketStats> | null = null;
 
-async function tokenStats(coin: Coin, now: number): Promise<TokenMarket> {
+function poolSampleKey(coin: Coin) {
+  return `${coin.migratedPool ?? coin.pool}:${coin.tokenDecimals}:${coin.migratedBaseIsA}:${coin.dbcCollectFeeMode}`;
+}
+
+async function tokenStats(coin: Coin, now: number, key: string): Promise<TokenMarket> {
   const pool = coin.migratedPool ?? coin.pool;
   const since = Math.floor(now) - 86400;
   const signatures = await connection.getSignaturesForAddress(
@@ -23,8 +32,7 @@ async function tokenStats(coin: Coin, now: number): Promise<TokenMarket> {
     'confirmed'
   );
   const recent = signatures.filter((sig) => !sig.err && (sig.blockTime ?? 0) >= since);
-  const key = `${pool}:${coin.tokenDecimals}:${coin.migratedBaseIsA}:${coin.dbcCollectFeeMode}`;
-  const previous = samplesByPool.get(key);
+  const previous = samplesByPool.get(key)?.decoded;
   const missing = recent.filter(({ signature }) => !previous?.has(signature));
   const txs = missing.length
     ? await connection.getTransactions(
@@ -46,19 +54,68 @@ async function tokenStats(coin: Coin, now: number): Promise<TokenMarket> {
       // Retry observations that cannot be decoded on this refresh.
     }
   }
-  samplesByPool.delete(key);
-  if (samplesByPool.size >= 64) samplesByPool.delete(samplesByPool.keys().next().value!);
-  samplesByPool.set(key, sample);
   const trades = recent.flatMap(({ signature }) =>
     (sample.get(signature) ?? []).map((trade) => displayTrade(trade, coin))
   );
-  const incomplete =
-    sample.size !== recent.length || signatures.some((sig) => sig.blockTime === null);
   const oldest = signatures.at(-1)?.blockTime ?? 0;
+  const incomplete =
+    sample.size !== recent.length ||
+    signatures.some((sig) => sig.blockTime === null) ||
+    (signatures.length === TX_LIMIT && oldest >= since);
   // A graduated snapshot samples its current pool; earlier DBC trades are outside this sample.
-  const partial =
-    Boolean(coin.migratedPool) || incomplete || (signatures.length === TX_LIMIT && oldest >= since);
-  return summarizeMarket(trades, coin.marketCapSol, partial, now);
+  const stats = summarizeMarket(
+    trades,
+    coin.marketCapSol,
+    Boolean(coin.migratedPool) || incomplete,
+    now
+  );
+  samplesByPool.set(key, {
+    decoded: sample,
+    quiet:
+      trades.length === 0 && !incomplete
+        ? {
+            until: now + QUIET_POOL_TTL_SECONDS,
+            reserve: coin.quoteReserveSol,
+            price: coin.priceSol,
+          }
+        : undefined,
+  });
+  return stats;
+}
+
+async function samplePool(coin: Coin, now: number) {
+  const key = poolSampleKey(coin);
+  const previous = samplesByPool.get(key);
+  const quiet = previous?.quiet;
+  if (
+    quiet &&
+    now < quiet.until &&
+    coin.quoteReserveSol === quiet.reserve &&
+    coin.priceSol === quiet.price
+  )
+    return summarizeMarket([], coin.marketCapSol, Boolean(coin.migratedPool), now);
+  if (previous) previous.quiet = undefined;
+  const indexed = await mobulaMarketSample(coin, TX_LIMIT, now).catch((): null => null);
+  return indexed ?? tokenStats(coin, now, key);
+}
+
+async function samplePools(coins: Coin[], now: number) {
+  const active = new Set(coins.map(poolSampleKey));
+  for (const key of samplesByPool.keys()) if (!active.has(key)) samplesByPool.delete(key);
+  const tokens: Record<string, TokenMarket> = {};
+  let next = 0;
+  async function sampleNext() {
+    for (let i = next++; i < coins.length; i = next++) {
+      const coin = coins[i]!;
+      try {
+        tokens[coin.mint] = await samplePool(coin, now);
+      } catch {
+        /* Unavailable pools remain absent, rather than reporting a false zero. */
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(POOL_CONCURRENCY, coins.length) }, sampleNext));
+  return tokens;
 }
 
 async function loadMarket(): Promise<MarketStats> {
@@ -78,31 +135,13 @@ async function loadMarket(): Promise<MarketStats> {
     };
   })().catch((): MarketStats['network'] => ({ slot: null, rpcMs: null, tps: null }));
   const coins = await listCoins();
-  // Keep page traffic bounded even if the launchpad grows: at most 192 transaction reads/minute.
   const officialMint = BRAND.officialMint;
-  const selected = [...coins]
-    .sort(
-      (a, b) =>
-        Number(b.mint === officialMint) - Number(a.mint === officialMint) ||
-        b.launchedAt - a.launchedAt
-    )
-    .slice(0, POOL_LIMIT);
-  const now = Date.now() / 1000;
-  const indexed = selected.map((coin) =>
-    mobulaMarketSample(coin, TX_LIMIT, now).catch((): null => null)
+  const ordered = [...coins].sort(
+    (a, b) =>
+      Number(b.mint === officialMint) - Number(a.mint === officialMint) ||
+      b.launchedAt - a.launchedAt
   );
-  const tokens: Record<string, TokenMarket> = {};
-  for (let i = 0; i < selected.length; i += 2) {
-    await Promise.all(
-      selected.slice(i, i + 2).map(async (coin, offset) => {
-        try {
-          tokens[coin.mint] = (await indexed[i + offset]) ?? (await tokenStats(coin, now));
-        } catch {
-          /* Unavailable pools remain absent, rather than reporting a false zero. */
-        }
-      })
-    );
-  }
+  const tokens = await samplePools(ordered, Date.now() / 1000);
   const tracked = Object.values(tokens);
   return {
     updatedAt: Math.floor(Date.now() / 1000),

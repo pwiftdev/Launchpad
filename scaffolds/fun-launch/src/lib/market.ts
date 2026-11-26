@@ -1,4 +1,4 @@
-import type { Trade } from './coin';
+import type { Coin, Trade } from './coin';
 import { tradeValueSol } from './pot';
 
 export type TokenMarket = {
@@ -21,6 +21,22 @@ export type MarketStats = {
   totalPools: number;
   partial: boolean;
 };
+
+export const POOL_RESERVES_DESCRIPTION =
+  'SOL and hSOL quote reserves in active bonding curves and graduated DAMM pools.';
+
+export function totalPoolReserves(
+  coins: Pick<Coin, 'isDemo' | 'isMigrated' | 'quoteReserveSol' | 'migratedQuoteReserveSol'>[]
+) {
+  let total = 0;
+  for (const coin of coins) {
+    const reserve =
+      coin.isMigrated && !coin.isDemo ? coin.migratedQuoteReserveSol : coin.quoteReserveSol;
+    if (reserve === undefined || !Number.isFinite(reserve) || reserve < 0) return undefined;
+    total += reserve;
+  }
+  return total;
+}
 
 /** Only actual observations enter the series; missing histories do not get invented movement. */
 export function summarizeMarket(

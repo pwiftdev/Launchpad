@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Trade } from './coin';
-import { sparklinePaths, summarizeMarket } from './market';
+import { sparklinePaths, summarizeMarket, totalPoolReserves } from './market';
 
 const now = 2_000_000;
 const trade = (overrides: Partial<Trade>): Trade => ({
@@ -54,6 +54,23 @@ describe('market summaries', () => {
     expect(data.points).toEqual([100, 100]);
     expect(data.changePercent).toBeNull();
     expect(data.volumeSol).toBe(0);
+  });
+});
+
+describe('launchpad pool reserves', () => {
+  it('adds current graduated reserves to active curves and counts each pool once', () => {
+    expect(
+      totalPoolReserves([
+        { isMigrated: false, quoteReserveSol: 3.5 },
+        { isMigrated: true, quoteReserveSol: 80, migratedQuoteReserveSol: 70.5 },
+        { isMigrated: true, quoteReserveSol: 80, migratedQuoteReserveSol: 0 },
+      ])
+    ).toBe(74);
+  });
+
+  it('waits for current graduated reserves when reading an older response', () => {
+    expect(totalPoolReserves([{ isMigrated: true, quoteReserveSol: 80 }])).toBeUndefined();
+    expect(totalPoolReserves([{ isMigrated: true, isDemo: true, quoteReserveSol: 80 }])).toBe(80);
   });
 });
 

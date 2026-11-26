@@ -22,6 +22,8 @@ export type Coin = {
   tokenDecimals?: number;
   tokenSupply?: number;
   migratedPool?: string;
+  /** Current quote reserves in the graduated pool, converted to SOL. */
+  migratedQuoteReserveSol?: number;
   /** Verified token order in the canonical graduated pool. */
   migratedBaseIsA?: boolean;
   dbcCollectFeeMode?: number;

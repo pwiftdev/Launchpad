@@ -19,6 +19,7 @@ import {
   loadMigratedPool,
   migratedPoolAddress,
   migratedPrice,
+  migratedQuoteReserve,
   migratedSwap,
   assertReleasedMigrationPolicy,
 } from './damm';
@@ -120,6 +121,23 @@ describe('verified graduation routing', () => {
     expect(
       migratedPrice({ ...pool.state, tokenAMint: NATIVE_MINT, tokenBMint: mint }, mint, 6)
     ).toBeCloseTo(0.001, 12);
+  });
+  it('uses live tracked quote reserves on either side of a graduated pool', async () => {
+    const { state } = await loadMigratedPool(rpc(), config, mint);
+    const reserves = {
+      ...state,
+      layoutVersion: 1,
+      tokenAAmount: new BN('70473580805'),
+      tokenBAmount: new BN('31234567890'),
+    };
+    expect(migratedQuoteReserve(reserves, NATIVE_MINT)).toBeCloseTo(31.23456789, 9);
+    expect(migratedQuoteReserve(reserves, mint)).toBeCloseTo(70.473580805, 9);
+    expect(migratedQuoteReserve(reserves, PublicKey.default)).toBeUndefined();
+    expect(migratedQuoteReserve({ ...reserves, layoutVersion: 2 }, NATIVE_MINT)).toBeUndefined();
+  });
+  it('derives quote reserves for older DAMM pools that lack tracked reserves', async () => {
+    const { state } = await loadMigratedPool(rpc(), config, mint);
+    expect(migratedQuoteReserve(state, NATIVE_MINT)).toBeGreaterThan(0);
   });
   it('quotes buys and sells through the real DAMM math, preserving the SOL-only fee unit', async () => {
     const connection = rpc();
