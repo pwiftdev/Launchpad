@@ -193,10 +193,8 @@ function Stats({
         )}
       </Stat>
       <Stat label="Holders">{holders ? holders.holders.length : '—'}</Stat>
-      <Stat label={coin.isMigrated ? 'Status' : 'Bonding'}>
-        {coin.isMigrated ? (
-          <span className="text-holo font-semibold">Bonded 🙏</span>
-        ) : (
+      {!coin.isMigrated && (
+        <Stat label="Bonding">
           <span className="inline-flex items-center gap-2">
             <span className={cn(bonding >= HOT_BOND_PROGRESS && 'font-semibold text-acid')}>
               {(bonding * 100).toFixed(bonding < 0.1 ? 2 : 1)}%
@@ -210,8 +208,8 @@ function Stats({
               <BondFill progress={bonding} />
             </span>
           </span>
-        )}
-      </Stat>
+        </Stat>
+      )}
     </dl>
   );
 }

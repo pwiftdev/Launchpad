@@ -14,8 +14,8 @@ import { AnimatedNumber } from '../ui/AnimatedNumber';
 import { PriceBackdrop } from '../coin/PriceBackdrop';
 import { useTokenMarket } from '@/hooks/useMarket';
 import { hasCurrentTaxSchedule } from '@/lib/launchTax';
-import { BRAND } from '@/constants/brand';
 import { BondFill, HOT_BOND_PROGRESS } from '../coin/BondingBar';
+import { SocialLinks } from '../coin/SocialLinks';
 
 /** 'up' / 'down' for ~1s after the value changes, so the row can flash. */
 function useChangeFlash(value: number): 'up' | 'down' | null {
@@ -38,14 +38,13 @@ type CoinCardProps = {
   compact?: boolean;
 };
 
-/** Board row. The whole row opens the coin panel; the star sits beside the link, not inside it. */
 export const CoinCard = memo(({ coin, isNew, compact }: CoinCardProps) => {
   const now = useNow(1000, coin.isDemo);
   const { usd } = useUsd();
   const flash = useChangeFlash(coin.marketCapSol);
   const market = useTokenMarket(coin);
   const down = (market?.changePercent ?? 0) < 0;
-  const pct = coin.isMigrated ? 100 : coin.progress * 100;
+  const pct = coin.progress * 100;
   const hot = !coin.isMigrated && coin.progress >= HOT_BOND_PROGRESS;
   const sniping =
     hasCurrentTaxSchedule(coin) &&
@@ -73,8 +72,11 @@ export const CoinCard = memo(({ coin, isNew, compact }: CoinCardProps) => {
       <CoinLink
         mint={coin.mint}
         aria-label={`${coin.name} ($${coin.symbol})`}
+        className="absolute inset-0 transition-colors hover:bg-neutral-900/25 focus-visible:bg-neutral-900/40 focus-visible:-outline-offset-2"
+      />
+      <div
         className={cn(
-          'relative flex items-center gap-3 px-3.5 pr-10 transition-colors hover:bg-neutral-900/25 focus-visible:bg-neutral-900/40 focus-visible:outline-none',
+          'pointer-events-none relative flex items-center gap-3 px-3.5 pr-10',
           compact ? 'py-2.5' : 'py-4'
         )}
       >
@@ -95,13 +97,7 @@ export const CoinCard = memo(({ coin, isNew, compact }: CoinCardProps) => {
                 DEMO
               </span>
             )}
-            {coin.isMigrated && !coin.isDemo ? (
-              <span className="bg-holo inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-extrabold tracking-wide text-ink">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={BRAND.assets.markSmall} alt="" className="h-3 w-3" />
-                BONDED
-              </span>
-            ) : !coin.isMigrated ? (
+            {!coin.isMigrated && (
               <TaxBadge
                 launchedAt={coin.launchedAt}
                 isMigrated={coin.isMigrated}
@@ -109,9 +105,16 @@ export const CoinCard = memo(({ coin, isNew, compact }: CoinCardProps) => {
                 feePolicyVersion={coin.feePolicyVersion}
                 hideWhenClean
               />
-            ) : null}
+            )}
           </div>
-          <p className="mt-1 truncate text-xs text-neutral-300">{coin.name}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+            <p className="min-w-0 truncate text-xs text-neutral-300">{coin.name}</p>
+            <SocialLinks
+              socials={coin.socials}
+              source={coin.source}
+              className="max-w-full flex-wrap gap-0 [&_a]:pointer-events-auto [&_a]:h-6 [&_a]:w-6"
+            />
+          </div>
           <p
             className="mt-1 truncate whitespace-nowrap font-mono text-[10px] text-neutral-500"
             suppressHydrationWarning
@@ -161,33 +164,33 @@ export const CoinCard = memo(({ coin, isNew, compact }: CoinCardProps) => {
             )}
             <span className="ml-1 text-[9px] font-normal text-neutral-500">recent</span>
           </span>
-          <span
-            className={cn(
-              'font-mono text-[10px] tabular',
-              coin.isMigrated ? 'text-cyan' : hot ? 'font-semibold text-acid' : 'text-neutral-400'
-            )}
-          >
-            {coin.isMigrated
-              ? 'Bonded'
-              : hot
-                ? `${pct.toFixed(0)}% · almost`
-                : `${pct.toFixed(pct < 10 ? 1 : 0)}% to bond`}
-          </span>
-          <span
-            className={cn(
-              'block h-1 w-20 overflow-hidden rounded-full bg-neutral-850',
-              hot && 'bond-track-hot'
-            )}
-            aria-hidden
-          >
-            <BondFill progress={coin.progress} isMigrated={coin.isMigrated} />
-          </span>
+          {!coin.isMigrated && (
+            <>
+              <span
+                className={cn(
+                  'font-mono text-[10px] tabular',
+                  hot ? 'font-semibold text-acid' : 'text-neutral-400'
+                )}
+              >
+                {hot ? `${pct.toFixed(0)}% · almost` : `${pct.toFixed(pct < 10 ? 1 : 0)}% to bond`}
+              </span>
+              <span
+                className={cn(
+                  'block h-1 w-20 overflow-hidden rounded-full bg-neutral-850',
+                  hot && 'bond-track-hot'
+                )}
+                aria-hidden
+              >
+                <BondFill progress={coin.progress} />
+              </span>
+            </>
+          )}
         </div>
-      </CoinLink>
+      </div>
       <StarButton
         mint={coin.mint}
         revealOnHover
-        className="absolute right-2 top-1/2 -translate-y-1/2"
+        className="absolute right-2 top-1/2 z-10 -translate-y-1/2"
       />
     </div>
   );

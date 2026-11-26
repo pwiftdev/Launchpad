@@ -1,12 +1,11 @@
 import Link from 'next/link';
 import type { Coin } from '@/lib/coin';
-import type { PotSummary } from '@/lib/pot';
 import { useUsd } from '@/hooks/useUsd';
 import { BondFill, HOT_BOND_PROGRESS } from '../coin/BondingBar';
 import { LogoMark } from '../brand/Logo';
-import { NETWORK_LABEL } from '@/constants/network';
+import { explorerUrl, NETWORK_LABEL } from '@/constants/network';
 import { formatReadableNumber } from '@/lib/format/number';
-import { cn } from '@/lib/utils';
+import { cn, shortenAddress } from '@/lib/utils';
 import { PanelSection } from './PanelSection';
 import { quoteAsset } from '@/lib/feeModes';
 
@@ -20,17 +19,9 @@ function mood(pct: number) {
   return 'Early days. Plenty of curve left.';
 }
 
-/** The bond meter: how far this coin is from bonding, in SOL, with the goal at the end. */
-export const PotMeter = ({
-  coin,
-  className,
-}: {
-  coin: Coin;
-  pot?: PotSummary;
-  className?: string;
-}) => {
+export const PotMeter = ({ coin }: { coin: Coin }) => {
   const { usd } = useUsd();
-  const pct = coin.isMigrated ? 100 : Math.min(Math.max(coin.progress * 100, 0), 100);
+  const pct = Math.min(Math.max(coin.progress * 100, 0), 100);
   const hot = !coin.isMigrated && pct >= HOT_BOND_PROGRESS * 100;
   const remainingSol = Math.max(coin.thresholdSol - coin.quoteReserveSol, 0);
   const { symbol } = quoteAsset(coin.quoteMint);
@@ -38,31 +29,39 @@ export const PotMeter = ({
 
   return (
     <PanelSection
-      title="Bond meter"
-      label="Bonding progress"
-      className={className}
+      title={coin.isMigrated ? 'Pool' : 'Bond meter'}
+      label={coin.isMigrated ? 'Trading pool' : 'Bonding progress'}
       aside={
-        <span
-          className={cn(
-            'font-mono text-xs font-semibold tabular-nums',
-            coin.isMigrated ? 'text-holo' : hot ? 'text-acid' : 'text-foreground'
-          )}
-        >
-          {coin.isMigrated ? 'Bonded' : `${pct.toFixed(pct < 10 ? 2 : 1)}%`}
-        </span>
+        coin.isMigrated ? undefined : (
+          <span
+            className={cn(
+              'font-mono text-xs font-semibold tabular-nums',
+              hot ? 'text-acid' : 'text-foreground'
+            )}
+          >
+            {pct.toFixed(pct < 10 ? 2 : 1)}%
+          </span>
+        )
       }
     >
       {coin.isMigrated ? (
-        <div className="holo-border relative flex items-center gap-3 overflow-hidden rounded-xl bg-neutral-900/60 p-3">
-          <LogoMark small animated className="h-10 w-10 shrink-0" />
-          <div className="min-w-0">
-            <p className="font-display text-sm font-bold tracking-tight">
-              <span className="text-holo">Bonded.</span>
-            </p>
-            <p className="mt-0.5 text-[11px] text-neutral-400">
-              Bonded and trading on Meteora DAMM v2.
-            </p>
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-neutral-900/60 px-3 py-2.5">
+          <span className="flex min-w-0 items-center gap-2 text-[12px] text-neutral-300">
+            <span aria-hidden className="iconify h-4 w-4 shrink-0 text-primary ph--swap" />
+            Trading on Meteora DAMM v2
+          </span>
+          {coin.migratedPool && !coin.isDemo && (
+            <a
+              href={explorerUrl(`address/${coin.migratedPool}`)}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`View Meteora pool ${coin.migratedPool} in explorer`}
+              className="inline-flex shrink-0 items-center gap-1 font-mono text-[11px] text-primary hover:underline"
+            >
+              {shortenAddress(coin.migratedPool)}
+              <span aria-hidden className="iconify h-3 w-3 ph--arrow-up-right" />
+            </a>
+          )}
         </div>
       ) : (
         <>

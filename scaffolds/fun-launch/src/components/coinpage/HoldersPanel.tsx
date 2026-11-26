@@ -308,7 +308,7 @@ export const HoldersPanel = ({
           </>
         ) : tab === 'pot' ? (
           <div className="grid gap-6 p-4 md:grid-cols-2">
-            <PotMeter coin={coin} pot={trades?.pot} />
+            <PotMeter coin={coin} />
             <FairnessCard holders={holders} coin={coin} />
           </div>
         ) : null}

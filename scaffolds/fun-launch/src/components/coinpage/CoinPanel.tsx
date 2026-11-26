@@ -96,7 +96,7 @@ export const CoinPanel = ({ coin, headerActions, className }: CoinPanelProps) =>
           </div>
           {!coin.isDemo && <TokenChatRoom mint={coin.mint} symbol={coin.symbol} />}
           <div className="order-5 min-w-0 divide-y divide-neutral-850">
-            <PotMeter coin={coin} pot={trades.data?.pot} />
+            <PotMeter coin={coin} />
             <TokenAbout coin={coin} />
             <FairnessCard holders={holders.data} coin={coin} />
             <RewardsPanel coin={coin} />

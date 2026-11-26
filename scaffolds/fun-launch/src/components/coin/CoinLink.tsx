@@ -5,6 +5,7 @@ type CoinLinkProps = React.PropsWithChildren<{
   mint: string;
   className?: string;
   'aria-label'?: string;
+  title?: string;
 }>;
 
 /**

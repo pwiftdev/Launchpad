@@ -9,6 +9,7 @@ import { useLocalSetting } from '@/hooks/useLocalSetting';
 import { LogoMark, NetworkBadge, Wordmark } from '../brand/Logo';
 import { usePalette } from './paletteContext';
 import { BRAND } from '@/constants/brand';
+import { OfficialTokenPill } from './OfficialTokenPill';
 
 export const TopBar = () => {
   const { setOpen } = usePalette();
@@ -58,13 +59,7 @@ export const TopBar = () => {
       </button>
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
-        <span
-          className="hidden items-center gap-1.5 rounded-md px-2 py-1 font-term text-[10px] uppercase tracking-[0.12em] text-neutral-500 lg:flex"
-          title="No KYC, no account, no email. Your wallet is your only login."
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-signal" />
-          No KYC
-        </span>
+        <OfficialTokenPill />
         <NetworkBadge className="hidden sm:inline" />
         {address && <ProfileEditorButton compact />}
         {address ? (
