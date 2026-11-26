@@ -137,6 +137,14 @@
     {
       "file": "034-hsol-holder-modes.sql",
       "sha256": "5733cf32f387624259cc443c150f208a1169b4edcd9b50564a0efc9733b4b985"
+    },
+    {
+      "file": "035-mskd-buyback-bucket.sql",
+      "sha256": "cafd2347ce37154da7f6d9b62cf422fcdfe57f4d69c170680fd01bea6a853bd7"
+    },
+    {
+      "file": "036-masked-launch.sql",
+      "sha256": "b15412df30f192f93e3590eb05b93d4ba1eb8c34687e8e391ce2b75fabffe9e0"
     }
   ],
   "catalog": {
@@ -2820,6 +2828,16 @@
         "numeric_scale": null
       },
       {
+        "table_name": "launch_coins",
+        "column_name": "creator_share_bps",
+        "udt_name": "int2",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 16,
+        "numeric_scale": 0
+      },
+      {
         "table_name": "launch_configs",
         "column_name": "network_genesis",
         "udt_name": "varchar",
@@ -3488,6 +3506,16 @@
         "character_maximum_length": null,
         "numeric_precision": null,
         "numeric_scale": null
+      },
+      {
+        "table_name": "pending_launch_intents",
+        "column_name": "creator_share_bps",
+        "udt_name": "int2",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 16,
+        "numeric_scale": 0
       },
       {
         "table_name": "token_callouts",
@@ -4195,6 +4223,16 @@
         "udt_name": "numeric",
         "is_nullable": "NO",
         "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 78,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "wallet_collections",
+        "column_name": "mskd_buyback",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": "0",
         "character_maximum_length": null,
         "numeric_precision": 78,
         "numeric_scale": 0
@@ -6834,17 +6872,17 @@
       },
       {
         "table_name": "launch_coins",
-        "name": "check:319d15f302ae0893e5a9e956688a2f64beb77806c30e3f678b37b5a5e56a7603",
+        "name": "check:1fcfca564d146d073b57ce9b8354b1cd15d77562da8a0d22701b4aa07a8c0ef7",
         "type": "c",
         "validated": true,
-        "definition": "CHECK (((mode = ANY (ARRAY['community'::text, 'cashback'::text, 'mskd'::text, 'cashback-hsol'::text, 'mskd-hsol'::text])) OR ((recipient)::text = (original_deployer)::text)))"
+        "definition": "CHECK (((policy_version <> ALL (ARRAY['bond-v1'::text, 'mskd-v1'::text, 'dev-v1'::text, 'cashback-v1'::text, 'hsol-v1'::text, 'cashback-hsol-v1'::text, 'mskd-hsol-v1'::text, 'masked-v1'::text])) OR (activation_time IS NOT NULL)))"
       },
       {
         "table_name": "launch_coins",
-        "name": "check:4d838e9aa62fd25f2368a13f1b5b65ffbb05affe1e5f19ce4b1ba13e25b843eb",
+        "name": "check:6ca9d962e5642d496d44e55416a2e758746d90cb256846c4e480ad7fb8cf1e4d",
         "type": "c",
         "validated": true,
-        "definition": "CHECK (((policy_version <> ALL (ARRAY['bond-v1'::text, 'mskd-v1'::text, 'dev-v1'::text, 'cashback-v1'::text, 'hsol-v1'::text, 'cashback-hsol-v1'::text, 'mskd-hsol-v1'::text])) OR (activation_time IS NOT NULL)))"
+        "definition": "CHECK ((((mode = 'masked'::text) = (creator_share_bps IS NOT NULL)) AND ((creator_share_bps IS NULL) OR (((creator_share_bps >= 0) AND (creator_share_bps <= 10000)) AND (((creator_share_bps)::integer % 1000) = 0)))))"
       },
       {
         "table_name": "launch_coins",
@@ -6855,17 +6893,17 @@
       },
       {
         "table_name": "launch_coins",
-        "name": "check:b13ef81b2e989f00ec5568c1ef70ab72ef880de59174e665560f9176c28d6454",
+        "name": "check:d2df5a2b5abbcf6e434548eb179769d965156290a5ae02be243aee61a8b4ec37",
         "type": "c",
         "validated": true,
-        "definition": "CHECK ((mode = ANY (ARRAY['creator'::text, 'community'::text, 'bond'::text, 'mskd'::text, 'dev'::text, 'cashback'::text, 'hsol'::text, 'cashback-hsol'::text, 'mskd-hsol'::text])))"
+        "definition": "CHECK (((mode = ANY (ARRAY['community'::text, 'cashback'::text, 'mskd'::text, 'cashback-hsol'::text, 'mskd-hsol'::text, 'masked'::text])) OR ((recipient)::text = (original_deployer)::text)))"
       },
       {
         "table_name": "launch_coins",
-        "name": "check:c18f34bf9041663c1befee7de36807b5248f9e5b424ca73ff005753c4571ad79",
+        "name": "check:d80217b34bf1fcf73129f27e40bab94fa4d3d3fb2c121f5f3a52f690ec0777ed",
         "type": "c",
         "validated": true,
-        "definition": "CHECK ((policy_version = ANY (ARRAY['rinse-v1'::text, 'legacy-devnet'::text, 'wallet-v1'::text, 'bond-v1'::text, 'mskd-v1'::text, 'dev-v1'::text, 'cashback-v1'::text, 'hsol-v1'::text, 'cashback-hsol-v1'::text, 'mskd-hsol-v1'::text])))"
+        "definition": "CHECK ((policy_version = ANY (ARRAY['rinse-v1'::text, 'legacy-devnet'::text, 'wallet-v1'::text, 'bond-v1'::text, 'mskd-v1'::text, 'dev-v1'::text, 'cashback-v1'::text, 'hsol-v1'::text, 'cashback-hsol-v1'::text, 'mskd-hsol-v1'::text, 'masked-v1'::text])))"
       },
       {
         "table_name": "launch_coins",
@@ -6880,6 +6918,13 @@
         "type": "c",
         "validated": true,
         "definition": "CHECK (((activation_time IS NULL) OR (activation_time > 0)))"
+      },
+      {
+        "table_name": "launch_coins",
+        "name": "check:fd60f23b60702d70dc505907d0005f0f461fb9dc9b775d94233f409580ab8311",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((mode = ANY (ARRAY['creator'::text, 'community'::text, 'bond'::text, 'mskd'::text, 'dev'::text, 'cashback'::text, 'hsol'::text, 'cashback-hsol'::text, 'mskd-hsol'::text, 'masked'::text])))"
       },
       {
         "table_name": "launch_coins",
@@ -6932,10 +6977,10 @@
       },
       {
         "table_name": "launch_configs",
-        "name": "check:c18f34bf9041663c1befee7de36807b5248f9e5b424ca73ff005753c4571ad79",
+        "name": "check:d80217b34bf1fcf73129f27e40bab94fa4d3d3fb2c121f5f3a52f690ec0777ed",
         "type": "c",
         "validated": true,
-        "definition": "CHECK ((policy_version = ANY (ARRAY['rinse-v1'::text, 'legacy-devnet'::text, 'wallet-v1'::text, 'bond-v1'::text, 'mskd-v1'::text, 'dev-v1'::text, 'cashback-v1'::text, 'hsol-v1'::text, 'cashback-hsol-v1'::text, 'mskd-hsol-v1'::text])))"
+        "definition": "CHECK ((policy_version = ANY (ARRAY['rinse-v1'::text, 'legacy-devnet'::text, 'wallet-v1'::text, 'bond-v1'::text, 'mskd-v1'::text, 'dev-v1'::text, 'cashback-v1'::text, 'hsol-v1'::text, 'cashback-hsol-v1'::text, 'mskd-hsol-v1'::text, 'masked-v1'::text])))"
       },
       {
         "table_name": "launch_configs",
@@ -7191,6 +7236,13 @@
       },
       {
         "table_name": "pending_launch_intents",
+        "name": "check:6ca9d962e5642d496d44e55416a2e758746d90cb256846c4e480ad7fb8cf1e4d",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((((mode = 'masked'::text) = (creator_share_bps IS NOT NULL)) AND ((creator_share_bps IS NULL) OR (((creator_share_bps >= 0) AND (creator_share_bps <= 10000)) AND (((creator_share_bps)::integer % 1000) = 0)))))"
+      },
+      {
+        "table_name": "pending_launch_intents",
         "name": "check:90564b06b385320c67dd0f5701ec5d5114f4b6c59c368046074c1a6d4a1d3920",
         "type": "c",
         "validated": true,
@@ -7198,17 +7250,17 @@
       },
       {
         "table_name": "pending_launch_intents",
-        "name": "check:b13ef81b2e989f00ec5568c1ef70ab72ef880de59174e665560f9176c28d6454",
-        "type": "c",
-        "validated": true,
-        "definition": "CHECK ((mode = ANY (ARRAY['creator'::text, 'community'::text, 'bond'::text, 'mskd'::text, 'dev'::text, 'cashback'::text, 'hsol'::text, 'cashback-hsol'::text, 'mskd-hsol'::text])))"
-      },
-      {
-        "table_name": "pending_launch_intents",
         "name": "check:cd3593543656a82007971a8baa6d401452056df694f0776193940ddc102cf323",
         "type": "c",
         "validated": true,
         "definition": "CHECK ((prepared_slot >= 0))"
+      },
+      {
+        "table_name": "pending_launch_intents",
+        "name": "check:fd60f23b60702d70dc505907d0005f0f461fb9dc9b775d94233f409580ab8311",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((mode = ANY (ARRAY['creator'::text, 'community'::text, 'bond'::text, 'mskd'::text, 'dev'::text, 'cashback'::text, 'hsol'::text, 'cashback-hsol'::text, 'mskd-hsol'::text, 'masked'::text])))"
       },
       {
         "table_name": "pending_launch_intents",
@@ -7352,10 +7404,10 @@
       },
       {
         "table_name": "wallet_balances",
-        "name": "check:0e02fbd4ca9785908d8edb975a41e9d2ab888a7a9113ac7232e4102904a7a0c8",
+        "name": "check:33fb6ab1c668ac4929e6883e44fc28b9450ebc3626ea02e8d398f8be3f8000e6",
         "type": "c",
         "validated": true,
-        "definition": "CHECK ((bucket = ANY (ARRAY['rinse_buyback'::text, 'creator'::text, 'community'::text, 'platform'::text])))"
+        "definition": "CHECK ((bucket = ANY (ARRAY['rinse_buyback'::text, 'creator'::text, 'community'::text, 'platform'::text, 'mskd_buyback'::text])))"
       },
       {
         "table_name": "wallet_balances",
@@ -7520,6 +7572,20 @@
       },
       {
         "table_name": "wallet_collections",
+        "name": "check:4f497f042ba479160c63c1d96920ae29cbc97d0c67e0b3fbb10d1456c10ad066",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((mskd_buyback >= (0)::numeric))"
+      },
+      {
+        "table_name": "wallet_collections",
+        "name": "check:58b17dd20e6c26917e6e2ed28d49ab3789d8568c1e01b043dbefec78f70d19ae",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((received = (rinse_net + post_net)) AND (received = ((((rinse_buyback + creator) + community) + platform) + mskd_buyback))))"
+      },
+      {
+        "table_name": "wallet_collections",
         "name": "check:6fb65b8bc7bf833bcf0c6a85272d07b581db397b9fdc43eac2b9434ec86b7871",
         "type": "c",
         "validated": true,
@@ -7552,13 +7618,6 @@
         "type": "c",
         "validated": true,
         "definition": "CHECK ((platform >= (0)::numeric))"
-      },
-      {
-        "table_name": "wallet_collections",
-        "name": "check:eed51165b5c83130769a7a59e78fa486afbd76102fc7f227058d5d6c7be367b9",
-        "type": "c",
-        "validated": true,
-        "definition": "CHECK (((received = (rinse_net + post_net)) AND (received = (((rinse_buyback + creator) + community) + platform))))"
       },
       {
         "table_name": "wallet_collections",
@@ -7814,13 +7873,6 @@
       },
       {
         "table_name": "wallet_jobs",
-        "name": "check:0e02fbd4ca9785908d8edb975a41e9d2ab888a7a9113ac7232e4102904a7a0c8",
-        "type": "c",
-        "validated": true,
-        "definition": "CHECK ((bucket = ANY (ARRAY['rinse_buyback'::text, 'creator'::text, 'community'::text, 'platform'::text])))"
-      },
-      {
-        "table_name": "wallet_jobs",
         "name": "check:0e84e244573a3171429c53756fff0807592a40192d7cdf84f8793a6496ca0d92",
         "type": "c",
         "validated": true,
@@ -7832,6 +7884,13 @@
         "type": "c",
         "validated": true,
         "definition": "CHECK (((signature IS NULL) OR (transaction_base64 IS NOT NULL)))"
+      },
+      {
+        "table_name": "wallet_jobs",
+        "name": "check:33fb6ab1c668ac4929e6883e44fc28b9450ebc3626ea02e8d398f8be3f8000e6",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((bucket = ANY (ARRAY['rinse_buyback'::text, 'creator'::text, 'community'::text, 'platform'::text, 'mskd_buyback'::text])))"
       },
       {
         "table_name": "wallet_jobs",
@@ -9360,7 +9419,7 @@
         "security_definer": false,
         "volatility": "v",
         "config": null,
-        "body_sha256": "6200e9060bfd0de2863f1a461e605b84dbf034a691bb3188115251d74c69fa6c"
+        "body_sha256": "4b78b4843a18eba88bd1fef11e71e53c3b9d94d7b18b040fbee45acbd159a90e"
       },
       {
         "name": "rinsed_epoch_immutable",

@@ -4,7 +4,7 @@ import { getConfig, networkGenesis } from '@/server/dbc';
 import { verifiedTradingAccess } from '@/server/tradingAccess';
 import { NETWORK_GENESIS } from '@/server/launchConfig';
 import bondPolicy from '@/constants/bondPolicy.json';
-import { SCHEDULE, SPLIT, feeMode, isFeeModeId } from '@/lib/feeModes';
+import { SCHEDULE, feeMode, isFeeModeId, isLaunchFeeMode } from '@/lib/feeModes';
 
 /** Operator preview state and real configured costs; never an activation switch. */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -28,7 +28,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     if (!bond && isFeeModeId(requested)) {
-      const approved = await verifiedTradingAccess(requested).catch((): null => null);
+      // Only Masked accepts new launches. Earlier modes stay listed for registered coins.
+      const approved = isLaunchFeeMode(requested)
+        ? await verifiedTradingAccess(requested).catch((): null => null)
+        : null;
       const mode = feeMode(requested);
       return res.status(200).json({
         ...common,
@@ -46,24 +49,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           protectionSlots: SCHEDULE.periodSlots,
           creatorBundledBuyExempt: true,
         },
-        split: SPLIT,
+        split: mode.split,
         mainnetTradingEnabled: approved?.genesis === genesis && network === 'mainnet-beta',
         ...(approved
           ? {}
-          : { notice: `${mode.label} requires a reviewed, enabled launch configuration.` }),
+          : {
+              notice: isLaunchFeeMode(requested)
+                ? `${mode.label} requires a reviewed, enabled launch configuration.`
+                : 'New coins launch as Masked.',
+            }),
       });
     }
 
     const config = await getConfig();
-    let canPrepare = false,
-      policyVersion = 'unreviewed';
-    try {
-      const approved = await verifiedTradingAccess('bond');
-      canPrepare = true;
-      policyVersion = approved.record?.policy_version ?? 'legacy-devnet';
-    } catch {
-      /* Configuration remains discoverable while new launches fail closed. */
-    }
+    // Bond it. is retired for new launches; its configuration stays readable for registered coins.
+    const canPrepare = false,
+      policyVersion = 'bond-v1';
     return res.status(200).json({
       ...common,
       canLaunch: canPrepare,
@@ -82,7 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ...(canPrepare
         ? {}
         : {
-            notice: 'New launches require a reviewed configuration and the company fee wallets.',
+            notice: 'New coins launch as Masked.',
           }),
     });
   } catch {

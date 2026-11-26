@@ -2,19 +2,31 @@ import { describe, expect, it } from 'vitest';
 import { allocateExecutedFee, allocateHolderSnapshot } from './feeLedger';
 
 describe('upcoming executed-fee accounting', () => {
-  it.each(['dev', 'cashback', 'mskd'] as const)('preserves %s beneficiary income across both phases and small collections', mode => {
-    for (const phase of ['rinse', 'post'] as const) {
-      let beneficiary = 0n;
-      for (let previous = 0n; previous < 10n; previous++) {
-        const result = allocateExecutedFee({ mode, phase, total: 3n, protocol: 1n, referral: 1n, previousPhaseNet: previous, activationTime: 0, tradeTime: 1 });
-        const earned = mode === 'dev' ? result.creator : result.community;
-        expect(result.rinseBuyback).toBe(0n);
-        expect(result.platform + earned).toBe(1n);
-        beneficiary += earned;
+  it.each(['dev', 'cashback', 'mskd'] as const)(
+    'preserves %s beneficiary income across both phases and small collections',
+    (mode) => {
+      for (const phase of ['rinse', 'post'] as const) {
+        let beneficiary = 0n;
+        for (let previous = 0n; previous < 10n; previous++) {
+          const result = allocateExecutedFee({
+            mode,
+            phase,
+            total: 3n,
+            protocol: 1n,
+            referral: 1n,
+            previousPhaseNet: previous,
+            activationTime: 0,
+            tradeTime: 1,
+          });
+          const earned = mode === 'dev' ? result.creator : result.community;
+          expect(result.rinseBuyback).toBe(0n);
+          expect(result.platform + earned).toBe(1n);
+          beneficiary += earned;
+        }
+        expect(beneficiary).toBe(6n);
       }
-      expect(beneficiary).toBe(6n);
     }
-  });
+  );
   it('routes Bond it. fees as 0.95% burn/0.05% operations before bonding and 0.50% creator/0.30% treasury afterward', () => {
     const common = { mode: 'bond' as const, activationTime: 0, tradeTime: 1_800_000_000 };
     expect(
@@ -26,6 +38,7 @@ describe('upcoming executed-fee accounting', () => {
       platform: 500_000n,
       creator: 0n,
       community: 0n,
+      mskdBuyback: 0n,
     });
     expect(
       allocateExecutedFee({ ...common, total: 10_000_000n, protocol: 2_000_000n, phase: 'post' })
@@ -36,6 +49,7 @@ describe('upcoming executed-fee accounting', () => {
       platform: 3_000_000n,
       creator: 5_000_000n,
       community: 0n,
+      mskdBuyback: 0n,
     });
     expect(() => allocateExecutedFee({ ...common, total: 1n, protocol: 0n })).toThrow('verified');
   });
@@ -142,6 +156,87 @@ describe('upcoming executed-fee accounting', () => {
         mode: 'creator',
       })
     ).toThrow();
+  });
+});
+
+describe('Masked executed-fee accounting', () => {
+  const common = {
+    mode: 'masked' as const,
+    activationTime: 0,
+    tradeTime: 1,
+    phase: 'post' as const,
+  };
+  it('splits collected income 60% creator and holders, 30% treasury, 10% $MSKD buyback', () => {
+    // 1.00% of a trade reaches the collector after Meteora's 0.25%: 1,000,000 lamports here.
+    expect(
+      allocateExecutedFee({
+        ...common,
+        total: 1_250_000n,
+        protocol: 250_000n,
+        creatorShareBps: 3000,
+      })
+    ).toEqual({
+      protocol: 250_000n,
+      referral: 0n,
+      rinseBuyback: 0n,
+      creator: 180_000n,
+      community: 420_000n,
+      platform: 300_000n,
+      mskdBuyback: 100_000n,
+    });
+    for (const [creatorShareBps, creator, community] of [
+      [0, 0n, 600_000n],
+      [10_000, 600_000n, 0n],
+    ] as const) {
+      const result = allocateExecutedFee({
+        ...common,
+        total: 1_000_000n,
+        protocol: 0n,
+        creatorShareBps,
+      });
+      expect([result.creator, result.community]).toEqual([creator, community]);
+    }
+  });
+  it('requires a valid locked creator share and refuses one on other modes', () => {
+    for (const creatorShareBps of [undefined, null, 500, 11_000])
+      expect(() =>
+        allocateExecutedFee({ ...common, total: 10n, protocol: 0n, creatorShareBps })
+      ).toThrow('locked creator share');
+    expect(() =>
+      allocateExecutedFee({ ...common, mode: 'dev', total: 10n, protocol: 0n, creatorShareBps: 0 })
+    ).toThrow('Only Masked coins');
+  });
+  it('conserves every lamport and never moves value between shares across tiny batches', () => {
+    let creator = 0n,
+      community = 0n,
+      platform = 0n,
+      mskdBuyback = 0n;
+    for (let previous = 0n; previous < 1000n; previous += 7n) {
+      const result = allocateExecutedFee({
+        ...common,
+        total: 7n,
+        protocol: 0n,
+        previousPhaseNet: previous,
+        creatorShareBps: 7000,
+      });
+      expect(result.creator + result.community + result.platform + result.mskdBuyback).toBe(7n);
+      creator += result.creator;
+      community += result.community;
+      platform += result.platform;
+      mskdBuyback += result.mskdBuyback;
+    }
+    const whole = allocateExecutedFee({
+      ...common,
+      total: 1001n,
+      protocol: 0n,
+      creatorShareBps: 7000,
+    });
+    expect([creator, community, platform, mskdBuyback]).toEqual([
+      whole.creator,
+      whole.community,
+      whole.platform,
+      whole.mskdBuyback,
+    ]);
   });
 });
 

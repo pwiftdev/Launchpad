@@ -28,6 +28,8 @@ export type RegisteredCoin = {
   activation_time?: string | null;
   creation_signature: string;
   finalized_slot: string;
+  /** Masked only: the creator's locked share of the 0.60%, in bps of that share. */
+  creator_share_bps?: number | null;
 };
 export type LaunchIntent = {
   network_genesis: string;
@@ -36,6 +38,7 @@ export type LaunchIntent = {
   deployer: string;
   mode: LaunchMode;
   payload_digest: string;
+  creator_share_bps?: number | null;
   prepared_slot: string;
   expires_at: Date;
   created_at: Date;
@@ -93,14 +96,15 @@ export async function reserveLaunchIntent(input: {
   configKey: string;
   deployer: string;
   mode: LaunchMode;
+  creatorShareBps?: number;
   payloadDigest: string;
   preparedSlot: number;
 }) {
   if (!Number.isSafeInteger(input.preparedSlot) || input.preparedSlot <= 0)
     throw new Error('A finalized preparation slot is required');
   await database().query(
-    `INSERT INTO pending_launch_intents(network_genesis,mint,config_key,deployer,mode,payload_digest,prepared_slot,expires_at)
-     VALUES($1,$2,$3,$4,$5,$6,$7,now()+interval '15 minutes') ON CONFLICT(network_genesis,mint) DO NOTHING`,
+    `INSERT INTO pending_launch_intents(network_genesis,mint,config_key,deployer,mode,payload_digest,prepared_slot,expires_at,creator_share_bps)
+     VALUES($1,$2,$3,$4,$5,$6,$7,now()+interval '15 minutes',$8) ON CONFLICT(network_genesis,mint) DO NOTHING`,
     [
       input.genesis,
       input.mint,
@@ -109,6 +113,7 @@ export async function reserveLaunchIntent(input: {
       input.mode,
       input.payloadDigest,
       input.preparedSlot,
+      input.creatorShareBps ?? null,
     ]
   );
   const saved = await launchIntent(input.genesis, input.mint);
@@ -116,6 +121,7 @@ export async function reserveLaunchIntent(input: {
     !saved ||
     saved.deployer !== input.deployer ||
     saved.mode !== input.mode ||
+    (saved.creator_share_bps ?? null) !== (input.creatorShareBps ?? null) ||
     saved.config_key !== input.configKey ||
     saved.payload_digest !== input.payloadDigest ||
     BigInt(saved.prepared_slot) <= 0n ||
@@ -129,8 +135,8 @@ export async function reserveLaunchIntent(input: {
 export async function recordFinalizedLaunch(coin: RegisteredCoin): Promise<RegisteredCoin> {
   await database().query(
     `INSERT INTO launch_coins(network_genesis,mint,dbc_pool,config_key,original_deployer,mode,recipient,
-      policy_version,activation_point,creation_signature,finalized_slot,activation_time,quote_mint)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,COALESCE($13,'So11111111111111111111111111111111111111112')) ON CONFLICT(network_genesis,mint) DO NOTHING`,
+      policy_version,activation_point,creation_signature,finalized_slot,activation_time,quote_mint,creator_share_bps)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,COALESCE($13,'So11111111111111111111111111111111111111112'),$14) ON CONFLICT(network_genesis,mint) DO NOTHING`,
     [
       coin.network_genesis,
       coin.mint,
@@ -145,12 +151,14 @@ export async function recordFinalizedLaunch(coin: RegisteredCoin): Promise<Regis
       coin.finalized_slot,
       coin.activation_time ?? null,
       coin.quote_mint ?? null,
+      coin.creator_share_bps ?? null,
     ]
   );
   const saved = await registeredCoin(coin.network_genesis, coin.mint);
   if (
     !saved ||
     (coin.quote_mint && saved.quote_mint !== coin.quote_mint) ||
+    (saved.creator_share_bps ?? null) !== (coin.creator_share_bps ?? null) ||
     [
       'dbc_pool',
       'config_key',

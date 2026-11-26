@@ -19,6 +19,8 @@ export type LaunchMetadata = {
   /** Legacy metadata is descriptive only; economic authority comes from the verified registry. */
   creatorMode?: { burnShare: number };
   launchMode?: import('@/lib/launchModes').LaunchMode;
+  /** Masked: the creator's locked share of the 0.60%. Descriptive; the registry is authoritative. */
+  feeSplit?: { creatorShareBps: number };
 };
 
 export function buildLaunchMetadata(params: {
@@ -31,6 +33,7 @@ export function buildLaunchMetadata(params: {
   socials?: Socials;
   burnShare: number;
   mode?: import('@/lib/launchModes').LaunchMode;
+  creatorShareBps?: number;
 }): LaunchMetadata {
   const socials = normalizeSocials(params.socials);
   return {
@@ -45,5 +48,8 @@ export function buildLaunchMetadata(params: {
     ...(params.mode
       ? { launchMode: params.mode }
       : { creatorMode: { burnShare: params.burnShare } }),
+    ...(params.creatorShareBps !== undefined
+      ? { feeSplit: { creatorShareBps: params.creatorShareBps } }
+      : {}),
   };
 }

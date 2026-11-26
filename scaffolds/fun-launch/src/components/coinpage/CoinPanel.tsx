@@ -3,6 +3,8 @@ import { useHolders, useTrades } from '@/hooks/useCoins';
 import { cn } from '@/lib/utils';
 import { CoinHeader } from './CoinHeader';
 import { TaxBanner } from './TaxBanner';
+import { FeeSplit } from '@/components/fees/FeeSplit';
+import { LAUNCH_FEE_MODE, feeMode } from '@/lib/feeModes';
 import { PotMeter } from './PotMeter';
 import { TradeBox } from './TradeBox';
 import { PriceChart } from './PriceChart';
@@ -35,6 +37,20 @@ export const CoinPanel = ({ coin, headerActions, className }: CoinPanelProps) =>
       className="border-b border-neutral-850"
     />
   );
+  // Masked coins show their locked creator/holder split before and after bonding.
+  const split = coin.creatorShareBps !== undefined && coin.creatorShareBps !== null && (
+    <section aria-label="Fee split" className="border-b border-neutral-850 px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+        Fee split · locked at launch
+      </p>
+      <FeeSplit
+        mode={feeMode(LAUNCH_FEE_MODE)}
+        creatorShareBps={coin.creatorShareBps}
+        compact
+        className="mt-2"
+      />
+    </section>
+  );
 
   return (
     <div className={cn('flex flex-col bg-neutral-950', className)}>
@@ -65,6 +81,7 @@ export const CoinPanel = ({ coin, headerActions, className }: CoinPanelProps) =>
           />
           <div className="order-1 border-b border-neutral-850 lg:hidden">
             {tax}
+            {split}
             <TradeBox coin={coin} />
           </div>
           <HoldersPanel
@@ -85,6 +102,7 @@ export const CoinPanel = ({ coin, headerActions, className }: CoinPanelProps) =>
         <aside className="contents lg:flex lg:min-w-0 lg:flex-col lg:divide-y lg:divide-neutral-850">
           <div className="hidden lg:block">
             {tax}
+            {split}
             <TradeBox coin={coin} />
           </div>
           <div className="order-5 min-w-0 divide-y divide-neutral-850">

@@ -44,6 +44,7 @@ type MetadataUploadParams = {
   socials: Socials;
   burnShare: number;
   mode?: import('@/lib/launchModes').LaunchMode;
+  creatorShareBps?: number;
   artifactIdentity: ArtifactIdentity;
 };
 
@@ -123,6 +124,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         configKey: approved.key.toBase58(),
         deployer: parsed.data.userWallet,
         mode: parsed.data.mode,
+        creatorShareBps: parsed.data.creatorShareBps,
         payloadDigest: await launchPayloadDigest(parsed.data),
         preparedSlot: await connection.getSlot('finalized'),
       });
@@ -138,6 +140,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       description,
       burnShare = 0,
       mode,
+      creatorShareBps,
     } = parsed.data;
     const socials = normalizeSocials(parsed.data.socials);
 
@@ -181,6 +184,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       description,
       socials,
       mode,
+      creatorShareBps,
       artifactIdentity,
     });
     if (!metadataUrl) {

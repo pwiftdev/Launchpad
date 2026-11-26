@@ -4,7 +4,9 @@ import { Dialog } from 'radix-ui';
 import { BRAND } from '@/constants/brand';
 import { cn } from '@/lib/utils';
 import { LogoMark } from './Logo';
-import { REWARD_MODES, SCHEDULE, SPLIT, feeMode, pct } from '@/lib/feeModes';
+import { LAUNCH_FEE_MODE, SCHEDULE, feeMode, pct } from '@/lib/feeModes';
+
+const { split } = feeMode(LAUNCH_FEE_MODE);
 
 /** Staggered entrance for each block of the card: `className={cn(RISE, …)} style={delay(n)}`. */
 const RISE = 'animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-700';
@@ -56,7 +58,7 @@ export const ThesisModal = ({ children }: { children: ReactElement }) => {
                 launch is yours.
               </p>
 
-              {/* One fee, three modes */}
+              {/* One fee, one split */}
               <div style={delay(3)} className={cn(RISE, 'mt-7 border-t border-neutral-850 pt-6')}>
                 <div className="flex items-baseline justify-between">
                   <p className="font-pixel text-[40px] leading-none">
@@ -69,27 +71,26 @@ export const ThesisModal = ({ children }: { children: ReactElement }) => {
                   </p>
                 </div>
                 <ul className="mt-5 divide-y divide-neutral-850 border-y border-neutral-850">
-                  {REWARD_MODES.map((id) => {
-                    const mode = feeMode(id);
-                    return (
-                      <li key={id} className="flex items-center gap-3 py-3">
-                        <span className="w-[8.5rem] shrink-0 text-[13px] font-medium">
-                          {mode.label}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-[12px] text-neutral-500">
-                          {pct(SPLIT.beneficiaryBps)} to {mode.beneficiaryLabel.toLowerCase()}
-                          {mode.quote !== 'sol' && `, in ${mode.payoutSymbol}`}
-                        </span>
-                        <span className="font-mono text-[11px] text-neutral-500">
-                          {mode.quoteSymbol}
-                        </span>
-                      </li>
-                    );
-                  })}
+                  {[
+                    ['Creator and holders', split.beneficiaryBps, 'split by the creator, locked'],
+                    ['Masked', split.houseBps, 'treasury'],
+                    ['$MSKD', split.buybackBps, 'bought back and burned'],
+                    ['Meteora', split.meteoraBps, 'protocol'],
+                  ].map(([label, bps, note]) => (
+                    <li key={label} className="flex items-center gap-3 py-3">
+                      <span className="w-[8.5rem] shrink-0 text-[13px] font-medium">{label}</span>
+                      <span className="min-w-0 flex-1 truncate text-[12px] text-neutral-500">
+                        {note}
+                      </span>
+                      <span className="font-mono text-[11px] text-neutral-500">
+                        {pct(Number(bps))}
+                      </span>
+                    </li>
+                  ))}
                 </ul>
                 <p className="mt-3 text-[12px] text-neutral-500">
-                  Every mode: house {pct(SPLIT.houseBps)}, Meteora {pct(SPLIT.meteoraBps)}. The
-                  launch slot alone charges {pct(SCHEDULE.startingFeeBps)} to stop snipers.
+                  Claim earnings in native XMR or SOL. The launch slot alone charges{' '}
+                  {pct(SCHEDULE.startingFeeBps)} to stop snipers.
                 </p>
               </div>
 

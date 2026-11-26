@@ -7,6 +7,7 @@ import {
   TOKEN_DECIMALS,
 } from '@/constants/launch';
 import { isSourcePostUrl, normalizeSocial, socialMaxLength, type SocialKind } from '@/lib/socials';
+import { isCreatorShareBps } from '@/lib/feeModes';
 
 // A submitted link must already be valid for its field; nothing is silently dropped.
 const social = (kind: SocialKind) =>
@@ -66,20 +67,21 @@ export const launchMetadataSchema = z.object({
     .optional(),
 });
 
-export const uploadSchema = launchMetadataSchema
-  .extend({
-    mint: address,
-    userWallet: address.refine((s) => PublicKey.isOnCurve(new PublicKey(s).toBytes())),
-    mode: z.enum(['bond', 'mskd', 'dev', 'cashback', 'hsol', 'cashback-hsol', 'mskd-hsol']),
-    configKey: address.optional(),
-    // Retained in the signed payload for compatibility; no creator-selectable routing.
-    burnShare: z.literal(0).default(0),
-    issuedAt: z.number().int(),
-    signature: z.string().max(100),
-  })
-  .refine((data) => (data.mode === 'bond' ? data.configKey === undefined : !!data.configKey), {
-    message: 'Signed config key required for this mode',
-  });
+export const uploadSchema = launchMetadataSchema.extend({
+  mint: address,
+  userWallet: address.refine((s) => PublicKey.isOnCurve(new PublicKey(s).toBytes())),
+  // New coins launch only as Masked. Earlier modes stay readable for registered coins.
+  mode: z.literal('masked'),
+  creatorShareBps: z
+    .number()
+    .int()
+    .refine(isCreatorShareBps, 'Choose the creator share in 10% steps'),
+  configKey: address,
+  // Retained in the signed payload for compatibility; no creator-selectable routing.
+  burnShare: z.literal(0).default(0),
+  issuedAt: z.number().int(),
+  signature: z.string().max(100),
+});
 
 export const swapSchema = z.object({
   mint: address,

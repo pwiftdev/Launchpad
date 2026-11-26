@@ -22,9 +22,9 @@ import {
 } from '@/constants/launch';
 import { useUsd } from '@/hooks/useUsd';
 import { getDemoCoin } from '@/lib/demo';
-import { ACTIVE_LAUNCH_MODE } from '@/lib/launchModes';
 import {
-  DEFAULT_FEE_MODE,
+  DEFAULT_CREATOR_SHARE_BPS,
+  LAUNCH_FEE_MODE,
   SCHEDULE,
   SPLIT,
   feeMode,
@@ -32,7 +32,7 @@ import {
   type FeeMode,
   type FeeModeId,
 } from '@/lib/feeModes';
-import { ModePicker } from '@/components/launch/ModePicker';
+import { CreatorSharePicker } from '@/components/launch/CreatorSharePicker';
 import { Decrypt } from '@/components/brand/Decrypt';
 import { FeeSplit } from '@/components/fees/FeeSplit';
 import { formatReadableNumber } from '@/lib/format/number';
@@ -56,14 +56,10 @@ import {
 } from '@/lib/socials';
 import { SOCIAL_ICONS } from '@/components/coin/SocialLinks';
 import { adminPageRedirect } from '@/server/adminPage';
-import { hsolLaunchModes } from '@/server/tradingAccess';
 import { readLaunchImage } from '@/lib/launchImageFile';
 
-type LaunchProps = { hsolModes: FeeModeId[] };
-export const getServerSideProps: GetServerSideProps<LaunchProps> = async (context) =>
-  adminPageRedirect(context) ?? {
-    props: { hsolModes: await hsolLaunchModes() },
-  };
+export const getServerSideProps: GetServerSideProps = async (context) =>
+  adminPageRedirect(context) ?? { props: {} };
 
 type DevBuyQuote = { tokens: number; costQuote: number; feeQuote: number; quoteSymbol: string };
 
@@ -80,26 +76,22 @@ const LINK_PLACEHOLDERS: Record<SocialKind, string> = {
   discord: 'discord.gg/maskedfrog',
 };
 
-export default function Launch({ hsolModes }: LaunchProps) {
+export default function Launch() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { publicKey, signTransaction, signMessage } = useWallet();
   const { setShowModal } = useUnifiedWalletContext();
 
-  const wallet = publicKey?.toBase58();
-  const [restoredFor, setRestoredFor] = useState<string>();
   const [name, setName] = useState('');
   const [ticker, setTicker] = useState('');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [links, setLinks] = useState(EMPTY_LINKS);
-  const [feeModeId, setFeeModeId] = useState<FeeModeId>(
-    NETWORK === 'mainnet-beta' ? 'dev' : DEFAULT_FEE_MODE
-  );
-  const mode = feeModeId;
-  const selectedMode = feeMode(feeModeId);
-  const availability = useLaunchAvailability(feeModeId);
+  const mode = LAUNCH_FEE_MODE;
+  const selectedMode = feeMode(mode);
+  const [creatorShareBps, setCreatorShareBps] = useState(DEFAULT_CREATOR_SHARE_BPS);
+  const availability = useLaunchAvailability(mode);
   const [devBuyPercent, setDevBuyPercent] = useState(0);
   const devBuy = useDevBuyQuote(devBuyPercent, mode);
   const { usd, price } = useUsd();
@@ -138,21 +130,14 @@ export default function Launch({ hsolModes }: LaunchProps) {
   const receipt = launched ?? previewReceipt;
 
   function clearMetadata() {
-    setRestoredFor(undefined);
     setName('');
     setTicker('');
     setDescription('');
     setImage(null);
     setLinks(EMPTY_LINKS);
     setDevBuyPercent(0);
+    setCreatorShareBps(DEFAULT_CREATOR_SHARE_BPS);
   }
-
-  useEffect(() => {
-    if (restoredFor && restoredFor !== wallet) {
-      clearMetadata();
-      setFeeModeId(NETWORK === 'mainnet-beta' ? 'dev' : DEFAULT_FEE_MODE);
-    }
-  }, [restoredFor, wallet]);
 
   function resetLaunch() {
     setLaunched(null);
@@ -200,9 +185,7 @@ export default function Launch({ hsolModes }: LaunchProps) {
   const socials = normalizeSocials(links);
   const isValid = !Object.values(errors).some(Boolean) && !Object.values(linkErrors).some(Boolean);
   const creationFee = availability.data?.poolCreationFeeSol ?? 0;
-  const hsolBuy = selectedMode.quote === 'hsol' && devBuyPercent > 0;
-  const totalCost =
-    creationFee + (devBuyPercent > 0 && !hsolBuy ? (devBuy.data?.costQuote ?? 0) : 0);
+  const totalCost = creationFee + (devBuyPercent > 0 ? (devBuy.data?.costQuote ?? 0) : 0);
 
   async function draftFromForm() {
     if (!isValid || !image) throw new Error('Add a valid name, ticker and artwork first.');
@@ -214,9 +197,9 @@ export default function Launch({ hsolModes }: LaunchProps) {
       description: description.trim() || undefined,
       socials: hasSocials(socials) ? socials : undefined,
       mode,
+      creatorShareBps,
     };
   }
-
 
   async function launch() {
     if (launchLock.current) return;
@@ -445,22 +428,15 @@ export default function Launch({ hsolModes }: LaunchProps) {
 
             <Step
               n={3}
-              title="Mode"
-              subtitle={`${pct(SCHEDULE.endingFeeBps)} flat, before and after bonding. The mode decides who gets the ${pct(SPLIT.beneficiaryBps)}.`}
+              title="Fee split"
+              subtitle={`${pct(SCHEDULE.endingFeeBps)} flat, before and after bonding. You decide how ${pct(SPLIT.beneficiaryBps)} of every trade splits between you and your holders.`}
             >
-              <ModePicker value={feeModeId} onChange={setFeeModeId} hsolModes={hsolModes} />
-              {selectedMode.quote === 'hsol' && (
-                <p className="mt-3 text-sm text-neutral-400">
-                  The pool bonds at {selectedMode.bondingTarget} hSOL. Use hSOL for the optional
-                  first buy and keep SOL for network fees and account rent.
-                </p>
-              )}
-              <FeeSplit mode={selectedMode} className="mt-4" />
+              <CreatorSharePicker value={creatorShareBps} onChange={setCreatorShareBps} />
+              <FeeSplit mode={selectedMode} creatorShareBps={creatorShareBps} className="mt-5" />
               <p className="mt-3 text-xs leading-relaxed text-neutral-500">
-                {selectedMode.beneficiary === 'holders'
-                  ? `Holder payouts are batched from collected fees and paid in ${selectedMode.payoutSymbol}, pro rata to balances. Pools, burn and house wallets are excluded.`
-                  : 'Creator payouts follow collected fees. The creator requests them by signing a message; no transaction is needed.'}{' '}
-                Bonding is not guaranteed.
+                Masked collects fees every hour and credits your share and each holder&rsquo;s
+                share. Holder shares are pro rata to balances; pools, burn and Masked wallets are
+                excluded. Everyone claims in native XMR or in SOL. Bonding is not guaranteed.
               </p>
             </Step>
 
@@ -477,7 +453,6 @@ export default function Launch({ hsolModes }: LaunchProps) {
                 quoteSymbol={selectedMode.quoteSymbol}
               />
             </Step>
-
 
             <div className="holo-border flex flex-col gap-4 rounded-2xl bg-panel p-5 sm:flex-row sm:items-center sm:justify-between">
               <dl className="text-sm">
@@ -500,12 +475,8 @@ export default function Launch({ hsolModes }: LaunchProps) {
                 <div className="mt-1 flex gap-2 text-base font-bold">
                   <dt>Total</dt>
                   <dd className="font-mono">
-                    {hsolBuy
-                      ? devBuy.data
-                        ? `${devBuy.data.costQuote.toFixed(4)} hSOL + ${creationFee} SOL`
-                        : 'Checking…'
-                      : `≈ ${totalCost.toFixed(4)} SOL`}
-                    {!hsolBuy && price && (
+                    {`≈ ${totalCost.toFixed(4)} SOL`}
+                    {price && (
                       <span className="ml-2 text-sm font-normal text-neutral-400">
                         {usd(totalCost)}
                       </span>
@@ -554,8 +525,9 @@ export default function Launch({ hsolModes }: LaunchProps) {
               image={imagePreview}
               socials={socials}
               mode={selectedMode}
+              creatorShareBps={creatorShareBps}
             />
-            <ScheduleCard mode={selectedMode} />
+            <ScheduleCard mode={selectedMode} creatorShareBps={creatorShareBps} />
           </aside>
         </div>
       )}
@@ -563,7 +535,7 @@ export default function Launch({ hsolModes }: LaunchProps) {
   );
 }
 
-function useLaunchAvailability(mode: FeeModeId | typeof ACTIVE_LAUNCH_MODE) {
+function useLaunchAvailability(mode: FeeModeId) {
   const [data, setData] = useState<{
     canLaunch: boolean;
     mode: string;
@@ -872,7 +844,13 @@ function useDevBuyQuote(percent: number, mode: FeeModeId) {
   return { data, loading };
 }
 
-const ScheduleCard = ({ mode: launchMode }: { mode: FeeMode }) => (
+const ScheduleCard = ({
+  mode: launchMode,
+  creatorShareBps,
+}: {
+  mode: FeeMode;
+  creatorShareBps: number;
+}) => (
   <div className="surface p-5">
     <p className="eyebrow">Trading fees</p>
     <ol className="mt-3 grid grid-cols-3 gap-1.5 text-center">
@@ -893,7 +871,7 @@ const ScheduleCard = ({ mode: launchMode }: { mode: FeeMode }) => (
         </li>
       ))}
     </ol>
-    <FeeSplit mode={launchMode} compact className="mt-4" />
+    <FeeSplit mode={launchMode} creatorShareBps={creatorShareBps} compact className="mt-4" />
     <p className="mt-3 text-xs leading-relaxed text-neutral-500">
       The 99% guard lasts one slot, not a seconds countdown. The creator’s bundled first buy pays
       1.25%; later trades by that wallet follow the normal schedule.{' '}

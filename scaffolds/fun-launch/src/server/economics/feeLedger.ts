@@ -1,5 +1,11 @@
 // Server-only accounting for the upcoming policy. These are accrued budgets, never proof of funding.
-import { BENEFICIARY_NET_BPS, feeMode, isFeeModeId } from '@/lib/feeModes';
+import {
+  BENEFICIARY_NET_BPS,
+  feeMode,
+  isCreatorShareBps,
+  isFeeModeId,
+  netShares,
+} from '@/lib/feeModes';
 import bondPolicy from '@/constants/bondPolicy.json';
 import type { LaunchMode } from '@/lib/launchModes';
 export type { LaunchMode } from '@/lib/launchModes';
@@ -10,7 +16,13 @@ export type FeeAllocation = {
   creator: bigint;
   community: bigint;
   platform: bigint;
+  /** $MSKD buyback and burn share. Masked coins only. */
+  mskdBuyback: bigint;
 };
+
+/** Cumulative carry: the same total always allocates the same amount, however it is batched. */
+const carried = (previous: bigint, available: bigint, bps: bigint) =>
+  ((previous + available) * bps) / 10_000n - (previous * bps) / 10_000n;
 
 export function allocateExecutedFee({
   total,
@@ -21,6 +33,7 @@ export function allocateExecutedFee({
   mode,
   previousPhaseNet = 0n,
   phase,
+  creatorShareBps,
 }: {
   total: bigint;
   protocol: bigint;
@@ -30,6 +43,8 @@ export function allocateExecutedFee({
   mode: LaunchMode;
   previousPhaseNet?: bigint;
   phase?: 'rinse' | 'post';
+  /** The coin's locked creator share of the 0.60%, required for Masked coins only. */
+  creatorShareBps?: number | null;
 }): FeeAllocation {
   if (
     ![activationTime, tradeTime].every(Number.isSafeInteger) ||
@@ -50,11 +65,34 @@ export function allocateExecutedFee({
   )
     throw new Error('Invalid executed fee amounts');
   const available = total - protocol - referral;
+  if (isFeeModeId(mode) && feeMode(mode).beneficiary === 'split') {
+    if (!isCreatorShareBps(creatorShareBps))
+      throw new Error('A Masked coin requires its locked creator share');
+    const shares = netShares(mode),
+      beneficiaryBps = BigInt(shares.beneficiary);
+    // The creator's part is carried on its own so batching never moves value between creator and holders.
+    const beneficiary = carried(previousPhaseNet, available, beneficiaryBps),
+      creator = carried(
+        previousPhaseNet,
+        available,
+        (beneficiaryBps * BigInt(creatorShareBps)) / 10_000n
+      ),
+      mskdBuyback = carried(previousPhaseNet, available, BigInt(shares.buyback));
+    return {
+      protocol,
+      referral,
+      rinseBuyback: 0n,
+      creator,
+      community: beneficiary - creator,
+      platform: available - beneficiary - mskdBuyback,
+      mskdBuyback,
+    };
+  }
+  if (creatorShareBps !== undefined && creatorShareBps !== null)
+    throw new Error('Only Masked coins carry a creator share');
   if (isFeeModeId(mode)) {
     const paysCreator = feeMode(mode).beneficiary === 'creator';
-    const share = BigInt(BENEFICIARY_NET_BPS);
-    const beneficiary =
-      ((previousPhaseNet + available) * share) / 10_000n - (previousPhaseNet * share) / 10_000n;
+    const beneficiary = carried(previousPhaseNet, available, BigInt(BENEFICIARY_NET_BPS));
     return {
       protocol,
       referral,
@@ -62,6 +100,7 @@ export function allocateExecutedFee({
       creator: paysCreator ? beneficiary : 0n,
       community: paysCreator ? 0n : beneficiary,
       platform: available - beneficiary,
+      mskdBuyback: 0n,
     };
   }
   if (mode === 'bond' && phase === undefined)
@@ -83,6 +122,7 @@ export function allocateExecutedFee({
     creator: !rinse && (mode === 'creator' || mode === 'bond') ? destination : 0n,
     community: !rinse && mode === 'community' ? destination : 0n,
     platform: available - destination,
+    mskdBuyback: 0n,
   };
 }
 

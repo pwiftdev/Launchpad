@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { PublicKey } from '@solana/web3.js';
 import { DynamicBondingCurveClient } from '@meteora-ag/dynamic-bonding-curve-sdk';
-import { hasBatchedHolderRewards, usesLaunchSlot } from '@/lib/launchModes';
+import { paysThroughCollector, usesLaunchSlot } from '@/lib/launchModes';
 import { z } from 'zod';
 import { apiGuard } from '@/server/apiGuard';
 import { connection, networkGenesis, getConfig, invalidateCoinDiscovery } from '@/server/dbc';
@@ -117,16 +117,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       config_key: intent.config_key,
       original_deployer: intent.deployer,
       mode: intent.mode,
-      recipient:
-        intent.mode === 'community' || hasBatchedHolderRewards(intent.mode)
-          ? reviewed.expected_fee_claimer
-          : intent.deployer,
+      recipient: paysThroughCollector(intent.mode)
+        ? reviewed.expected_fee_claimer
+        : intent.deployer,
       policy_version: reviewed.policy_version,
       quote_mint: config.quoteMint.toBase58(),
       activation_point: state.activationPoint.toString(),
       activation_time: usesLaunchSlot(intent.mode) ? String(tx.blockTime) : null,
       creation_signature: parsed.data.signature,
       finalized_slot: String(proof.slot),
+      creator_share_bps: intent.creator_share_bps ?? null,
     });
     invalidateCoinDiscovery(saved.mint);
     return res.status(200).json({
@@ -135,6 +135,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       mint: saved.mint,
       mode: saved.mode,
       originalDeployer: saved.original_deployer,
+      creatorShareBps: saved.creator_share_bps ?? null,
     });
   } catch {
     return res.status(422).json({

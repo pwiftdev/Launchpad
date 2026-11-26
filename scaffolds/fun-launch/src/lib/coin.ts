@@ -19,6 +19,8 @@ export type Coin = {
   quoteToSol?: number;
   /** Only immutable reviewed policy records authorize the current schedule display. */
   feePolicyVersion?: import('@/lib/launchModes').LaunchPolicyVersion;
+  /** Masked: the creator's locked share of the 0.60%, in bps of that share. */
+  creatorShareBps?: number | null;
   tokenDecimals?: number;
   tokenSupply?: number;
   migratedPool?: string;

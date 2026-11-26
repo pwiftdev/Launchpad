@@ -87,7 +87,8 @@ it('rejects reserved launch labels before storing an intent or uploading artifac
     mint: Keypair.generate().publicKey.toBase58(),
     devBuyPercent: 0,
     burnShare: 0,
-    mode: 'dev',
+    mode: 'masked',
+    creatorShareBps: 5000,
     configKey,
     issuedAt: Date.now(),
     signature: 'A'.repeat(86) + '==',
@@ -128,7 +129,8 @@ it('prepares two launches with matching metadata and fresh mints, and rejects a 
     userWallet: wallet.toBase58(),
     devBuyPercent: 0,
     burnShare: 0,
-    mode: 'mskd',
+    mode: 'masked',
+    creatorShareBps: 3000,
     configKey,
   } satisfies Omit<LaunchPayload, 'mint'>;
   const issuedAt = Date.now();
@@ -150,9 +152,13 @@ it('prepares two launches with matching metadata and fresh mints, and rejects a 
     expect(response.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   }
 
-  expect(vi.mocked(reserveLaunchIntent).mock.calls.map(([intent]) => intent.mint)).toEqual([
-    firstMint,
-    secondMint,
+  expect(
+    vi
+      .mocked(reserveLaunchIntent)
+      .mock.calls.map(([intent]) => [intent.mint, intent.creatorShareBps])
+  ).toEqual([
+    [firstMint, 3000],
+    [secondMint, 3000],
   ]);
   const artifacts = vi.mocked(uploadPublicArtifact).mock.calls.map(([artifact]) => artifact);
   const metadata = artifacts
@@ -165,6 +171,8 @@ it('prepares two launches with matching metadata and fresh mints, and rejects a 
       symbol: shared.tokenSymbol,
       twitter: shared.socials.twitter,
       extensions: shared.socials,
+      launchMode: 'masked',
+      feeSplit: { creatorShareBps: 3000 },
     }))
   );
   for (const record of metadata) expect(record).not.toHaveProperty('source');

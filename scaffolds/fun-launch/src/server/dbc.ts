@@ -236,6 +236,7 @@ async function toCoin(
     mode: registry?.mode,
     configKey: s.config.toBase58(),
     feePolicyVersion: registry?.policy_version,
+    creatorShareBps: registry?.creator_share_bps ?? null,
     quoteMint: config.quoteMint.toBase58(),
     quoteToSol,
     tokenDecimals: mintData.decimals,

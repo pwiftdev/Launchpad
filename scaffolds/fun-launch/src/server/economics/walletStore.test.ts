@@ -76,6 +76,7 @@ beforeEach(async () => {
   await db.exec(migration('017-wallet-settlement.sql'));
   await db.exec(migration('018-wallet-hourly-processing.sql'));
   await db.exec(migration('019-wallet-settlement-receipts.sql'));
+  await db.exec(migration('035-mskd-buyback-bucket.sql'));
   await db.query(
     `INSERT INTO launch_configs(network_genesis,config_key,policy_version,expected_fee_claimer,expected_leftover_receiver,config_digest,verified_slot)VALUES($1,$2,'wallet-v1',$3,$4,$5,1)`,
     [
@@ -513,6 +514,78 @@ describe('actual collected income only', () => {
       (await store.balances(fixtureGenesis, mint)).find((r) => r.bucket === 'rinse_buyback')!.funded
     ).toBe('8');
     await expect(db.query('UPDATE wallet_collections SET received=100')).rejects.toThrow();
+  });
+  it('splits a Masked collection between creator, holders, treasury and the $MSKD buyback', async () => {
+    await db.exec('DROP SCHEMA public CASCADE;CREATE SCHEMA public;');
+    for (const file of [
+      '003-launch-registry.sql',
+      '017-wallet-settlement.sql',
+      '018-wallet-hourly-processing.sql',
+      '019-wallet-settlement-receipts.sql',
+      '024-bond-it-policy.sql',
+      '025-mskd-modes.sql',
+      '026-mskd-sol-pair.sql',
+      '027-holder-payout-allocations.sql',
+      '033-hsol-launch-pair.sql',
+      '034-hsol-holder-modes.sql',
+      '035-mskd-buyback-bucket.sql',
+      '036-masked-launch.sql',
+    ])
+      await db.exec(migration(file));
+    await db.query(
+      `INSERT INTO launch_configs(network_genesis,config_key,policy_version,expected_fee_claimer,expected_leftover_receiver,config_digest,verified_slot)VALUES($1,$2,'masked-v1',$3,$4,$5,1)`,
+      [
+        fixtureGenesis,
+        config,
+        collector.publicKey.toBase58(),
+        treasury.publicKey.toBase58(),
+        'a'.repeat(64),
+      ]
+    );
+    await db.query(
+      `INSERT INTO launch_coins(network_genesis,mint,dbc_pool,config_key,original_deployer,mode,recipient,policy_version,activation_point,activation_time,creation_signature,finalized_slot,creator_share_bps)VALUES($1,$2,$3,$4,$5,'masked',$6,'masked-v1',1000,1000,'creation',1,3000)`,
+      [
+        fixtureGenesis,
+        mint,
+        pool,
+        config,
+        creator.publicKey.toBase58(),
+        collector.publicKey.toBase58(),
+      ]
+    );
+    await seedEvent('masked', 1, '1000000');
+    const job = await signGeneric(
+      await store.queueCollection(
+        fixtureGenesis,
+        mint,
+        await store.pendingFeeEvents(fixtureGenesis, mint)
+      )
+    );
+    await store.settle(job.id, effect(job, { receivedLamports: 1_000_000n }));
+    const funded = Object.fromEntries(
+      (await store.balances(fixtureGenesis, mint)).map((row) => [row.bucket, row.funded])
+    );
+    expect(funded).toEqual({
+      creator: '180000',
+      community: '420000',
+      platform: '300000',
+      mskd_buyback: '100000',
+      rinse_buyback: '0',
+    });
+    expect((await db.query('SELECT mskd_buyback::text FROM wallet_collections')).rows).toEqual([
+      { mskd_buyback: '100000' },
+    ]);
+    await expect(
+      store.requestClaim({
+        networkGenesis: fixtureGenesis,
+        mint,
+        wallet: creator.publicKey.toBase58(),
+        epoch: null,
+        amount: 1000n,
+        requestId: randomUUID(),
+        authorizationDigest: 'e'.repeat(64),
+      })
+    ).rejects.toThrow('claim screen');
   });
   it('does not fund on raw events, mismatched receipts or operating rent/fees', async () => {
     await seedEvent('raw', 0, '10');

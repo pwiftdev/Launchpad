@@ -10,6 +10,7 @@ export const LaunchPreviewCard = ({
   image,
   socials,
   mode: launchMode,
+  creatorShareBps,
   source,
 }: {
   name: string;
@@ -18,6 +19,8 @@ export const LaunchPreviewCard = ({
   socials?: Socials;
   source?: string;
   mode: FeeMode;
+  /** Masked: the creator's share of the 0.60%, in bps of that share. */
+  creatorShareBps?: number;
 }) => (
   <div className="surface p-5">
     <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
@@ -38,6 +41,11 @@ export const LaunchPreviewCard = ({
           <span className="border border-neutral-700 px-2 py-0.5 font-term text-2xs font-semibold uppercase tracking-wide text-neutral-300">
             {launchMode.label}
           </span>
+          {creatorShareBps !== undefined && (
+            <span className="border border-neutral-700 px-2 py-0.5 font-term text-2xs font-semibold uppercase tracking-wide text-neutral-300">
+              Holders {100 - creatorShareBps / 100}%
+            </span>
+          )}
         </div>
         <BondingBar progress={0} className="mt-2 h-1.5" />
       </div>

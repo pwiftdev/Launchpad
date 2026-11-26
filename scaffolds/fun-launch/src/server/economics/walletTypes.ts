@@ -1,6 +1,12 @@
 import type { RegisteredCoin } from '../launchRegistry';
 import type { FinalizedEvidence } from './chainEvidence';
-export type WalletBucket = 'rinse_buyback' | 'creator' | 'community' | 'platform';
+export type WalletBucket =
+  | 'rinse_buyback'
+  | 'creator'
+  | 'community'
+  | 'platform'
+  /** Masked: 0.10% of every trade, reserved to buy back and burn $MSKD. */
+  | 'mskd_buyback';
 export type WalletJobKind =
   | 'collect'
   | 'buyback'

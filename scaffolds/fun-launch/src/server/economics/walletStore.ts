@@ -2,6 +2,7 @@ import {
   hasBatchedHolderRewards,
   hasCreatorRewards,
   isCashbackMode,
+  isMaskedMode,
   isMskdMode,
 } from '@/lib/launchModes';
 import { isHsolMode } from '@/lib/feeModes';
@@ -50,7 +51,13 @@ import {
 export type { WalletJob, WalletBalance } from './walletTypes';
 
 const ACTIVE = ['queued', 'prepared', 'signed', 'submitted', 'manual_review'];
-const BUCKETS: WalletBucket[] = ['rinse_buyback', 'creator', 'community', 'platform'];
+const BUCKETS: WalletBucket[] = [
+  'rinse_buyback',
+  'creator',
+  'community',
+  'platform',
+  'mskd_buyback',
+];
 const amount = (value: bigint) => {
   if (value <= 0n || value > 18446744073709551615n)
     throw new Error('Invalid wallet settlement amount');
@@ -134,7 +141,7 @@ export class WalletStore {
       await client.query<WalletCoin>(
         `SELECT c.*,cfg.expected_fee_claimer AS collector,cfg.expected_leftover_receiver AS treasury FROM launch_coins c
    JOIN launch_configs cfg ON(cfg.network_genesis=c.network_genesis AND cfg.config_key=c.config_key)
-   WHERE c.network_genesis=$1 AND c.mint=$2 AND c.policy_version IN('wallet-v1','bond-v1','dev-v1','cashback-v1','mskd-v1','hsol-v1','cashback-hsol-v1','mskd-hsol-v1') AND cfg.policy_version=c.policy_version`,
+   WHERE c.network_genesis=$1 AND c.mint=$2 AND c.policy_version IN('wallet-v1','bond-v1','dev-v1','cashback-v1','mskd-v1','hsol-v1','cashback-hsol-v1','mskd-hsol-v1','masked-v1') AND cfg.policy_version=c.policy_version`,
         [network, mint]
       )
     ).rows[0];
@@ -188,7 +195,7 @@ export class WalletStore {
       (
         await this.db.query<{ liability: string }>(
           `SELECT coalesce(sum(b.funded-b.spent),0)::text AS liability FROM wallet_balances b JOIN launch_coins c USING(network_genesis,mint)
-  JOIN launch_configs cfg ON(cfg.network_genesis=c.network_genesis AND cfg.config_key=c.config_key) WHERE b.network_genesis=$1 AND cfg.expected_fee_claimer=$2 AND c.policy_version NOT IN('hsol-v1','cashback-hsol-v1','mskd-hsol-v1') AND c.policy_version IN('wallet-v1','bond-v1','dev-v1','cashback-v1','mskd-v1','hsol-v1','cashback-hsol-v1','mskd-hsol-v1')`,
+  JOIN launch_configs cfg ON(cfg.network_genesis=c.network_genesis AND cfg.config_key=c.config_key) WHERE b.network_genesis=$1 AND cfg.expected_fee_claimer=$2 AND c.policy_version NOT IN('hsol-v1','cashback-hsol-v1','mskd-hsol-v1') AND c.policy_version IN('wallet-v1','bond-v1','dev-v1','cashback-v1','mskd-v1','hsol-v1','cashback-hsol-v1','mskd-hsol-v1','masked-v1')`,
           [network, collector]
         )
       ).rows[0]!.liability
@@ -200,7 +207,7 @@ export class WalletStore {
   ): Promise<{ liability: bigint; operating: bigint; minimumSlot: number }> {
     const row = (
       await this.db.query<{ liability: string; operating: string; slot: string }>(
-        `WITH coins AS(SELECT c.network_genesis,c.mint,c.policy_version FROM launch_coins c JOIN launch_configs cfg ON(cfg.network_genesis=c.network_genesis AND cfg.config_key=c.config_key)WHERE c.network_genesis=$1 AND cfg.expected_fee_claimer=$2 AND c.policy_version IN('wallet-v1','bond-v1','dev-v1','cashback-v1','mskd-v1','hsol-v1','cashback-hsol-v1','mskd-hsol-v1') AND cfg.policy_version=c.policy_version), liabilities AS(SELECT coalesce(sum(CASE WHEN coins.policy_version IN('hsol-v1','cashback-hsol-v1','mskd-hsol-v1') THEN 0 WHEN coins.policy_version='bond-v1' AND b.bucket='platform' THEN b.reserved ELSE b.funded-b.spent END),0)::text AS liability FROM wallet_balances b JOIN coins USING(network_genesis,mint)),operations AS(SELECT coalesce(sum(CASE WHEN j.status=ANY($3::text[]) THEN coalesce(j.expectations->>'operatingCostLamports','0')::numeric + greatest(coalesce(j.expectations->>'temporaryFundingLamports','0')::numeric,0) ELSE 0 END),0)::text AS operating,coalesce(max(j.finalized_slot),0)::text AS slot FROM wallet_jobs j JOIN coins USING(network_genesis,mint))SELECT * FROM liabilities CROSS JOIN operations`,
+        `WITH coins AS(SELECT c.network_genesis,c.mint,c.policy_version FROM launch_coins c JOIN launch_configs cfg ON(cfg.network_genesis=c.network_genesis AND cfg.config_key=c.config_key)WHERE c.network_genesis=$1 AND cfg.expected_fee_claimer=$2 AND c.policy_version IN('wallet-v1','bond-v1','dev-v1','cashback-v1','mskd-v1','hsol-v1','cashback-hsol-v1','mskd-hsol-v1','masked-v1') AND cfg.policy_version=c.policy_version), liabilities AS(SELECT coalesce(sum(CASE WHEN coins.policy_version IN('hsol-v1','cashback-hsol-v1','mskd-hsol-v1') THEN 0 WHEN coins.policy_version='bond-v1' AND b.bucket='platform' THEN b.reserved ELSE b.funded-b.spent END),0)::text AS liability FROM wallet_balances b JOIN coins USING(network_genesis,mint)),operations AS(SELECT coalesce(sum(CASE WHEN j.status=ANY($3::text[]) THEN coalesce(j.expectations->>'operatingCostLamports','0')::numeric + greatest(coalesce(j.expectations->>'temporaryFundingLamports','0')::numeric,0) ELSE 0 END),0)::text AS operating,coalesce(max(j.finalized_slot),0)::text AS slot FROM wallet_jobs j JOIN coins USING(network_genesis,mint))SELECT * FROM liabilities CROSS JOIN operations`,
         [network, collector, ['prepared', 'signed', 'submitted', 'manual_review']]
       )
     ).rows[0]!;
@@ -358,7 +365,7 @@ export class WalletStore {
   ): Promise<void> {
     const row = (
       await query.query<{ count: string }>(
-        `SELECT count(*)::text FROM wallet_jobs j JOIN launch_coins c USING(network_genesis,mint)JOIN launch_configs cfg ON(cfg.network_genesis=c.network_genesis AND cfg.config_key=c.config_key)WHERE j.network_genesis=$1 AND cfg.expected_fee_claimer=$2 AND c.policy_version IN('wallet-v1','bond-v1','dev-v1','cashback-v1','mskd-v1','hsol-v1','cashback-hsol-v1','mskd-hsol-v1') AND j.id<>$3 AND j.signature IS NOT NULL AND j.status IN('signed','submitted','manual_review')`,
+        `SELECT count(*)::text FROM wallet_jobs j JOIN launch_coins c USING(network_genesis,mint)JOIN launch_configs cfg ON(cfg.network_genesis=c.network_genesis AND cfg.config_key=c.config_key)WHERE j.network_genesis=$1 AND cfg.expected_fee_claimer=$2 AND c.policy_version IN('wallet-v1','bond-v1','dev-v1','cashback-v1','mskd-v1','hsol-v1','cashback-hsol-v1','mskd-hsol-v1','masked-v1') AND j.id<>$3 AND j.signature IS NOT NULL AND j.status IN('signed','submitted','manual_review')`,
         [network, collector, jobId]
       )
     ).rows[0]!;
@@ -375,13 +382,13 @@ export class WalletStore {
         signature: string | null;
         last_valid_block_height: string | null;
       }>(
-        `SELECT j.id,j.mint,j.kind,j.status,j.signature,j.last_valid_block_height::text FROM wallet_jobs j JOIN launch_coins c USING(network_genesis,mint)JOIN launch_configs cfg ON(cfg.network_genesis=c.network_genesis AND cfg.config_key=c.config_key)WHERE j.network_genesis=$1 AND cfg.expected_fee_claimer=$2 AND c.policy_version IN('wallet-v1','bond-v1','dev-v1','cashback-v1','mskd-v1','hsol-v1','cashback-hsol-v1','mskd-hsol-v1') AND j.status=ANY($3::text[])ORDER BY j.created_at,j.id LIMIT 100`,
+        `SELECT j.id,j.mint,j.kind,j.status,j.signature,j.last_valid_block_height::text FROM wallet_jobs j JOIN launch_coins c USING(network_genesis,mint)JOIN launch_configs cfg ON(cfg.network_genesis=c.network_genesis AND cfg.config_key=c.config_key)WHERE j.network_genesis=$1 AND cfg.expected_fee_claimer=$2 AND c.policy_version IN('wallet-v1','bond-v1','dev-v1','cashback-v1','mskd-v1','hsol-v1','cashback-hsol-v1','mskd-hsol-v1','masked-v1') AND j.status=ANY($3::text[])ORDER BY j.created_at,j.id LIMIT 100`,
         [network, collector, ACTIVE]
       )
     ).rows;
     const jobs = (
       await this.db.query<{ kind: string; status: string; count: string }>(
-        `SELECT j.kind,j.status,count(*)::text FROM wallet_jobs j JOIN launch_coins c USING(network_genesis,mint)JOIN launch_configs cfg ON(cfg.network_genesis=c.network_genesis AND cfg.config_key=c.config_key)WHERE j.network_genesis=$1 AND c.policy_version IN('wallet-v1','bond-v1','dev-v1','cashback-v1','mskd-v1','hsol-v1','cashback-hsol-v1','mskd-hsol-v1') AND cfg.expected_fee_claimer=$2 GROUP BY j.kind,j.status ORDER BY j.kind,j.status`,
+        `SELECT j.kind,j.status,count(*)::text FROM wallet_jobs j JOIN launch_coins c USING(network_genesis,mint)JOIN launch_configs cfg ON(cfg.network_genesis=c.network_genesis AND cfg.config_key=c.config_key)WHERE j.network_genesis=$1 AND c.policy_version IN('wallet-v1','bond-v1','dev-v1','cashback-v1','mskd-v1','hsol-v1','cashback-hsol-v1','mskd-hsol-v1','masked-v1') AND cfg.expected_fee_claimer=$2 GROUP BY j.kind,j.status ORDER BY j.kind,j.status`,
         [network, collector]
       )
     ).rows;
@@ -395,7 +402,7 @@ export class WalletStore {
         missing_count: string;
         total_count: string;
       }>(
-        `WITH coins AS(SELECT c.* FROM launch_coins c JOIN launch_configs cfg ON(cfg.network_genesis=c.network_genesis AND cfg.config_key=c.config_key)WHERE c.network_genesis=$1 AND c.policy_version IN('wallet-v1','bond-v1','dev-v1','cashback-v1','mskd-v1','hsol-v1','cashback-hsol-v1','mskd-hsol-v1') AND cfg.expected_fee_claimer=$2),pools AS(SELECT mint,dbc_pool AS pool FROM coins UNION ALL SELECT c.mint,m.damm_pool AS pool FROM coins c JOIN launch_migrations m USING(network_genesis,mint))SELECT p.mint,p.pool,i.complete,i.finalized_slot::text,i.scan_head_signature,count(*)FILTER(WHERE i.complete IS DISTINCT FROM true OR i.scan_head_signature IS NOT NULL)OVER()::text AS missing_count,count(*)OVER()::text AS total_count FROM pools p LEFT JOIN wallet_index_cursors i ON(i.network_genesis=$1 AND i.pool=p.pool)ORDER BY p.mint,p.pool LIMIT 100`,
+        `WITH coins AS(SELECT c.* FROM launch_coins c JOIN launch_configs cfg ON(cfg.network_genesis=c.network_genesis AND cfg.config_key=c.config_key)WHERE c.network_genesis=$1 AND c.policy_version IN('wallet-v1','bond-v1','dev-v1','cashback-v1','mskd-v1','hsol-v1','cashback-hsol-v1','mskd-hsol-v1','masked-v1') AND cfg.expected_fee_claimer=$2),pools AS(SELECT mint,dbc_pool AS pool FROM coins UNION ALL SELECT c.mint,m.damm_pool AS pool FROM coins c JOIN launch_migrations m USING(network_genesis,mint))SELECT p.mint,p.pool,i.complete,i.finalized_slot::text,i.scan_head_signature,count(*)FILTER(WHERE i.complete IS DISTINCT FROM true OR i.scan_head_signature IS NOT NULL)OVER()::text AS missing_count,count(*)OVER()::text AS total_count FROM pools p LEFT JOIN wallet_index_cursors i ON(i.network_genesis=$1 AND i.pool=p.pool)ORDER BY p.mint,p.pool LIMIT 100`,
         [network, collector]
       )
     ).rows;
@@ -485,6 +492,8 @@ export class WalletStore {
     return this.tx(async (client) => {
       await this.lock(client, network, mint);
       const coin = await this.coin(client, network, mint);
+      // Masked creator and holder shares are claimed through the XMR/SOL claim screen, not here.
+      if (isMaskedMode(coin.mode)) throw new Error('Masked claims use the claim screen');
       const batched = hasBatchedHolderRewards(coin.mode);
       const assetMint = signedRewardMint(coin.mode, network);
       if (assetMint === null || input.assetMint !== assetMint)
@@ -1583,7 +1592,13 @@ export class WalletStore {
         [network, mint]
       )
     ).rows[0]!;
-    const allocations = { rinse_buyback: 0n, creator: 0n, community: 0n, platform: 0n };
+    const allocations = {
+      rinse_buyback: 0n,
+      creator: 0n,
+      community: 0n,
+      platform: 0n,
+      mskd_buyback: 0n,
+    };
     for (const [phase, net, previous] of [
       ['rinse', rinse, BigInt(totals.rinse_net)],
       ['post', post, BigInt(totals.post_net)],
@@ -1596,14 +1611,16 @@ export class WalletStore {
         mode: coin.mode,
         phase,
         previousPhaseNet: previous,
+        creatorShareBps: coin.creator_share_bps,
       });
       allocations.rinse_buyback += a.rinseBuyback;
+      allocations.mskd_buyback += a.mskdBuyback;
       allocations.creator += a.creator;
       allocations.community += a.community;
       allocations.platform += a.platform;
     }
     await client.query(
-      `INSERT INTO wallet_collections(job_id,network_genesis,mint,pool,signature,finalized_slot,transaction_index,received,raw_observed,rinse_net,post_net,rinse_buyback,creator,community,platform)VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+      `INSERT INTO wallet_collections(job_id,network_genesis,mint,pool,signature,finalized_slot,transaction_index,received,raw_observed,rinse_net,post_net,rinse_buyback,creator,community,platform,mskd_buyback)VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
       [
         job.id,
         network,
@@ -1620,6 +1637,7 @@ export class WalletStore {
         allocations.creator.toString(),
         allocations.community.toString(),
         allocations.platform.toString(),
+        allocations.mskd_buyback.toString(),
       ]
     );
     for (const bucket of BUCKETS) {

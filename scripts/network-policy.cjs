@@ -75,6 +75,7 @@ const MAINNET_REWARD_PINS = {
   'hsol-v1': 'MAINNET_HSOL_CONFIG_KEY',
   'cashback-hsol-v1': 'MAINNET_CASHBACK_HSOL_CONFIG_KEY',
   'mskd-hsol-v1': 'MAINNET_MSKD_HSOL_CONFIG_KEY',
+  'masked-v1': 'MAINNET_MASKED_CONFIG_KEY',
 };
 
 function mainnetConfigPin(policy, env = process.env) {

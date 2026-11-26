@@ -4,10 +4,14 @@ import { LAUNCH_IMAGE_MAX_DATA_URL_LENGTH } from '@/constants/launch';
 import { swapSchema, tradeUnits, uploadSchema } from './validation';
 
 describe('API input boundaries', () => {
-  it('admits only the explicit Bond it. mode and refuses selectable burn routing', () => {
-    expect(uploadSchema.shape.mode.safeParse('bond').success).toBe(true);
-    for (const mode of ['creator', 'community', undefined, null])
+  it('admits only Masked launches with a 10% creator share step and refuses burn routing', () => {
+    expect(uploadSchema.shape.mode.safeParse('masked').success).toBe(true);
+    for (const mode of ['bond', 'dev', 'cashback', 'mskd', 'hsol', 'creator', undefined, null])
       expect(uploadSchema.shape.mode.safeParse(mode).success).toBe(false);
+    for (const share of [0, 3000, 10_000])
+      expect(uploadSchema.shape.creatorShareBps.safeParse(share).success).toBe(true);
+    for (const share of [-1000, 2500, 10_001, '1000', undefined])
+      expect(uploadSchema.shape.creatorShareBps.safeParse(share).success).toBe(false);
     expect(uploadSchema.shape.burnShare.safeParse(0).success).toBe(true);
     for (const share of [25, 50, 75, 100])
       expect(uploadSchema.shape.burnShare.safeParse(share).success).toBe(false);

@@ -7,6 +7,7 @@ import { useUsd } from '@/hooks/useUsd';
 import { LAUNCH_TAX_WINDOW_SECONDS } from '@/constants/launch';
 import { cn, shortenAddress } from '@/lib/utils';
 import { CoinAvatar } from '../coin/CoinAvatar';
+import { SplitBadge } from '@/components/coin/SplitBadge';
 import { TaxBadge } from '../coin/TaxBadge';
 import { CoinLink } from '../coin/CoinLink';
 import { StarButton } from '../coin/StarButton';
@@ -97,6 +98,7 @@ export const CoinCard = memo(({ coin, isNew, compact }: CoinCardProps) => {
                 DEMO
               </span>
             )}
+            <SplitBadge creatorShareBps={coin.creatorShareBps} />
             {!coin.isMigrated && (
               <TaxBadge
                 launchedAt={coin.launchedAt}

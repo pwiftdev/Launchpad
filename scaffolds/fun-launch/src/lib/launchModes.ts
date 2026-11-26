@@ -25,3 +25,8 @@ export const isCashbackMode = (mode: LaunchMode): mode is 'cashback' | 'cashback
   mode === 'cashback' || mode === 'cashback-hsol';
 export const hasBatchedHolderRewards = (mode: LaunchMode) =>
   isCashbackMode(mode) || isMskdMode(mode);
+/** Masked: one launch type whose creator and holders share 0.60%, paid through the company collector. */
+export const isMaskedMode = (mode: LaunchMode): mode is 'masked' => mode === 'masked';
+/** Coins whose fees the company collector claims and pays out, rather than the creator directly. */
+export const paysThroughCollector = (mode: LaunchMode) =>
+  mode === 'community' || hasBatchedHolderRewards(mode) || isMaskedMode(mode);

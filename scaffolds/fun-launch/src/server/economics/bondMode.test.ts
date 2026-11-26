@@ -34,6 +34,7 @@ const migrations = [
   '018-wallet-hourly-processing.sql',
   '019-wallet-settlement-receipts.sql',
   '024-bond-it-policy.sql',
+  '035-mskd-buyback-bucket.sql',
 ];
 const migration = (name: string) =>
   readFileSync(new URL(`../../../../../scripts/migrations/${name}`, import.meta.url), 'utf8');

@@ -4,21 +4,16 @@ import Page from '@/components/ui/Page/Page';
 import { Decrypt } from '@/components/brand/Decrypt';
 import { FeeSplit } from '@/components/fees/FeeSplit';
 import { BRAND } from '@/constants/brand';
-import {
-  REWARD_MODES,
-  pairingMode,
-  SCHEDULE,
-  SPLIT,
-  feeMode,
-  pct,
-  type FeeModeId,
-} from '@/lib/feeModes';
+import { CREATOR_SHARE_STEP_BPS, LAUNCH_FEE_MODE, SCHEDULE, feeMode, pct } from '@/lib/feeModes';
 import { adminPageRedirect } from '@/server/adminPage';
-import { hsolLaunchModes } from '@/server/tradingAccess';
 import type { GetServerSideProps } from 'next';
 
-export const getServerSideProps: GetServerSideProps<{ hsolModes: FeeModeId[] }> = async (context) =>
-  adminPageRedirect(context) ?? { props: { hsolModes: await hsolLaunchModes() } };
+export const getServerSideProps: GetServerSideProps = async (context) =>
+  adminPageRedirect(context) ?? { props: {} };
+
+const MASKED = feeMode(LAUNCH_FEE_MODE);
+const { split } = MASKED;
+const EXAMPLES = [0, 5000, 10_000];
 
 const RULES: [string, string][] = [
   [
@@ -34,8 +29,16 @@ const RULES: [string, string][] = [
     'At the configured reserve target the curve migrates to Meteora DAMM v2. Migration needs confirmed on-chain transactions; reaching the target alone does not complete it. Launch liquidity stays permanently locked.',
   ],
   [
+    'Locked forever',
+    `The creator picks the split in ${CREATOR_SHARE_STEP_BPS / 100}% steps before launch. It is signed with the launch and written into the coin's metadata. Nobody can change it afterwards, not the creator and not Masked.`,
+  ],
+  [
     'Payouts',
-    'Fees are claimed by the house wallet and paid out in batches as they accrue. Creators request their share by signing a message. Holder payouts are pro rata to balances; pools, burn and house wallets are excluded. Extra liquidity providers keep their own fees.',
+    'Masked claims fees every hour and credits the creator share and each holder share. Holder shares are pro rata to balances; pools, burn and Masked wallets are excluded. Extra liquidity providers keep their own fees.',
+  ],
+  [
+    'Claim in Monero or SOL',
+    'Claim in native XMR, sent to the Monero address you enter, or in SOL to your wallet. If native XMR payouts are down, the claim is offered in wXMR on Solana instead. Conversion costs are shown before you confirm.',
   ],
   [
     'No accounts, no KYC',
@@ -43,7 +46,7 @@ const RULES: [string, string][] = [
   ],
 ];
 
-export default function Rules({ hsolModes }: { hsolModes: FeeModeId[] }) {
+export default function Rules() {
   return (
     <Page>
       <Head>
@@ -58,45 +61,39 @@ export default function Rules({ hsolModes }: { hsolModes: FeeModeId[] }) {
           <span className="text-neutral-500">Before and after bonding.</span>
         </h1>
         <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-neutral-400">
-          All launch modes have the same standard fee. Meteora keeps {pct(SPLIT.meteoraBps)}, the
-          house keeps {pct(SPLIT.houseBps)}, and the mode you launch in decides who gets the other{' '}
-          {pct(SPLIT.beneficiaryBps)}.
+          Every coin has the same fee. Meteora keeps {pct(split.meteoraBps)}, Masked keeps{' '}
+          {pct(split.houseBps)} and {pct(split.buybackBps)} buys back and burns $MSKD. The creator
+          splits the other {pct(split.beneficiaryBps)} with holders, locked forever at launch.
         </p>
       </header>
 
-      {/* Modes */}
-      <section aria-labelledby="modes" className="border-t border-neutral-850 pt-8">
-        <h2 id="modes" className="eyebrow">
-          Launch modes
+      {/* Split */}
+      <section aria-labelledby="split" className="border-t border-neutral-850 pt-8">
+        <h2 id="split" className="eyebrow">
+          The creator&rsquo;s split
         </h2>
         <div className="mt-5 grid gap-3 md:grid-cols-3">
-          {REWARD_MODES.map((id) => {
-            const mode = feeMode(id);
-            return (
-              <article key={id} className="surface flex flex-col p-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-display text-[15px] uppercase">{mode.label}</h3>
-                  <span className="rounded-md border border-neutral-800 px-1.5 py-0.5 font-mono text-[11px] text-neutral-400">
-                    {hsolModes.includes(pairingMode(id, 'hsol')) ? 'SOL · hSOL' : 'SOL'}
-                  </span>
-                </div>
-                <p className="mt-1.5 text-[13px] text-neutral-400">{mode.tagline}</p>
-                <p className="mt-6 font-pixel text-[32px] leading-none">
-                  {pct(SPLIT.beneficiaryBps)}
-                </p>
-                <p className="mt-1.5 text-[13px] text-neutral-500">
-                  of every trade to {mode.beneficiary === 'creator' ? 'the creator' : 'holders'}
-                  {mode.payoutSymbol !== mode.quoteSymbol ? `, paid in ${mode.payoutSymbol}` : ''}
-                </p>
-                <FeeSplit mode={mode} compact className="mt-6" />
-              </article>
-            );
-          })}
+          {EXAMPLES.map((creatorShareBps) => (
+            <article key={creatorShareBps} className="surface flex flex-col p-6">
+              <h3 className="font-display text-[15px] uppercase">
+                {creatorShareBps === 0
+                  ? 'All to holders'
+                  : creatorShareBps === 10_000
+                    ? 'All to the creator'
+                    : 'Even split'}
+              </h3>
+              <p className="mt-6 font-pixel text-[32px] leading-none">
+                {pct((split.beneficiaryBps * (10_000 - creatorShareBps)) / 10_000)}
+              </p>
+              <p className="mt-1.5 text-[13px] text-neutral-500">of every trade to holders</p>
+              <FeeSplit mode={MASKED} creatorShareBps={creatorShareBps} compact className="mt-6" />
+            </article>
+          ))}
         </div>
         <p className="mt-4 max-w-3xl text-[12px] leading-relaxed text-neutral-500">
-          MSKD pays the holder share in wXMR, a Solana token issued by a bridge that holds Monero.
-          The issuer controls minting and handles redemptions. In-app redemption is planned. Trades
-          on Solana are public in every mode.
+          Any {CREATOR_SHARE_STEP_BPS / 100}% step from 0 to 100% is allowed. Every coin card shows
+          its split. Trades on Solana are public; a Monero claim keeps where your earnings go
+          private.
         </p>
       </section>
 
@@ -130,9 +127,9 @@ export default function Rules({ hsolModes }: { hsolModes: FeeModeId[] }) {
       </div>
 
       <p className="mt-8 max-w-3xl text-[12px] leading-relaxed text-neutral-500">
-        Coins launched before these modes keep the fee policy they launched with; check each
-        coin&rsquo;s live quote. Network fees and account rent are separate and shown before
-        signing. Bonding is a goal, not a promise.
+        Coins launched before Masked keep the fee policy they launched with; check each coin&rsquo;s
+        live quote. Network fees and account rent are separate and shown before signing. Bonding is
+        a goal, not a promise.
       </p>
     </Page>
   );
