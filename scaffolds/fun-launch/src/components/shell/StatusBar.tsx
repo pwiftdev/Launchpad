@@ -1,44 +1,23 @@
 import Link from 'next/link';
-import { useMemo, useRef } from 'react';
+import { useRef } from 'react';
 import { useCoins } from '@/hooks/useCoins';
 import { useNow } from '@/hooks/useNow';
 import { NETWORK, NETWORK_LABEL } from '@/constants/network';
 import { formatUsd, useUsd } from '@/hooks/useUsd';
-import { useMarketStats, demoMarket } from '@/hooks/useMarket';
-import { useDemoMode } from '@/hooks/useDemoMode';
-import { getDemoCoins } from '@/lib/demo';
+import { useLaunchpadMarket } from '@/hooks/useMarket';
 import { cn } from '@/lib/utils';
 
 const number = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 
 export const StatusBar = () => {
   const statsRef = useRef<HTMLDListElement>(null);
-  const { visible: preview } = useDemoMode();
   const { data: coins } = useCoins();
-  const { data, isFetching } = useMarketStats();
+  const { data, isFetching, preview, volume, swaps, liquidity, coverage } =
+    useLaunchpadMarket(coins);
   const now = useNow(1000);
   const { usd, price } = useUsd();
-  const samples = useMemo(() => (preview ? getDemoCoins().map(demoMarket) : []), [preview]);
-  const volume = preview
-    ? samples.reduce((sum, token) => sum + token.volumeSol, 0)
-    : data?.trackedPools
-      ? data.volumeSol
-      : null;
-  const trades = preview
-    ? samples.reduce((sum, token) => sum + token.trades, 0)
-    : data?.trackedPools
-      ? data.trades
-      : null;
-  const liquidity = coins?.reduce(
-    (sum, coin) => sum + (coin.isMigrated ? 0 : coin.quoteReserveSol),
-    0
-  );
   const age = now && data?.updatedAt ? now - data.updatedAt : null;
   const live = !!data?.network.slot && age !== null && age < 180;
-  const coverage = preview
-    ? 'Simulated sample activity. No real funds or trading.'
-    : 'Recent swaps within 24 hours, sampled across up to 8 pools. ' +
-      (data ? data.trackedPools + ' of ' + data.totalPools + ' pools tracked.' : 'Loading.');
 
   return (
     <footer
@@ -85,7 +64,7 @@ export const StatusBar = () => {
         />
         <Stat
           label={preview ? 'Sample swaps' : 'Tracked swaps'}
-          value={trades === null ? '?' : number.format(trades)}
+          value={swaps === null ? '?' : number.format(swaps)}
           title={coverage}
         />
         <Stat

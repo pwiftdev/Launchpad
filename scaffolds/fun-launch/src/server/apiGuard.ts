@@ -72,6 +72,7 @@ function pollingClass(req: NextApiRequest): keyof typeof POLLING_LIMITS | undefi
       '/api/coins',
       '/api/trending',
       '/api/market-stats',
+      '/api/solana-market',
       '/api/sol-price',
       '/api/burns',
       '/api/token-image',

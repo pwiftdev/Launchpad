@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PublicKey } from '@solana/web3.js';
+import { OFFICIAL_MSKD } from '@/constants/officialMskd';
 
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
@@ -69,6 +70,25 @@ describe('shared market snapshot', () => {
     expect(mocks.signatures).toHaveBeenCalledTimes(8);
     expect(mocks.signatures.mock.calls.every((call) => call[1].limit === 24)).toBe(true);
     await getMarketStats();
+    expect(mocks.signatures).toHaveBeenCalledTimes(8);
+  });
+  it('reserves a slot for the official MSKD pool even when its launch is older', async () => {
+    vi.stubEnv('NEXT_PUBLIC_NETWORK', 'mainnet-beta');
+    const coins = await mocks.list();
+    const migratedPool = new PublicKey(Buffer.alloc(32, 99)).toBase58();
+    Object.assign(coins[0], { mint: OFFICIAL_MSKD.mint, isMigrated: true, migratedPool });
+    Object.assign(coins[1], { symbol: 'MSKD' });
+    const { getMarketStats } = await import('./market');
+    const data = await getMarketStats();
+    expect(Object.keys(data.tokens).sort()).toEqual(
+      [OFFICIAL_MSKD.mint, ...coins.slice(5).map((coin: { mint: string }) => coin.mint)].sort()
+    );
+    expect(data.tokens[OFFICIAL_MSKD.mint]).toMatchObject({
+      points: [10_000, 100],
+      trades: 1,
+      partial: true,
+    });
+    expect(mocks.signatures.mock.calls[0]?.[0].toBase58()).toBe(migratedPool);
     expect(mocks.signatures).toHaveBeenCalledTimes(8);
   });
   it('does not invent missing network samples or pool histories', async () => {

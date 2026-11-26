@@ -5,7 +5,7 @@ import { useLocalSetting } from '@/hooks/useLocalSetting';
 import { cn } from '@/lib/utils';
 import { CoinCard } from './CoinCard';
 import { BoardPanel, SortControl } from './BoardPanel';
-import { BondHero } from './BondHero';
+import { BoardOverview } from './BoardOverview';
 import { LogoMark } from '../brand/Logo';
 
 type ColumnId = 'new' | 'close' | 'bonded';
@@ -112,7 +112,7 @@ export const Board = ({ coins, status, displayStale = false }: BoardProps) => {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <BondHero coins={coins} />
+      <BoardOverview coins={coins} />
       <div className="mb-2.5 flex shrink-0 items-center justify-between gap-3 px-1">
         <div className="flex items-center gap-2">
           <h2 className="font-display text-[14px] uppercase">The board</h2>

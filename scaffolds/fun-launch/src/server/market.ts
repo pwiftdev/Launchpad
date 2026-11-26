@@ -1,4 +1,5 @@
 import { PublicKey, type PerfSample } from '@solana/web3.js';
+import { BRAND } from '@/constants/brand';
 import { connection, listCoins } from './dbc';
 import { decodeTrades } from './trades';
 import { displayTrade } from './tradeDecoder';
@@ -78,7 +79,14 @@ async function loadMarket(): Promise<MarketStats> {
   })().catch((): MarketStats['network'] => ({ slot: null, rpcMs: null, tps: null }));
   const coins = await listCoins();
   // Keep page traffic bounded even if the launchpad grows: at most 192 transaction reads/minute.
-  const selected = [...coins].sort((a, b) => b.launchedAt - a.launchedAt).slice(0, POOL_LIMIT);
+  const officialMint = BRAND.officialMint;
+  const selected = [...coins]
+    .sort(
+      (a, b) =>
+        Number(b.mint === officialMint) - Number(a.mint === officialMint) ||
+        b.launchedAt - a.launchedAt
+    )
+    .slice(0, POOL_LIMIT);
   const now = Date.now() / 1000;
   const indexed = selected.map((coin) =>
     mobulaMarketSample(coin, TX_LIMIT, now).catch((): null => null)

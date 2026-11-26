@@ -121,6 +121,7 @@ describe('public launchpad admission', () => {
       '/api/coins',
       '/api/trending',
       '/api/market-stats',
+      '/api/solana-market',
       '/api/sol-price',
       '/api/burns',
       '/api/quote',

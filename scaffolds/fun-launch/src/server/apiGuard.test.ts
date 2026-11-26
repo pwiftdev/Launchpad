@@ -201,6 +201,7 @@ describe('API guard', () => {
       '/api/coins/?query=1',
       '/api/trending',
       '/api/market-stats',
+      '/api/solana-market',
       '/api/sol-price',
       '/api/burns',
       `/api/coins/${'1'.repeat(32)}`,

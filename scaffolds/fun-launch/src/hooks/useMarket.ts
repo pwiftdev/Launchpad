@@ -1,11 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import type { Coin } from '@/lib/coin';
 import type { MarketStats, TokenMarket } from '@/lib/market';
 import { summarizeMarket } from '@/lib/market';
-import { getDemoTrades } from '@/lib/demo';
+import { getDemoCoins, getDemoTrades } from '@/lib/demo';
+import type { SolanaMarket } from '@/lib/solanaMarket';
+import { useDemoMode } from './useDemoMode';
 
 const demoCache = new Map<string, TokenMarket>();
-export function demoMarket(coin: Coin): TokenMarket {
+function demoMarket(coin: Coin): TokenMarket {
   let data = demoCache.get(coin.mint);
   if (!data) {
     const history = getDemoTrades(coin);
@@ -37,4 +40,46 @@ export function useMarketStats() {
 export function useTokenMarket(coin: Coin) {
   const query = useMarketStats();
   return coin.isDemo ? demoMarket(coin) : query.data?.tokens[coin.mint];
+}
+
+export function useLaunchpadMarket(coins: Coin[] | undefined) {
+  const { visible: preview } = useDemoMode();
+  const { data, isFetching } = useMarketStats();
+  const samples = useMemo(() => (preview ? getDemoCoins().map(demoMarket) : []), [preview]);
+  const volume = preview
+    ? samples.reduce((sum, token) => sum + token.volumeSol, 0)
+    : data?.trackedPools
+      ? data.volumeSol
+      : null;
+  const swaps = preview
+    ? samples.reduce((sum, token) => sum + token.trades, 0)
+    : data?.trackedPools
+      ? data.trades
+      : null;
+  const liquidity = useMemo(
+    () => coins?.reduce((sum, coin) => sum + (coin.isMigrated ? 0 : coin.quoteReserveSol), 0),
+    [coins]
+  );
+  const coverage = preview
+    ? 'Simulated sample activity. No real funds or trading.'
+    : 'Recent swaps within 24 hours, sampled across up to 8 pools. ' +
+      (data ? `${data.trackedPools} of ${data.totalPools} pools tracked.` : 'Loading.');
+  return { data, isFetching, preview, volume, swaps, liquidity, coverage };
+}
+
+export function useSolanaMarket() {
+  return useQuery<SolanaMarket>({
+    queryKey: ['solana-market'],
+    queryFn: async ({ signal }) => {
+      const timeout = AbortSignal.timeout(6000);
+      const response = await fetch('/api/solana-market', {
+        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+      });
+      if (!response.ok) throw new Error('Solana market statistics unavailable');
+      return response.json();
+    },
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    retry: 1,
+  });
 }
