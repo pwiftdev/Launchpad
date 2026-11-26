@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Tooltip } from 'radix-ui';
 import { usePrivacyMode } from '@/hooks/usePrivacyMode';
-import { NAV_ITEMS, isActivePath, navigateDocument } from '@/constants/nav';
+import { NAV_ITEMS, isActivePath } from '@/constants/nav';
 import { BRAND } from '@/constants/brand';
 import { useLocalSetting } from '@/hooks/useLocalSetting';
 import { cn } from '@/lib/utils';
@@ -30,7 +30,6 @@ export const SideRail = () => {
       >
         <Link
           href="/"
-          onNavigate={navigateDocument(pathname, '/')}
           aria-label={`${BRAND.name} home`}
           className="group flex items-center gap-2 rounded-lg p-1"
         >
@@ -47,7 +46,6 @@ export const SideRail = () => {
         <RailTip label="Launch a coin" show={!expanded}>
           <Link
             href="/launch"
-            onNavigate={navigateDocument(pathname, '/launch')}
             className={cn(
               'btn-holo flex h-10 items-center justify-center gap-2 rounded-lg text-[13px]',
               expanded ? 'w-full text-sm' : 'w-10'
@@ -70,7 +68,6 @@ export const SideRail = () => {
             <RailTip key={item.href} label={item.label} show={!expanded}>
               <Link
                 href={item.href}
-                onNavigate={navigateDocument(pathname, item.href)}
                 aria-current={active ? 'page' : undefined}
                 aria-label={item.label}
                 className={cn(

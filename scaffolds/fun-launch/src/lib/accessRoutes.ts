@@ -20,19 +20,12 @@ const LAUNCHPAD_APIS = [
   '/api/market-stats',
   '/api/solana-market',
   '/api/sol-price',
-  '/api/burns',
   '/api/token-image',
   '/api/quote',
   '/api/swap-tx',
   '/api/send-transaction',
   '/api/transaction-status',
   '/api/rewards',
-  '/api/callouts',
-  '/api/token-chat',
-  '/api/launch-previews',
-  '/api/otc',
-  '/api/otc-rings',
-  '/api/otc-rings-rpc',
   '/api/upload',
   '/api/dev-buy-quote',
   '/api/launch/status',
@@ -83,7 +76,7 @@ function mintAddress(value: string): boolean {
 export function launchpadPage(url: string): boolean {
   const path = accessPath(url);
   if (
-    ['/', '/launch', '/launch-preview', '/otc', '/rules', '/burns', '/roadmap', '/404'].includes(
+    ['/', '/launch', '/rules', '/roadmap', '/404'].includes(
       path
     )
   )
@@ -101,7 +94,6 @@ export function publicApi(url: string, open = launchpadIsPublic()): boolean {
       '/api/og/brand',
       '/api/og/plzzz',
       '/api/og/rinsed',
-      '/api/profiles',
     ].includes(path)
   )
     return true;

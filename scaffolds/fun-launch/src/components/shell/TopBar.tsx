@@ -2,8 +2,6 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useUnifiedWalletContext, useWallet } from '@jup-ag/wallet-adapter';
 import { cn } from '@/lib/utils';
-import { useWalletProfiles } from '@/hooks/useWalletProfiles';
-import { ProfileEditorButton } from '../profiles/ProfileEditor';
 import { WalletIdentity } from '../profiles/WalletIdentity';
 import { useLocalSetting } from '@/hooks/useLocalSetting';
 import { LogoMark, NetworkBadge, Wordmark } from '../brand/Logo';
@@ -16,7 +14,6 @@ export const TopBar = () => {
   const { setShowModal } = useUnifiedWalletContext();
   const { disconnect, publicKey } = useWallet();
   const address = useMemo(() => publicKey?.toBase58(), [publicKey]);
-  const { profiles } = useWalletProfiles(address ? [address] : []);
   const [isMac, setIsMac] = useState(false);
   const [railExpanded] = useLocalSetting('rinsed.rail', false);
   useEffect(() => setIsMac(/Mac|iPhone|iPad/.test(navigator.userAgent)), []);
@@ -61,7 +58,6 @@ export const TopBar = () => {
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <OfficialTokenPill />
         <NetworkBadge className="hidden sm:inline" />
-        {address && <ProfileEditorButton compact />}
         {address ? (
           <button
             type="button"
@@ -71,7 +67,7 @@ export const TopBar = () => {
           >
             <span className="h-2 w-2 rounded-full bg-emerald" />
             <span className="max-w-24 text-xs sm:max-w-40">
-              <WalletIdentity wallet={address} profile={profiles[address]} compact />
+              <WalletIdentity wallet={address} compact />
             </span>
           </button>
         ) : (

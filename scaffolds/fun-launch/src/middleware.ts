@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { accessPath, launchpadIsPublic, publicApi, publicPage } from '@/lib/accessRoutes';
-import { OTC_PATH } from '@/constants/nav';
 import { ADMIN_COOKIE, readAdminSession } from '@/server/adminSession';
 import { siteOriginForHeaders } from '@/server/siteOrigin';
 import { contentSecurityPolicy, newScriptNonce, NONCE_HEADER } from '@/server/securityHeaders';
@@ -13,7 +12,7 @@ export function middleware(request: NextRequest) {
   if (!api && publicPage(path, open) && /\.(?:png|svg|ico|webp|jpe?g|gif)$/.test(path))
     return NextResponse.next();
   const nonce = newScriptNonce(),
-    policy = contentSecurityPolicy(nonce, undefined, path === OTC_PATH);
+    policy = contentSecurityPolicy(nonce);
   const headers = new Headers(request.headers);
   // Never trust a client-supplied nonce or policy header.
   headers.set(NONCE_HEADER, nonce);
@@ -55,5 +54,5 @@ export function middleware(request: NextRequest) {
 export const config = {
   runtime: 'nodejs',
   // Artwork routes enforce access in apiGuard and read the request without a middleware body copy.
-  matcher: ['/((?!_next/static/|_next/webpack-hmr|api/(?:upload|launch-previews)/?$).*)'],
+  matcher: ['/((?!_next/static/|_next/webpack-hmr|api/upload/?$).*)'],
 };

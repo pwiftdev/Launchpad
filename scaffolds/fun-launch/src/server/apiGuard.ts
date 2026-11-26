@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { isIP } from 'node:net';
 import { accessPath, launchpadIsPublic, publicApi } from '@/lib/accessRoutes';
-import { PREVIEW_API } from '@/lib/launchPreview';
 import { ADMIN_COOKIE, readAdminSession } from './adminSession';
 import { siteOrigins } from './siteOrigin';
 
@@ -10,15 +9,11 @@ type Bucket = { count: number; until: number };
 const buckets = new Map<string, Bucket>();
 // Read traffic cannot consume write admission counters or their bounded storage.
 const pollingBuckets = new Map<string, Bucket>();
-const chatWriteBuckets = new Map<string, Bucket>();
-const previewBuckets = new Map<string, Bucket>();
 const MAX_BUCKETS = 10_000;
 const POLLING_LIMITS = {
   market: { minute: 12_000, burst: 1000, ipMinute: 900, ipBurst: 80 },
   interactive: { minute: 6000, burst: 800, ipMinute: 180, ipBurst: 40 },
-  chat: { minute: 4000, burst: 400, ipMinute: 120, ipBurst: 25 },
 };
-const CHAT_API = '/api/token-chat';
 
 type Limit = { key: string; limit: number; windowMs: number };
 type Admission = { allowed: boolean; retryAfter: number };
@@ -66,7 +61,6 @@ export function takeLimit(key: string, limit: number, windowMs: number): boolean
 function pollingClass(req: NextApiRequest): keyof typeof POLLING_LIMITS | undefined {
   if (req.method !== 'GET' && req.method !== 'HEAD') return;
   const path = accessPath(req.url ?? '');
-  if (path === CHAT_API) return 'chat';
   if (
     [
       '/api/coins',
@@ -74,7 +68,6 @@ function pollingClass(req: NextApiRequest): keyof typeof POLLING_LIMITS | undefi
       '/api/market-stats',
       '/api/solana-market',
       '/api/sol-price',
-      '/api/burns',
       '/api/token-image',
     ].includes(path) ||
     /^\/api\/coins\/[1-9A-HJ-NP-Za-km-z]{32,44}(?:\/(?:trades|holders|live))?$/.test(path)
@@ -88,8 +81,6 @@ function pollingClass(req: NextApiRequest): keyof typeof POLLING_LIMITS | undefi
       '/api/launch/status',
       '/api/launch/receipt-status',
       '/api/rewards',
-      '/api/profiles',
-      '/api/callouts',
     ].includes(path) ||
     /^\/api\/coins\/[1-9A-HJ-NP-Za-km-z]{32,44}\/balance$/.test(path)
   )
@@ -144,17 +135,14 @@ export function apiGuard(req: NextApiRequest, res: NextApiResponse): boolean {
   }
   const ip = clientIp(req);
   const polling = pollingClass(req);
-  const path = accessPath(req.url ?? '');
-  const chatWrite = mutating && path === CHAT_API;
-  const preview = path === PREVIEW_API;
   const limits = polling
     ? admitPolling(polling, ip)
     : admit(
         [
-          { key: 'all-api', limit: chatWrite ? 600 : 1200, windowMs: 60_000 },
-          { key: `api:${ip}`, limit: chatWrite ? 60 : preview ? 120 : 240, windowMs: 60_000 },
+          { key: 'all-api', limit: 1200, windowMs: 60_000 },
+          { key: `api:${ip}`, limit: 240, windowMs: 60_000 },
         ],
-        chatWrite ? chatWriteBuckets : preview ? previewBuckets : buckets
+        buckets
       );
   if (!limits.allowed) {
     res.setHeader('Retry-After', String(limits.retryAfter));

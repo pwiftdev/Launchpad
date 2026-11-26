@@ -86,15 +86,10 @@ export function validateEnv(env = process.env) {
       );
   if (env.FINANCIAL_WORKER_ENABLED === 'true')
     throw new Error('Legacy native worker settings cannot configure the wallet-v1 deployment');
-  for (const key of ['TOKEN_CHAT_SECRET', 'LAUNCH_PREVIEW_SECRET', 'OTC_PREVIEW_SECRET'])
-    if (env[key] && !/^[0-9a-f]{64}$/.test(env[key]))
-      throw new Error(`${key} must be a 32-byte lowercase hex secret`);
   for (const key of [
     'WALLET_WORKER_ENABLED',
     'MAINNET_TRADING_ENABLED',
     'LAUNCHPAD_PUBLIC',
-    'OTC_MAINNET_OFFERS_ENABLED',
-    'OTC_RINGS_SETTLEMENT_ENABLED',
   ])
     if (env[key] !== undefined && !['true', 'false'].includes(env[key]))
       throw new Error(`Invalid ${key}`);
@@ -155,35 +150,6 @@ export function validateEnv(env = process.env) {
     throw new Error('Demo launches must be disabled on mainnet');
   if (env.MAINNET_TRADING_ENABLED === 'true' && env.NEXT_PUBLIC_NETWORK !== 'mainnet-beta')
     throw new Error('MAINNET_TRADING_ENABLED requires the explicitly selected mainnet network');
-  if (env.OTC_MAINNET_OFFERS_ENABLED === 'true') {
-    if (env.NEXT_PUBLIC_NETWORK !== 'mainnet-beta')
-      throw new Error('OTC_MAINNET_OFFERS_ENABLED requires mainnet-beta');
-    if (!env.OTC_PREVIEW_SECRET || !/^postgres(?:ql)?:\/\//.test(env.DATABASE_URL || ''))
-      throw new Error('Mainnet OTC offers require OTC_PREVIEW_SECRET and a Postgres database');
-  }
-  if (env.OTC_RINGS_SETTLEMENT_ENABLED === 'true') {
-    const mainnet = env.NEXT_PUBLIC_NETWORK === 'mainnet-beta';
-    if (
-      !env.OTC_PREVIEW_SECRET ||
-      !/^postgres(?:ql)?:\/\//.test(env.DATABASE_URL || '') ||
-      (mainnet && env.OTC_MAINNET_OFFERS_ENABLED !== 'true')
-    )
-      throw new Error('Rings settlement requires the OTC desk, its server secret and Postgres');
-    if (!localValidator) {
-      const endpoint = new URL(env.OTC_RINGS_RPC_URL || env.RPC_URL);
-      const host = mainnet ? 'mainnet.helius-rpc.com' : 'devnet.helius-rpc.com';
-      if (
-        endpoint.origin !== `https://${host}` ||
-        endpoint.pathname !== '/' ||
-        endpoint.hash ||
-        endpoint.username ||
-        endpoint.password ||
-        [...endpoint.searchParams.keys()].join() !== 'api-key' ||
-        !endpoint.searchParams.get('api-key')
-      )
-        throw new Error('Rings settlement requires a keyed Helius RPC for the selected network');
-    }
-  }
   if (
     env.WALLET_WORKER_ENABLED === 'true' ||
     env.MAINNET_TRADING_ENABLED === 'true' ||

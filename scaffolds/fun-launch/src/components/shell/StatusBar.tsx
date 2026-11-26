@@ -107,9 +107,6 @@ export const StatusBar = () => {
         <Link href="/rules" className="hover:text-primary">
           Rules
         </Link>
-        <Link href="/burns" className="hover:text-primary">
-          Burns
-        </Link>
       </nav>
     </footer>
   );

@@ -3,7 +3,6 @@ import type { Coin } from '@/lib/coin';
 import { explorerUrl } from '@/constants/network';
 import { formatReadableNumber } from '@/lib/format/number';
 import { SOCIAL_KINDS, SOCIAL_LABELS } from '@/lib/socials';
-import { useWalletProfiles } from '@/hooks/useWalletProfiles';
 import { WalletIdentity } from '@/components/profiles/WalletIdentity';
 import { SOCIAL_ICONS } from '@/components/coin/SocialLinks';
 import { cn } from '@/lib/utils';
@@ -11,7 +10,6 @@ import { PanelSection } from './PanelSection';
 
 export function TokenAbout({ coin }: { coin: Coin }) {
   const [expanded, setExpanded] = useState(false);
-  const { profiles } = useWalletProfiles(coin.isDemo ? [] : [coin.creator]);
   const links = SOCIAL_KINDS.flatMap((kind) =>
     coin.socials?.[kind] ? [{ kind, href: coin.socials[kind]! }] : []
   );
@@ -72,7 +70,7 @@ export function TokenAbout({ coin }: { coin: Coin }) {
             rel="noreferrer"
             className="text-neutral-300 hover:text-primary"
           >
-            <WalletIdentity wallet={coin.creator} profile={profiles[coin.creator]} compact />
+            <WalletIdentity wallet={coin.creator} compact />
           </a>
         </Row>
         <Row label="Current supply">

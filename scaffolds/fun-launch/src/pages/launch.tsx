@@ -10,7 +10,6 @@ import Page from '@/components/ui/Page/Page';
 import { Button } from '@/components/ui/button';
 import { LaunchSuccess, type LaunchReceipt } from '@/components/launch/LaunchSuccess';
 import { LaunchPreviewCard } from '@/components/launch/LaunchPreviewCard';
-import { PrivatePreviewControls } from '@/components/launch/PrivatePreviewControls';
 import type { GetServerSideProps } from 'next';
 import { BRAND } from '@/constants/brand';
 import {
@@ -57,14 +56,13 @@ import {
 } from '@/lib/socials';
 import { SOCIAL_ICONS } from '@/components/coin/SocialLinks';
 import { adminPageRedirect } from '@/server/adminPage';
-import { launchPreviewKey } from '@/server/privateEncryption';
 import { hsolLaunchModes } from '@/server/tradingAccess';
-import { readLaunchImage, restorePreviewImage, type LaunchPreviewDraft } from '@/lib/launchPreview';
+import { readLaunchImage } from '@/lib/launchImageFile';
 
-type LaunchProps = { previewsEnabled: boolean; hsolModes: FeeModeId[] };
+type LaunchProps = { hsolModes: FeeModeId[] };
 export const getServerSideProps: GetServerSideProps<LaunchProps> = async (context) =>
   adminPageRedirect(context) ?? {
-    props: { previewsEnabled: !!launchPreviewKey(), hsolModes: await hsolLaunchModes() },
+    props: { hsolModes: await hsolLaunchModes() },
   };
 
 type DevBuyQuote = { tokens: number; costQuote: number; feeQuote: number; quoteSymbol: string };
@@ -82,7 +80,7 @@ const LINK_PLACEHOLDERS: Record<SocialKind, string> = {
   discord: 'discord.gg/maskedfrog',
 };
 
-export default function Launch({ previewsEnabled, hsolModes }: LaunchProps) {
+export default function Launch({ hsolModes }: LaunchProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { publicKey, signTransaction, signMessage } = useWallet();
@@ -206,7 +204,7 @@ export default function Launch({ previewsEnabled, hsolModes }: LaunchProps) {
   const totalCost =
     creationFee + (devBuyPercent > 0 && !hsolBuy ? (devBuy.data?.costQuote ?? 0) : 0);
 
-  async function draftFromForm(): Promise<LaunchPreviewDraft> {
+  async function draftFromForm() {
     if (!isValid || !image) throw new Error('Add a valid name, ticker and artwork first.');
     return {
       tokenLogo: await readLaunchImage(image),
@@ -219,17 +217,6 @@ export default function Launch({ previewsEnabled, hsolModes }: LaunchProps) {
     };
   }
 
-  function restoreDraft(draft: LaunchPreviewDraft) {
-    const artwork = restorePreviewImage(draft.tokenLogo);
-    setRestoredFor(wallet);
-    setImage(artwork);
-    setName(draft.tokenName);
-    setTicker(draft.tokenSymbol);
-    setDescription(draft.description ?? '');
-    setLinks({ ...EMPTY_LINKS, ...draft.socials });
-    setFeeModeId(draft.mode);
-    setDevBuyPercent(draft.devBuyPercent);
-  }
 
   async function launch() {
     if (launchLock.current) return;
@@ -491,14 +478,6 @@ export default function Launch({ previewsEnabled, hsolModes }: LaunchProps) {
               />
             </Step>
 
-            {previewsEnabled && (
-              <a
-                href="#private-launch-preview"
-                className="w-fit text-sm font-medium text-primary underline-offset-4 hover:underline lg:hidden"
-              >
-                Save a private preview
-              </a>
-            )}
 
             <div className="holo-border flex flex-col gap-4 rounded-2xl bg-panel p-5 sm:flex-row sm:items-center sm:justify-between">
               <dl className="text-sm">
@@ -576,17 +555,6 @@ export default function Launch({ previewsEnabled, hsolModes }: LaunchProps) {
               socials={socials}
               mode={selectedMode}
             />
-            {previewsEnabled && (
-              <PrivatePreviewControls
-                key={wallet ?? 'disconnected'}
-                wallet={wallet}
-                signMessage={signMessage}
-                connect={() => setShowModal(true)}
-                draftFromForm={draftFromForm}
-                restoreDraft={restoreDraft}
-                canSave={isValid && !!image && !submitting}
-              />
-            )}
             <ScheduleCard mode={selectedMode} />
           </aside>
         </div>

@@ -39,7 +39,7 @@ function admittedRequest(url = '/api/coins', method = 'GET', ip = '192.0.2.1') {
 }
 
 describe('API guard', () => {
-  it.each(['/api/upload', '/api/launch-previews'])(
+  it.each(['/api/upload', '/api/launch/confirm'])(
     'enforces access on %s without middleware',
     (url) => {
       vi.stubEnv('LAUNCHPAD_PUBLIC', 'false');
@@ -72,7 +72,7 @@ describe('API guard', () => {
   it('admits public user APIs without an admin cookie while preserving origin checks and private routes', () => {
     vi.stubEnv('LAUNCHPAD_PUBLIC', 'true');
     vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://launch.example');
-    for (const url of ['/api/coins', '/api/callouts', '/api/rewards', '/api/launch/status']) {
+    for (const url of ['/api/coins', '/api/rewards', '/api/launch/status']) {
       const req = request();
       req.url = url;
       req.method = 'GET';
@@ -190,8 +190,8 @@ describe('API guard', () => {
     expect(apiGuard(write, writeRes)).toBe(false);
     expect(writeRes.status).toHaveBeenCalledWith(429);
     expect(apiGuard(admittedRequest('/api/coins'), response())).toBe(true);
-    expect(apiGuard(admittedRequest('/api/profiles?wallets=test'), response())).toBe(true);
-    expect(apiGuard(admittedRequest('/api/profiles', 'POST'), response())).toBe(false);
+    expect(apiGuard(admittedRequest('/api/rewards?wallet=test'), response())).toBe(true);
+    expect(apiGuard(admittedRequest('/api/upload', 'POST'), response())).toBe(false);
   });
   it('uses only exact known polling GET/HEAD routes', () => {
     const control = admittedRequest('/api/admin/session', 'POST');
@@ -203,14 +203,12 @@ describe('API guard', () => {
       '/api/market-stats',
       '/api/solana-market',
       '/api/sol-price',
-      '/api/burns',
       `/api/coins/${'1'.repeat(32)}`,
       `/api/coins/${'1'.repeat(32)}/live`,
       '/api/quote',
       '/api/rewards',
       '/api/launch/status',
       '/api/transaction-status',
-      '/api/callouts',
     ])
       expect(apiGuard(admittedRequest(route, 'GET'), response())).toBe(true);
     expect(apiGuard(admittedRequest('/api/coins', 'HEAD'), response())).toBe(true);

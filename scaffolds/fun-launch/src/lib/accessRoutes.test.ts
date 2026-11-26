@@ -26,6 +26,7 @@ describe('private preview access', () => {
       '/launch',
       '/launch-preview',
       '/otc',
+      '/burns',
       '/rules',
       '/roadmap',
       '/token/test',
@@ -42,7 +43,6 @@ describe('private preview access', () => {
       '/api/og/brand',
       '/api/og/plzzz',
       '/api/og/rinsed',
-      '/api/profiles',
     ])
       expect(publicApi(path)).toBe(true);
     for (const path of [
@@ -53,6 +53,7 @@ describe('private preview access', () => {
       '/api/whitelist',
       '/api/whitelist/coins',
       '/api/og/token',
+      '/api/profiles',
       '/api/profiles/admin',
       '/api/callouts',
       '/api/launch-previews',
@@ -88,10 +89,7 @@ describe('public launchpad admission', () => {
     for (const path of [
       '/',
       '/launch',
-      '/launch-preview',
-      '/otc',
       '/rules',
-      '/burns',
       '/roadmap',
       '/404',
       `/token/${mint}`,
@@ -102,6 +100,9 @@ describe('public launchpad admission', () => {
       expect(publicPage(path)).toBe(true);
     for (const path of [
       '/launch/admin',
+      '/launch-preview',
+      '/otc',
+      '/burns',
       '/admin/wallet',
       '/unknown',
       '/token/test',
@@ -123,16 +124,11 @@ describe('public launchpad admission', () => {
       '/api/market-stats',
       '/api/solana-market',
       '/api/sol-price',
-      '/api/burns',
       '/api/quote',
       '/api/swap-tx',
       '/api/send-transaction',
       '/api/transaction-status',
       '/api/rewards',
-      '/api/callouts',
-      '/api/launch-previews',
-      '/api/otc',
-      '/api/profiles',
       '/api/upload',
       '/api/dev-buy-quote',
       '/api/launch/status',
@@ -161,7 +157,12 @@ describe('public launchpad admission', () => {
       '/api/profiles/export',
       '/api/og/test',
       '/api/unknown',
-      '/api/otc/admin',
+      '/api/otc',
+      '/api/burns',
+      '/api/callouts',
+      '/api/profiles',
+      '/api/token-chat',
+      '/api/launch-previews',
     ])
       expect(publicApi(path)).toBe(false);
   });
@@ -169,7 +170,8 @@ describe('public launchpad admission', () => {
     vi.stubEnv('LAUNCHPAD_PUBLIC', 'true');
     expect(publicPage('/_next/data/build/index.json')).toBe(true);
     expect(publicPage('/_next/data/build/roadmap.json')).toBe(true);
-    expect(publicPage('/_next/data/build/otc.json')).toBe(true);
+    expect(publicPage('/_next/data/build/rules.json')).toBe(true);
+    expect(publicPage('/_next/data/build/otc.json')).toBe(false);
     expect(publicPage(`/_next/data/build/token/${mint}.json?query=1`)).toBe(true);
     expect(publicPage('/_next/data/build/admin/wallet.json')).toBe(false);
     expect(publicPage('/_next/data/build/unknown.json')).toBe(false);

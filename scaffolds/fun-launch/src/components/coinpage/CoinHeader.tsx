@@ -11,7 +11,6 @@ import { StarButton } from '../coin/StarButton';
 import { AnimatedNumber } from '../ui/AnimatedNumber';
 import { ShareButton } from '../coin/ShareButton';
 import { SocialLinks } from '../coin/SocialLinks';
-import { ProfileEditorButton } from '../profiles/ProfileEditor';
 import { formatValue } from './PriceChart';
 import { quoteAsset } from '@/lib/feeModes';
 
@@ -116,7 +115,6 @@ export const CoinHeader = ({ coin, trades, holders, status, actions }: CoinHeade
         <div className="flex shrink-0 items-center gap-0.5 lg:ml-2 lg:border-l lg:border-neutral-850 lg:pl-3">
           {status}
           {!coin.isDemo && <ShareButton mint={coin.mint} symbol={coin.symbol} />}
-          {!coin.isDemo && <ProfileEditorButton compact />}
           <StarButton mint={coin.mint} className="h-9 w-9" />
           {actions}
         </div>

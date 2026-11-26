@@ -10,7 +10,6 @@ import { formatAge } from '@/lib/format/date';
 import { displayShare, holderSupplyShare, rankTraders } from '@/lib/tokenActivity';
 import { useNow } from '@/hooks/useNow';
 import { useUsd } from '@/hooks/useUsd';
-import { useWalletProfiles } from '@/hooks/useWalletProfiles';
 import { WalletIdentity } from '@/components/profiles/WalletIdentity';
 import { cn } from '@/lib/utils';
 import { FairnessCard } from './FairnessCard';
@@ -50,17 +49,6 @@ export const HoldersPanel = ({
   const [frozen, setFrozen] = useState<TradesResponse>();
   const { publicKey } = useWallet();
   const wallet = publicKey?.toBase58();
-  const wallets = useMemo(
-    () => [
-      ...new Set([
-        ...(trades?.trades.map((trade) => trade.wallet) ?? []),
-        ...(holders?.holders.map((holder) => holder.owner) ?? []),
-        coin.creator,
-      ]),
-    ],
-    [trades, holders, coin.creator]
-  );
-  const { profiles } = useWalletProfiles(coin.isDemo ? [] : wallets);
   const tape = paused ? frozen : trades;
   const identity = (address: string) => (
     <a
@@ -69,13 +57,12 @@ export const HoldersPanel = ({
       rel="noreferrer"
       className="text-neutral-300 hover:text-primary"
     >
-      <WalletIdentity wallet={address} profile={profiles[address]} compact />
+      <WalletIdentity wallet={address} compact />
     </a>
   );
   const match = (address: string) =>
     !search ||
-    address.toLowerCase().includes(search.toLowerCase()) ||
-    profiles[address]?.username?.toLowerCase().includes(search.toLowerCase());
+    address.toLowerCase().includes(search.toLowerCase());
   const shownTrades = (tape?.trades ?? []).filter(
     (trade) =>
       match(trade.wallet) &&

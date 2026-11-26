@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { NAV_ITEMS, isActivePath, navigateDocument } from '@/constants/nav';
+import { NAV_ITEMS, isActivePath } from '@/constants/nav';
 import { cn } from '@/lib/utils';
 import { usePalette } from './paletteContext';
 
@@ -38,7 +38,6 @@ export const MobileTabBar = () => {
       </div>
       <Link
         href="/launch"
-        onNavigate={navigateDocument(pathname, '/launch')}
         aria-label="Launch a coin"
         className="btn-holo -mt-6 flex h-14 w-14 items-center justify-center rounded-2xl ring-4 ring-background active:scale-95"
       >
@@ -64,7 +63,6 @@ const Tab = ({
   return (
     <Link
       href={href}
-      onNavigate={navigateDocument(pathname, href)}
       aria-current={active ? 'page' : undefined}
       className={cn(tabClass, active ? 'text-foreground' : 'text-neutral-500')}
     >

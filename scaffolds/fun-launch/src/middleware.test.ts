@@ -7,7 +7,7 @@ import { NONCE_HEADER, validScriptNonce } from './server/securityHeaders';
 afterEach(() => vi.unstubAllEnvs());
 it('leaves artwork request bodies with their handlers while matching adjacent routes', () => {
   const matches = (url: string) => unstable_doesMiddlewareMatch({ config, url });
-  for (const path of ['/api/upload', '/api/launch-previews/']) expect(matches(path)).toBe(false);
+  for (const path of ['/api/upload', '/api/upload/']) expect(matches(path)).toBe(false);
   for (const path of ['/api/upload/admin', '/api/launch/confirm', '/launch'])
     expect(matches(path)).toBe(true);
 });
@@ -43,17 +43,17 @@ describe('document nonce forwarding', () => {
     expect(page.status).toBe(307);
     expect(page.headers.get('Location')).toBe('https://launch.example/admin');
   });
-  it('allows WebAssembly only on OTC documents and keeps JavaScript eval blocked', () => {
+  it('never allows WebAssembly or JavaScript eval in production documents', () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('LAUNCHPAD_PUBLIC', 'true');
     const policy = (path: string) =>
       middleware(new NextRequest(`https://launch.example${path}`)).headers.get(
         'Content-Security-Policy'
       );
-    expect(policy('/otc?deal=example')).toContain("'wasm-unsafe-eval'");
-    expect(policy('/otc')).not.toContain("'unsafe-eval'");
-    expect(policy('/api/otc')).not.toContain("'wasm-unsafe-eval'");
-    expect(policy('/')).not.toContain("'wasm-unsafe-eval'");
+    for (const path of ['/', '/launch', '/api/coins']) {
+      expect(policy(path)).not.toContain("'wasm-unsafe-eval'");
+      expect(policy(path)).not.toContain("'unsafe-eval'");
+    }
   });
   it('returns gone for retired registration without admitting similar API paths', () => {
     for (const value of ['true', 'false']) {
@@ -75,13 +75,12 @@ describe('document nonce forwarding', () => {
       '/',
       '/launch',
       '/rules',
-      '/burns',
       '/roadmap',
       '/404',
       '/token/So11111111111111111111111111111111111111112',
       '/api/coins',
       '/api/upload',
-      '/api/callouts',
+      '/api/rewards',
     ]) {
       const result = middleware(
         new NextRequest(`https://launch.example${path}`, { headers: { host: 'launch.example' } })

@@ -29,7 +29,7 @@ const counts = new Map<string, number>();
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 export function recordRpcUsage(
-  scope: 'web' | 'rings' | 'rings-gateway' | 'rings-proof' | 'mobula',
+  scope: 'web' | 'mobula',
   body?: unknown
 ) {
   if (process.env.RPC_USAGE_LOG !== 'true') return;

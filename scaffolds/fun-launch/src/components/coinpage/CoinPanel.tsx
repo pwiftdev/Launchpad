@@ -9,10 +9,8 @@ import { PriceChart } from './PriceChart';
 import { HoldersPanel } from './HoldersPanel';
 import { FairnessCard } from './FairnessCard';
 import { RewardsPanel } from './RewardsPanel';
-import { TokenCallouts } from '@/components/profiles/TokenCallouts';
 import { TokenAbout } from './TokenAbout';
 import { MarketConnection } from './MarketConnection';
-import { TokenChatRoom } from './TokenChatRoom';
 
 type CoinPanelProps = {
   coin: Coin;
@@ -81,11 +79,6 @@ export const CoinPanel = ({ coin, headerActions, className }: CoinPanelProps) =>
             onRetryHolders={() => void holders.refetch()}
             className="order-3 border-b border-neutral-850 lg:border-b-0"
           />
-          {!coin.isDemo && (
-            <div className="order-4 border-t border-neutral-850 p-4">
-              <TokenCallouts mint={coin.mint} />
-            </div>
-          )}
         </div>
 
         {/* Order and facts column */}
@@ -94,7 +87,6 @@ export const CoinPanel = ({ coin, headerActions, className }: CoinPanelProps) =>
             {tax}
             <TradeBox coin={coin} />
           </div>
-          {!coin.isDemo && <TokenChatRoom mint={coin.mint} symbol={coin.symbol} />}
           <div className="order-5 min-w-0 divide-y divide-neutral-850">
             <PotMeter coin={coin} />
             <TokenAbout coin={coin} />

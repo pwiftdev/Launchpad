@@ -5,7 +5,7 @@ import { usePrivacyMode } from '@/hooks/usePrivacyMode';
 import { useCoins } from '@/hooks/useCoins';
 import { useCoinPanel } from '@/hooks/useCoinPanel';
 import { useWatchlist } from '@/hooks/useWatchlist';
-import { NAV_ITEMS, requiresDocumentNavigation } from '@/constants/nav';
+import { NAV_ITEMS } from '@/constants/nav';
 import { useUsd } from '@/hooks/useUsd';
 import { cn } from '@/lib/utils';
 import { CoinAvatar } from '../coin/CoinAvatar';
@@ -82,8 +82,7 @@ export const CommandPalette = () => {
         icon: p.icon,
         run: () => {
           close();
-          if (requiresDocumentNavigation(router.pathname, p.href)) window.location.assign(p.href);
-          else router.push(p.href);
+          router.push(p.href);
         },
       }));
     const actions: Entry[] = [
