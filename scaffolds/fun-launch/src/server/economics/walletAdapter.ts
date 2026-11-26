@@ -106,12 +106,11 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
       configKey = new PublicKey(coin.config_key),
       poolKey = new PublicKey(coin.dbc_pool);
     const client = new DynamicBondingCurveClient(this.rpc, 'finalized');
-    const [config, pool, digest, mintInfo, poolInfo] = await Promise.all([
+    const [config, pool, digest, [mintInfo, poolInfo]] = await Promise.all([
       client.state.getPoolConfig(configKey),
       client.state.getPool(poolKey),
       verifyConfigAccount(this.rpc, configKey),
-      this.rpc.getAccountInfo(mint, 'finalized'),
-      this.rpc.getAccountInfo(poolKey, 'finalized'),
+      this.rpc.getMultipleAccountsInfo([mint, poolKey], 'finalized'),
     ]);
     if (
       !config ||
@@ -134,8 +133,12 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
       throw new Error('Quote asset differs from immutable coin');
     const tokenAta = getAssociatedTokenAddressSync(mint, this.collector),
       quoteAta = getAssociatedTokenAddressSync(config.quoteMint, this.collector);
-    for (const address of [tokenAta, quoteAta]) {
-      const info = await this.rpc.getAccountInfo(address, 'finalized');
+    const custody = [tokenAta, quoteAta];
+    const accounts = await this.rpc.getMultipleAccountsInfo(custody, 'finalized');
+    if (accounts.length !== custody.length || accounts.some((info) => info === undefined))
+      throw new Error('Incomplete finalized collector account snapshot');
+    for (const [index, address] of custody.entries()) {
+      const info = accounts[index];
       if (!info) continue;
       if (!info.owner.equals(TOKEN_PROGRAM_ID))
         throw new Error('Invalid collector token account program');

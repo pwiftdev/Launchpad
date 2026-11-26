@@ -2,11 +2,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiGuard, takeLimit, clientIp } from '@/server/apiGuard';
 import { connection, getCoin, parseKey, invalidateCoinDisplay } from '@/server/dbc';
 import { invalidateTradeHistory } from '@/server/trades';
-import { invalidateHolders } from '@/server/holders';
 import { CoinLiveHub } from '@/server/liveCoin';
 const hub = new CoinLiveHub(connection, (mint, pools) => {
   invalidateCoinDisplay(mint);
-  invalidateHolders(mint);
   for (const pool of pools) invalidateTradeHistory(pool);
 });
 export const config = { api: { responseLimit: false } };

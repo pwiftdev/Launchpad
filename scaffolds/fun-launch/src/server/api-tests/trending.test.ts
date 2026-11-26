@@ -73,6 +73,12 @@ describe('trending display reliability', () => {
     expect(first.data.runners).toHaveLength(10);
     await load();
     expect(mocks.count).toHaveBeenCalledTimes(25);
+    now += 29_999;
+    await load();
+    expect(mocks.count).toHaveBeenCalledTimes(25);
+    now += 2;
+    await load();
+    expect(mocks.count).toHaveBeenCalledTimes(50);
   });
   it('keeps a genuinely observed clock frozen on interruption without dropping usable cached rankings', async () => {
     const first = await load();

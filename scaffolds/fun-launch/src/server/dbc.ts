@@ -29,12 +29,20 @@ import {
 import { isFeeModeId, isHsolMode, QUOTES, quoteAsset } from '@/lib/feeModes';
 import { NETWORK_GENESIS } from '../../../../scripts/network-policy.cjs';
 import { createHsolRateReader } from './hsolRate';
-import { registeredConfigKeys, registeredCoin, type LaunchMode } from './launchRegistry';
+import {
+  registeredConfigKeys,
+  registeredCoin,
+  registeredCoins,
+  type LaunchMode,
+  type RegisteredCoin,
+} from './launchRegistry';
 import { loadMigratedPool, migratedPrice } from './damm';
 import { hasSocials, SOCIAL_KINDS, type Socials } from '@/lib/socials';
 import { readDisplayClock } from './displayClock';
 import { allowsMskdIdentity } from './officialMskd';
 import { readBorshString } from './mintMetadata';
+import { createDisplayPoolReader } from './displayPools';
+import { recordRpcUsage } from './rpcUsage';
 
 const RPC_URL = process.env.RPC_URL as string;
 const POOL_CONFIG_KEY = process.env.POOL_CONFIG_KEY as string;
@@ -42,11 +50,15 @@ const POOL_CONFIG_KEY = process.env.POOL_CONFIG_KEY as string;
 export const connection = new Connection(RPC_URL || 'http://127.0.0.1:8899', {
   commitment: 'confirmed',
   disableRetryOnRateLimit: true,
-  fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(8000) }),
+  fetch: (input, init) => {
+    recordRpcUsage('web', init?.body);
+    return fetch(input, { ...init, signal: AbortSignal.timeout(8000) });
+  },
 });
 export const dbc = new DynamicBondingCurveClient(connection, 'confirmed');
 export const configKey = () => new PublicKey(POOL_CONFIG_KEY);
 const hsolRate = createHsolRateReader(connection);
+const displayPools = createDisplayPoolReader(connection, dbc.state);
 
 const LAMPORTS = 1e9;
 const COINS_TTL_MS = 10_000;
@@ -180,11 +192,11 @@ async function toCoin(
   account: VirtualPool,
   config: PoolConfig,
   mintData: Mint,
+  registry: RegisteredCoin | null | undefined,
   meta?: TokenMeta
 ): Promise<Coin | null> {
   const s = account.poolState;
   const mint = s.baseMint.toBase58();
-  const registry = await registeredCoin(await networkGenesis(), mint);
   const name = meta?.name || 'Unnamed coin';
   const symbol = meta?.symbol || mint.slice(0, 4);
   if (!allowsMskdIdentity({ name, symbol, mint, deployer: registry?.original_deployer }))
@@ -254,6 +266,7 @@ async function toCoin(
 
 let coinsCache: { at: number; coins: Coin[] } | null = null;
 let coinsPending: Promise<Coin[]> | null = null;
+let coinsGeneration = 0;
 type CoinLookup = { coin: Coin; account: VirtualPool; config: PoolConfig };
 const coinLookups = new Map<
   string,
@@ -265,7 +278,13 @@ export function invalidateCoinDisplay(mint: string) {
       entry.at = 0;
       entry.generation++;
     }
-  if (coinsCache) coinsCache.at = 0;
+}
+
+export function invalidateCoinDiscovery(mint: string) {
+  invalidateCoinDisplay(mint);
+  displayPools.invalidate();
+  coinsGeneration++;
+  coinsCache = null;
 }
 
 /** All pools on our config, newest first. */
@@ -281,15 +300,21 @@ export async function listCoins(): Promise<Coin[]> {
 }
 
 async function loadCoins(): Promise<Coin[]> {
-  const keys = await discoverableConfigKeys(await networkGenesis());
-  const all: { publicKey: PublicKey; account: VirtualPool; config: PoolConfig }[] = [];
-  for (const id of keys) {
-    const key = new PublicKey(id),
-      config = await getConfig(key);
-    const pools = await dbc.state.getPoolsByConfig(key);
-    all.push(...pools.map((p) => ({ ...p, config })));
-  }
-  const metas = await getMetas(all.map((p) => p.account.poolState.baseMint));
+  const generation = coinsGeneration;
+  const genesis = await networkGenesis();
+  const keys = (await discoverableConfigKeys(genesis)).map((key) => new PublicKey(key));
+  const configs = new Map(
+    await Promise.all(keys.map(async (key) => [key.toBase58(), await getConfig(key)] as const))
+  );
+  const all = await displayPools.list(keys);
+  const mints = all.map((p) => p.account.poolState.baseMint);
+  const [metas, registry] = await Promise.all([
+    getMetas(mints),
+    registeredCoins(
+      genesis,
+      mints.map((mint) => mint.toBase58())
+    ),
+  ]);
   const coins: Coin[] = [];
   // Fresh mint supplies deliberately bypass immutable metadata caches so burns update market caps.
   for (let i = 0; i < all.length; i += 24) {
@@ -300,8 +325,10 @@ async function loadCoins(): Promise<Coin[]> {
     await Promise.all(
       batch.map(async (p, index) => {
         const info = mintAccounts[index],
-          mint = p.account.poolState.baseMint;
+          mint = p.account.poolState.baseMint,
+          config = configs.get(p.account.poolState.config.toBase58());
         if (
+          !config ||
           !info ||
           (!info.owner.equals(TOKEN_PROGRAM_ID) && !info.owner.equals(TOKEN_2022_PROGRAM_ID))
         )
@@ -310,8 +337,9 @@ async function loadCoins(): Promise<Coin[]> {
         const coin = await toCoin(
           p.publicKey,
           p.account,
-          p.config,
+          config,
           data,
+          registry.get(mint.toBase58()),
           metas.get(mint.toBase58())
         );
         if (coin) coins.push(coin);
@@ -319,7 +347,7 @@ async function loadCoins(): Promise<Coin[]> {
     );
   }
   coins.sort((a, b) => b.launchedAt - a.launchedAt);
-  coinsCache = { at: Date.now(), coins };
+  if (generation === coinsGeneration) coinsCache = { at: Date.now(), coins };
   return coins;
 }
 
@@ -328,11 +356,12 @@ export async function getCoin(
   mint: string,
   { fresh = true }: { fresh?: boolean } = {}
 ): Promise<{ coin: Coin; account: VirtualPool; config: PoolConfig } | null> {
-  const cacheKey = `${await networkGenesis()}:${mint}`;
+  const genesis = await networkGenesis();
+  const cacheKey = `${genesis}:${mint}`;
   // Trading/validation callers retain fresh reads by default; only display endpoints opt into caching.
-  if (fresh) return loadCoin(mint);
+  if (fresh) return loadCoin(mint, genesis, true);
   const current = coinLookups.get(cacheKey);
-  if (!fresh && current && Date.now() - current.at < 1500) return current.value;
+  if (current && Date.now() - current.at < (current.value ? 3000 : 15_000)) return current.value;
   if (current?.pending) return current.pending;
   if (coinLookups.size >= 256) {
     const oldest = [...coinLookups].find(([, entry]) => !entry.pending)?.[0];
@@ -341,7 +370,7 @@ export async function getCoin(
   }
   const entry = current ?? { at: 0, value: null, generation: 0 },
     generation = entry.generation,
-    pending = loadCoin(mint);
+    pending = loadCoin(mint, genesis, false);
   entry.pending = pending;
   coinLookups.set(cacheKey, entry);
   try {
@@ -356,8 +385,18 @@ export async function getCoin(
     delete entry.pending;
   }
 }
-async function loadCoin(mint: string): Promise<CoinLookup | null> {
-  const found = await dbc.state.getPoolByBaseMint(new PublicKey(mint));
+async function loadCoin(mint: string, genesis: string, fresh: boolean): Promise<CoinLookup | null> {
+  const mintKey = new PublicKey(mint);
+  const registry = fresh ? null : await registeredCoin(genesis, mint);
+  const registeredPool =
+    !fresh && registry
+      ? await displayPools.read({
+          publicKey: new PublicKey(registry.dbc_pool),
+          mint: mintKey,
+          config: new PublicKey(registry.config_key),
+        })
+      : null;
+  const found = registeredPool ?? (await dbc.state.getPoolByBaseMint(mintKey));
   if (!found) return null;
   const s = found.account.poolState;
   if (!(await supportedConfig(s.config))) return null;
@@ -369,7 +408,14 @@ async function loadCoin(mint: string): Promise<CoinLookup | null> {
   if (!info || (!info.owner.equals(TOKEN_PROGRAM_ID) && !info.owner.equals(TOKEN_2022_PROGRAM_ID)))
     return null;
   const mintData = unpackMint(s.baseMint, info, info.owner);
-  const coin = await toCoin(found.publicKey, found.account, config, mintData, metas.get(mint));
+  const coin = await toCoin(
+    found.publicKey,
+    found.account,
+    config,
+    mintData,
+    fresh ? await registeredCoin(genesis, mint) : registry,
+    metas.get(mint)
+  );
   return coin ? { coin, account: found.account, config } : null;
 }
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Dialog } from 'radix-ui';
 import { usePrivacyMode } from '@/hooks/usePrivacyMode';
-import { useCoins, usePrefetchCoin } from '@/hooks/useCoins';
+import { useCoins } from '@/hooks/useCoins';
 import { useCoinPanel } from '@/hooks/useCoinPanel';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { NAV_ITEMS, requiresDocumentNavigation } from '@/constants/nav';
@@ -19,7 +19,6 @@ type Entry = {
   icon?: string;
   coin?: { image: string | null; symbol: string };
   run: () => void;
-  prefetch?: () => void;
 };
 
 /** Ctrl/Cmd+K: jump to any coin, page or action. */
@@ -28,7 +27,6 @@ export const CommandPalette = () => {
   const router = useRouter();
   const { data: coins } = useCoins();
   const { open: openCoin } = useCoinPanel();
-  const prefetch = usePrefetchCoin();
   const { isWatched } = useWatchlist();
   const privacy = usePrivacyMode();
   const { usd } = useUsd();
@@ -71,7 +69,6 @@ export const CommandPalette = () => {
           close();
           openCoin(c.mint);
         },
-        prefetch: () => prefetch(c.mint),
       }));
     const pages: Entry[] = [
       { href: '/launch', label: 'Launch a coin', icon: 'ph--plus-bold' },
@@ -102,7 +99,7 @@ export const CommandPalette = () => {
       },
     ].filter((a) => !q || a.label.toLowerCase().includes(q));
     return [...matchedCoins, ...pages, ...actions];
-  }, [coins, query, isWatched, privacy, router, openCoin, prefetch, setOpen, usd]);
+  }, [coins, query, isWatched, privacy, router, openCoin, setOpen, usd]);
 
   useEffect(() => setActive(0), [query]);
   useEffect(() => {
@@ -171,7 +168,6 @@ export const CommandPalette = () => {
                     data-index={i}
                     onMouseMove={() => {
                       if (i !== active) setActive(i);
-                      entry.prefetch?.();
                     }}
                     onClick={entry.run}
                     className={cn(

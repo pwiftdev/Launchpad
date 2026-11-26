@@ -24,7 +24,7 @@ export type MarketStats = {
 
 /** Only actual observations enter the series; missing histories do not get invented movement. */
 export function summarizeMarket(
-  trades: Trade[],
+  trades: Pick<Trade, 'ts' | 'marketCapSol' | 'sol' | 'feeSol' | 'side'>[],
   currentCap: number,
   partial = false,
   now = Date.now() / 1000

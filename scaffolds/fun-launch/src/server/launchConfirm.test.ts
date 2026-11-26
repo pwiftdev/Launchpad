@@ -22,6 +22,7 @@ vi.mock('@/server/dbc', () => ({
   connection: { getTransaction: mocks.tx, getAccountInfo: mocks.account },
   networkGenesis: mocks.network,
   getConfig: mocks.config,
+  invalidateCoinDiscovery: vi.fn(),
 }));
 vi.mock('@/server/launchRegistry', () => ({
   registeredCoin: mocks.registered,
@@ -89,7 +90,9 @@ beforeEach(() => {
     publicKey: pool,
     account: { poolState: { config, activationPoint: { toString: () => '100' } } },
   });
-  mocks.config.mockResolvedValue({ quoteMint: new PublicKey('So11111111111111111111111111111111111111112') });
+  mocks.config.mockResolvedValue({
+    quoteMint: new PublicKey('So11111111111111111111111111111111111111112'),
+  });
   mocks.digest.mockResolvedValue(digest);
   mocks.reviewed.mockResolvedValue({
     policy_version: 'wallet-v1',

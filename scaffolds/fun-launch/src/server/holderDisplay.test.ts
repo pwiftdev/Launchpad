@@ -28,8 +28,6 @@ vi.mock('./dbc', () => ({
 }));
 vi.mock('./damm', () => ({ loadMigratedPool: f.migrated }));
 vi.mock('./launchConfig', () => ({ configuredVaultProgram: f.program }));
-import handler from '@/pages/api/coins/[mint]/holders';
-import { invalidateHolders } from './holders';
 
 const mint = Keypair.generate().publicKey,
   program = Keypair.generate().publicKey,
@@ -55,7 +53,7 @@ const largest = (address: PublicKey, amount: number) => ({
   uiAmount: amount,
 });
 beforeEach(() => {
-  invalidateHolders(mint.toBase58());
+  vi.resetModules();
   vi.stubEnv('VAULT_PROGRAM_ID', program.toBase58());
   f.program.mockReturnValue(program);
   f.parse.mockReturnValue(mint);
@@ -112,8 +110,12 @@ beforeEach(() => {
     value: keys.map((key) => values.get(key.toBase58()) ?? null),
   }));
 });
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
 async function run() {
+  const { default: handler } = await import('@/pages/api/coins/[mint]/holders');
   let status = 0,
     body: HoldersResponse | undefined;
   const response = {
@@ -184,6 +186,10 @@ it('uses actual post-burn mint supply instead of the stale board denominator', a
   expect(body!.holders[0]!.shareOfCirculating).toBeCloseTo(300 / 440);
 });
 it('rejects a stale bank rather than mixing largest-account data with older balances', async () => {
+  let now = Date.now();
+  vi.spyOn(Date, 'now').mockImplementation(() => now);
+  expect((await run()).status).toBe(200);
+  now += 15_001;
   const original = f.snapshot.getMockImplementation()!;
   f.snapshot.mockImplementation(async (keys: PublicKey[]) => ({
     ...(await original(keys)),
@@ -192,4 +198,17 @@ it('rejects a stale bank rather than mixing largest-account data with older bala
   const result = await run();
   expect(result.status).toBe(200);
   expect(result.body).toMatchObject({ stale: true, snapshotSlot: 101 });
+});
+
+it('shares the same 15-second holder sample across repeated requests', async () => {
+  let now = Date.now();
+  vi.spyOn(Date, 'now').mockImplementation(() => now);
+  const initialReads = f.largest.mock.calls.length;
+  await run();
+  now += 14_000;
+  await run();
+  expect(f.largest).toHaveBeenCalledTimes(initialReads + 1);
+  now += 1001;
+  await run();
+  expect(f.largest).toHaveBeenCalledTimes(initialReads + 2);
 });

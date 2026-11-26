@@ -26,8 +26,6 @@ vi.mock('@/server/dbc', () => ({
 }));
 vi.mock('@/server/launchRegistry', () => ({ registeredConfig: mocks.policy }));
 vi.mock('@/server/launchConfig', () => ({ configuredVaultProgram: mocks.native }));
-import handler from '@/pages/api/coins/[mint]/holders';
-import { invalidateHolders } from './holders';
 const mint = Keypair.generate().publicKey,
   collector = Keypair.generate().publicKey,
   baseVault = Keypair.generate().publicKey,
@@ -36,7 +34,7 @@ const collectorAta = getAssociatedTokenAddressSync(mint, collector);
 const actualHolder = Keypair.generate().publicKey;
 beforeEach(() => {
   vi.resetAllMocks();
-  invalidateHolders(mint.toBase58());
+  vi.resetModules();
   vi.stubEnv('VAULT_PROGRAM_ID', '');
   mocks.parseKey.mockReturnValue(mint);
   mocks.getCoin.mockResolvedValue({
@@ -103,6 +101,7 @@ beforeEach(() => {
   }));
 });
 async function call() {
+  const { default: handler } = await import('@/pages/api/coins/[mint]/holders');
   let status = 200,
     body: unknown;
   const response = {

@@ -3,6 +3,7 @@ import { ringsAccess } from '@/server/otcRingsAccess';
 import { ringsGatewayRequest, ringsGatewayTarget } from '@/server/otcRingsGateway';
 import { ProfileStore, SocialError } from '@/server/profileStore';
 import { readLimited } from '@/server/remote';
+import { recordRpcUsage } from '@/server/rpcUsage';
 
 export const config = { api: { bodyParser: { sizeLimit: '110kb' }, responseLimit: '2mb' } };
 
@@ -21,6 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       headers.delete('x-sync');
       headers.set('x-async', 'true');
     }
+    recordRpcUsage(prove ? 'rings-proof' : 'rings-gateway');
     const response = await fetch(url, {
       method: input.method,
       headers,

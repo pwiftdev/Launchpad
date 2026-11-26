@@ -19,7 +19,8 @@ export type PotSummary = {
 };
 
 /** SOL value of a trade, fee included: buys spend `sol`, sells receive `sol` after the fee. */
-export const tradeValueSol = (t: Trade) => (t.side === 'buy' ? t.sol : t.sol + t.feeSol);
+export const tradeValueSol = (t: Pick<Trade, 'side' | 'sol' | 'feeSol'>) =>
+  t.side === 'buy' ? t.sol : t.sol + t.feeSol;
 
 /**
  * Preserves the historical devnet estimate for old API clients. Never use this estimate for

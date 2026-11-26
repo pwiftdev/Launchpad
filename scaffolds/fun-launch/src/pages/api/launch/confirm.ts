@@ -4,7 +4,7 @@ import { DynamicBondingCurveClient } from '@meteora-ag/dynamic-bonding-curve-sdk
 import { hasBatchedHolderRewards, usesLaunchSlot } from '@/lib/launchModes';
 import { z } from 'zod';
 import { apiGuard } from '@/server/apiGuard';
-import { connection, networkGenesis, getConfig } from '@/server/dbc';
+import { connection, networkGenesis, getConfig, invalidateCoinDiscovery } from '@/server/dbc';
 import { launchIntent, registeredCoin, recordFinalizedLaunch } from '@/server/launchRegistry';
 import {
   configuredVaultProgram,
@@ -128,6 +128,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       creation_signature: parsed.data.signature,
       finalized_slot: String(proof.slot),
     });
+    invalidateCoinDiscovery(saved.mint);
     return res.status(200).json({
       status: 'registered',
       genesis,

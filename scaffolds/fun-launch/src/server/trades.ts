@@ -1,9 +1,9 @@
 // Display-only confirmed history. Financial workers use their separate finalized journal.
 import { PublicKey } from '@solana/web3.js';
 import type { Trade } from '@/lib/coin';
-import { TOKEN_DECIMALS, TOTAL_SUPPLY } from '@/constants/launch';
+import { TOKEN_DECIMALS } from '@/constants/launch';
 import { connection } from './dbc';
-import { decodeTrades, type TokenContext } from './tradeDecoder';
+import { decodeTrades, displayTrade, type TokenContext } from './tradeDecoder';
 export { decodeTrade, decodeTrades } from './tradeDecoder';
 const REFRESH_MS = 2_000,
   PAGE = 100,
@@ -35,12 +35,8 @@ const cache = new Map<string, Cache>();
 const keyFor = (pool: string, token: TokenContext) =>
   `${pool}:${token.tokenDecimals ?? TOKEN_DECIMALS}:${token.migratedBaseIsA}:${token.dbcCollectFeeMode}`;
 function view(entry: Cache, token: TokenContext, stale = false): TradeHistory {
-  const supply = token.tokenSupply ?? TOTAL_SUPPLY;
   return {
-    trades: entry.trades.map((trade) => {
-      const rate = token.quoteToSol ?? 1;
-      return { ...trade, sol: trade.sol * rate, feeSol: trade.feeSol * rate, priceSol: trade.priceSol * rate, marketCapSol: trade.priceSol * rate * supply };
-    }),
+    trades: entry.trades.map((trade) => displayTrade(trade, token)),
     complete: entry.baselineComplete && !entry.lost && !entry.retry.size,
     updatedAt: Math.floor(entry.at / 1000),
     stale,

@@ -37,7 +37,7 @@ export const StatusBar = () => {
   const live = !!data?.network.slot && age !== null && age < 180;
   const coverage = preview
     ? 'Simulated sample activity. No real funds or trading.'
-    : 'Recent decoded DBC swaps within 24h; up to 24 transactions per pool and 8 pools. ' +
+    : 'Recent swaps within 24 hours, sampled across up to 8 pools. ' +
       (data ? data.trackedPools + ' of ' + data.totalPools + ' pools tracked.' : 'Loading.');
 
   return (
@@ -63,7 +63,9 @@ export const StatusBar = () => {
         <span className="font-term font-medium uppercase tracking-wider text-neutral-300">
           {NETWORK === 'mainnet-beta' ? 'Solana' : NETWORK_LABEL}
         </span>
-        <span className="hidden font-term text-neutral-500 lg:inline">{live ? 'connected' : 'syncing…'}</span>
+        <span className="hidden font-term text-neutral-500 lg:inline">
+          {live ? 'connected' : 'syncing…'}
+        </span>
       </div>
       <dl
         ref={statsRef}

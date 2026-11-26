@@ -97,24 +97,15 @@ const cache = new Map<
     value?: HoldersResponse;
     pending?: Promise<HoldersResponse>;
     retryAt: number;
-    generation: number;
   }
 >();
-export function invalidateHolders(mint: string) {
-  for (const [key, entry] of cache)
-    if (key === mint || key.endsWith(':' + mint)) {
-      entry.at = 0;
-      entry.generation++;
-      entry.retryAt = 0;
-    }
-}
 export async function cachedHolders(
   mint: string,
   load: () => Promise<HoldersResponse>
 ): Promise<HoldersResponse> {
   const entry = cache.get(mint),
     now = Date.now();
-  if (entry?.value && (now - entry.at < 3000 || now < entry.retryAt))
+  if (entry?.value && (now - entry.at < 15_000 || now < entry.retryAt))
     return { ...entry.value, stale: now < entry.retryAt };
   if (entry?.pending) return entry.pending;
   if (!entry && cache.size >= 128) {
@@ -122,12 +113,11 @@ export async function cachedHolders(
     if (!idle) throw new Error('Holders display service busy');
     cache.delete(idle);
   }
-  const next = entry ?? { at: 0, retryAt: 0, generation: 0 },
-    generation = next.generation;
+  const next = entry ?? { at: 0, retryAt: 0 };
   const pending = load()
     .then((value) => {
       next.value = value;
-      next.at = next.generation === generation ? Date.now() : 0;
+      next.at = Date.now();
       next.retryAt = 0;
       return value;
     })

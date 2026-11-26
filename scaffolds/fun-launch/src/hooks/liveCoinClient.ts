@@ -84,6 +84,7 @@ export function watchLiveCoin(
       source.addEventListener('ready', () => {
         if (!created.users) return;
         status(true);
+        holdersAt = Date.now();
         invalidate(true);
       });
       source.addEventListener('update', () => {
@@ -91,7 +92,7 @@ export function watchLiveCoin(
         created.timer = setTimeout(() => {
           created.timer = undefined;
           if (!created.users) return;
-          const holders = Date.now() - holdersAt >= 4000;
+          const holders = Date.now() - holdersAt >= 15_000;
           if (holders) holdersAt = Date.now();
           invalidate(holders);
         }, 350);

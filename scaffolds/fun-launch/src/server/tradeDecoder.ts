@@ -15,6 +15,17 @@ export type TokenContext = Pick<
   Coin,
   'tokenDecimals' | 'tokenSupply' | 'migratedBaseIsA' | 'dbcCollectFeeMode' | 'quoteToSol'
 >;
+
+export function displayTrade(trade: Trade, token: TokenContext): Trade {
+  const rate = token.quoteToSol ?? 1;
+  return {
+    ...trade,
+    sol: trade.sol * rate,
+    feeSol: trade.feeSol * rate,
+    priceSol: trade.priceSol * rate,
+    marketCapSol: trade.priceSol * rate * (token.tokenSupply ?? TOTAL_SUPPLY),
+  };
+}
 const TAG = Buffer.from('e445a52e51cb9a1d', 'hex');
 type Call = {
   program: string;

@@ -4,7 +4,7 @@ import { displayChainTime, listCoins } from '@/server/dbc';
 import { recentTxCount } from '@/server/trades';
 import type { Coin, TrendingCoin, TrendingResponse } from '@/lib/coin';
 
-const TTL_MS = 5_000;
+const TTL_MS = 30_000;
 const RETRY_MS = 5_000;
 const MAX_STALE_MS = 5 * 60_000;
 const SCORE_LIMIT = 25;
@@ -92,11 +92,7 @@ async function refresh(): Promise<Snapshot> {
 
 async function snapshot(): Promise<{ result: Snapshot; stale: boolean }> {
   const now = Date.now();
-  if (
-    cached &&
-    now < cached.usableUntil &&
-    (now < retryAt || now - cached.at < (cached.data.stale ? RETRY_MS : TTL_MS))
-  )
+  if (cached && now < cached.usableUntil && (now < retryAt || now - cached.at < TTL_MS))
     return { result: cached, stale: now < retryAt || Boolean(cached.data.stale) };
   if (now < retryAt) throw new Error('Trending refresh is backing off');
   pending ??= refresh()

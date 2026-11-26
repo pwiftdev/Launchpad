@@ -69,6 +69,15 @@ export async function registeredCoin(genesis: string, mint: string) {
   );
   return result.rows[0] ?? null;
 }
+
+export async function registeredCoins(genesis: string, mints: string[]) {
+  if (!process.env.DATABASE_URL || !mints.length) return new Map<string, RegisteredCoin>();
+  const result = await database().query<RegisteredCoin>(
+    'SELECT * FROM launch_coins WHERE network_genesis=$1 AND mint=ANY($2::varchar[])',
+    [genesis, mints]
+  );
+  return new Map(result.rows.map((row) => [row.mint, row]));
+}
 export async function launchIntent(genesis: string, mint: string) {
   const result = await database().query<LaunchIntent>(
     'SELECT * FROM pending_launch_intents WHERE network_genesis=$1 AND mint=$2',
@@ -140,7 +149,8 @@ export async function recordFinalizedLaunch(coin: RegisteredCoin): Promise<Regis
   );
   const saved = await registeredCoin(coin.network_genesis, coin.mint);
   if (
-    !saved || (coin.quote_mint && saved.quote_mint !== coin.quote_mint) ||
+    !saved ||
+    (coin.quote_mint && saved.quote_mint !== coin.quote_mint) ||
     [
       'dbc_pool',
       'config_key',

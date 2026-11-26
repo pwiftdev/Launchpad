@@ -1,5 +1,4 @@
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
 import type {
   CoinResponse,
   CoinsResponse,
@@ -102,8 +101,8 @@ export function useHolders(mint: string | undefined) {
     queryKey: ['holders', mint],
     queryFn: ({ signal }) => (demo ? getDemoHolders(demo) : fetchHolders(mint!, signal)),
     enabled: !!mint,
-    refetchInterval: demo ? false : live.connected ? 15000 : 8000,
-    staleTime: 3000,
+    refetchInterval: demo ? false : live.connected ? 30_000 : 20_000,
+    staleTime: 15_000,
     retry: 1,
   });
 }
@@ -118,8 +117,8 @@ export function useTrending(enabled = true) {
       if (!data.clockStale) syncServerClock(data.serverTime);
       return data;
     },
-    refetchInterval: 5_000,
-    staleTime: 4_000,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
   });
   if (!visible) return query;
   const data: TrendingResponse = {
@@ -134,26 +133,4 @@ export function useTrending(enabled = true) {
     ...query,
     data,
   };
-}
-
-/** Warms everything the coin panel needs, e.g. on hover, so opening it is instant. */
-export function usePrefetchCoin() {
-  const client = useQueryClient();
-  return useCallback(
-    (mint: string) => {
-      const demo = getDemoCoin(mint);
-      client.prefetchQuery({
-        queryKey: ['trades', mint],
-        queryFn: () => (demo ? getDemoTrades(demo) : fetchTrades(mint)),
-        staleTime: 5_000,
-      });
-      client.prefetchQuery({
-        queryKey: ['holders', mint],
-        queryFn: () => (demo ? getDemoHolders(demo) : fetchHolders(mint)),
-        staleTime: 15_000,
-      });
-      void import('lightweight-charts');
-    },
-    [client]
-  );
 }

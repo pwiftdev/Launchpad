@@ -2,6 +2,7 @@ import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { initializePoseidon, SHIELDED_POOL_PROGRAM_ID } from '@heliuslabs/spr';
 import { getSplAssetRegistryAddress } from '@heliuslabs/spr/addresses';
 import { decodeSplAssetRegistry } from '@heliuslabs/spr/interface';
+import { recordRpcUsage } from './rpcUsage';
 import { address } from '@solana/kit';
 import bs58 from 'bs58';
 import { buildRingsDeposit, dealTermsLeg } from '@/lib/otcRingsDeposit';
@@ -13,8 +14,10 @@ export function ringsConnection(rpc: URL) {
   return new Connection(rpc.toString(), {
     commitment: 'confirmed',
     disableRetryOnRateLimit: true,
-    fetch: (url, options) =>
-      fetch(url, { ...options, redirect: 'error', signal: AbortSignal.timeout(7000) }),
+    fetch: (url, options) => {
+      recordRpcUsage('rings', options?.body);
+      return fetch(url, { ...options, redirect: 'error', signal: AbortSignal.timeout(7000) });
+    },
   });
 }
 
