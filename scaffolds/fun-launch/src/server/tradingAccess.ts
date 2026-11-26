@@ -1,29 +1,39 @@
 import type { NextApiResponse } from 'next';
 import { connection, getLaunchConfig } from './dbc';
 import { configuredCompanyWallets } from './launchConfig';
-import type { LaunchMode } from './launchRegistry';
+import { registeredConfig, type LaunchMode } from './launchRegistry';
 import { ACTIVE_LAUNCH_MODE, ACTIVE_LAUNCH_POLICY } from '@/lib/launchModes';
 import {
   expectedNetworkGenesis,
   localValidatorPolicy,
+  mainnetConfigPin,
+  mainnetLaunchPolicy,
   NETWORK_GENESIS,
 } from '../../../../scripts/network-policy.cjs';
 
-import { isFeeModeId } from '@/lib/feeModes';
+import { HSOL_MODES, isFeeModeId, type FeeModeId } from '@/lib/feeModes';
 
 /** Live network, explicit release flag and reviewed wallet policy are all required. */
 export async function verifiedTradingAccess(mode: LaunchMode = ACTIVE_LAUNCH_MODE) {
-  if (mode !== ACTIVE_LAUNCH_MODE && !isFeeModeId(mode)) throw new Error('Only Bond it. and reviewed MSKD modes are available for new launches');
+  if (mode !== ACTIVE_LAUNCH_MODE && !isFeeModeId(mode))
+    throw new Error('Only Bond it. and reviewed MSKD modes are available for new launches');
+  if (mode === 'mskd-hsol' && !process.env.MSKD_PAYOUT_POOL)
+    throw new Error('The reviewed MSKD payout route is unavailable');
   const expected = expectedNetworkGenesis(process.env);
   const isolated = localValidatorPolicy(process.env);
   // Read the runtime environment object: Next inlines direct NEXT_PUBLIC_* references.
   const environment = process.env;
   const network = environment.NEXT_PUBLIC_NETWORK || 'devnet';
+  const policy = isFeeModeId(mode) ? `${mode}-v1` : ACTIVE_LAUNCH_POLICY;
+  const additionalPin =
+    expected === NETWORK_GENESIS['mainnet-beta'] && policy !== mainnetLaunchPolicy()
+      ? mainnetConfigPin(policy)
+      : null;
   if (
-    (isFeeModeId(mode) && expected === NETWORK_GENESIS['mainnet-beta']) ||
     (process.env.SOLANA_NETWORK && process.env.SOLANA_NETWORK !== network) ||
     (expected === NETWORK_GENESIS['mainnet-beta'] &&
-      process.env.MAINNET_TRADING_ENABLED !== 'true') ||
+      (process.env.MAINNET_TRADING_ENABLED !== 'true' ||
+        (policy !== mainnetLaunchPolicy() && !additionalPin))) ||
     (!isolated &&
       expected !== NETWORK_GENESIS.devnet &&
       expected !== NETWORK_GENESIS['mainnet-beta'])
@@ -36,7 +46,8 @@ export async function verifiedTradingAccess(mode: LaunchMode = ACTIVE_LAUNCH_MOD
   const approved = await getLaunchConfig(mode);
   if (
     approved.genesis !== expected ||
-    approved.record?.policy_version !== (isFeeModeId(mode) ? `${mode}-v1` : ACTIVE_LAUNCH_POLICY) ||
+    (additionalPin && approved.key.toBase58() !== additionalPin) ||
+    approved.record?.policy_version !== policy ||
     !approved.record.enabled_for_launch
   )
     throw new Error('A reviewed enabled wallet policy is required');
@@ -44,7 +55,10 @@ export async function verifiedTradingAccess(mode: LaunchMode = ACTIVE_LAUNCH_MOD
     throw new Error('Financial network changed');
   return approved;
 }
-export async function allowTrading(res: NextApiResponse, mode: LaunchMode = ACTIVE_LAUNCH_MODE): Promise<boolean> {
+export async function allowTrading(
+  res: NextApiResponse,
+  mode: LaunchMode = ACTIVE_LAUNCH_MODE
+): Promise<boolean> {
   try {
     await verifiedTradingAccess(mode);
     return true;
@@ -56,4 +70,25 @@ export async function allowTrading(res: NextApiResponse, mode: LaunchMode = ACTI
       'Trading is unavailable until this network and its reviewed wallet fee policy are enabled.',
   });
   return false;
+}
+
+export async function hsolLaunchModes(): Promise<FeeModeId[]> {
+  if (process.env.MAINNET_TRADING_ENABLED !== 'true') return [];
+  try {
+    const genesis = expectedNetworkGenesis();
+    if (genesis !== NETWORK_GENESIS['mainnet-beta']) return [];
+    return (
+      await Promise.all(
+        HSOL_MODES.map(async (mode) => {
+          const policy = `${mode}-v1` as const;
+          const key = mainnetConfigPin(policy);
+          if (!key || (mode === 'mskd-hsol' && !process.env.MSKD_PAYOUT_POOL)) return [];
+          const record = await registeredConfig(genesis, key);
+          return record?.policy_version === policy && record.enabled_for_launch ? [mode] : [];
+        })
+      )
+    ).flat();
+  } catch {
+    return [];
+  }
 }

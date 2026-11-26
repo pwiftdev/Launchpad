@@ -108,6 +108,7 @@ export type TradesResponse = {
   trades: Trade[];
   /** Price at launch, for the first candle */
   launchPriceSol: number;
+  quoteToSol?: number;
   /** Holder pot and launch-tax totals over the coin's full history */
   pot: PotSummary;
   /** False if history was too long to read in full, so totals may be understated */
@@ -136,13 +137,14 @@ export type TrendingResponse = {
 
 export type QuoteResponse = {
   route?: 'dbc' | 'damm-v2';
-  pool?: string;
+  pool: string;
   feeMint?: string;
   feeAmount?: number;
   feeSolIsEstimate?: boolean;
   side: 'buy' | 'sell';
   amountIn: number;
   amountOut: number;
+  minimumAmountOut: string;
   feeSol: number;
   feePercent: number;
   taxPercent: number;

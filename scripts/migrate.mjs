@@ -6,7 +6,6 @@ const require = createRequire(new URL('../scaffolds/fun-launch/package.json', im
 
 const databaseNeeded = Boolean(
   process.env.DATABASE_URL ||
-  process.env.WHITELIST_ENABLED === 'true' ||
   process.env.FINANCIAL_WORKER_ENABLED === 'true' ||
   process.env.LAUNCH_POLICY_VERSION ||
   process.env.VAULT_PROGRAM_ID
@@ -22,9 +21,13 @@ if (!databaseNeeded) {
     await client.query('BEGIN');
     await client.query("SELECT pg_advisory_xact_lock(hashtext('rinsed-schema'))");
     const journal = await client.query("SELECT to_regclass('launch_schema_migrations') AS name");
-    const applied = new Map(journal.rows[0].name
-      ? (await client.query('SELECT filename,sha256 FROM launch_schema_migrations')).rows.map(row => [row.filename, row.sha256])
-      : []);
+    const applied = new Map(
+      journal.rows[0].name
+        ? (await client.query('SELECT filename,sha256 FROM launch_schema_migrations')).rows.map(
+            (row) => [row.filename, row.sha256]
+          )
+        : []
+    );
     const dir = new URL('./migrations/', import.meta.url);
     const files = (await readdir(dir)).filter((name) => name.endsWith('.sql')).sort();
     const pending = [];
@@ -39,7 +42,10 @@ if (!databaseNeeded) {
       pending.push([file, hash]);
     }
     for (const revision of pending)
-      await client.query('INSERT INTO launch_schema_migrations(filename,sha256) VALUES($1,$2)', revision);
+      await client.query(
+        'INSERT INTO launch_schema_migrations(filename,sha256) VALUES($1,$2)',
+        revision
+      );
     await client.query('COMMIT');
     console.log('Application database schema ready.');
   } catch {

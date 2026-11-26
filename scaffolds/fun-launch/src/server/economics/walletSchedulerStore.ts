@@ -91,7 +91,7 @@ export class WalletSchedulerStore {
         `SELECT coin.mint FROM launch_coins coin JOIN launch_configs cfg
       ON(cfg.network_genesis=coin.network_genesis AND cfg.config_key=coin.config_key)
       LEFT JOIN wallet_scheduler_state scheduler ON(scheduler.network_genesis=coin.network_genesis AND scheduler.collector=$2)
-      WHERE coin.network_genesis=$1 AND coin.policy_version IN('wallet-v1','bond-v1','dev-v1','cashback-v1','mskd-v1') AND cfg.policy_version=coin.policy_version AND cfg.expected_fee_claimer=$2
+      WHERE coin.network_genesis=$1 AND coin.policy_version IN('wallet-v1','bond-v1','dev-v1','cashback-v1','mskd-v1','hsol-v1','cashback-hsol-v1','mskd-hsol-v1') AND cfg.policy_version=coin.policy_version AND cfg.expected_fee_claimer=$2
       ORDER BY CASE WHEN scheduler.cursor_mint IS NULL OR coin.mint>scheduler.cursor_mint THEN 0 ELSE 1 END,coin.mint LIMIT $3`,
         [this.genesis, this.collector, limit]
       )

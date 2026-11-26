@@ -27,8 +27,12 @@ const LAUNCHPAD_APIS = [
   '/api/transaction-status',
   '/api/rewards',
   '/api/callouts',
+  '/api/token-chat',
+  '/api/launch-previews',
+  '/api/otc',
+  '/api/otc-rings',
+  '/api/otc-rings-rpc',
   '/api/upload',
-  '/api/launch-check',
   '/api/dev-buy-quote',
   '/api/launch/status',
   '/api/launch/confirm',
@@ -77,7 +81,12 @@ function mintAddress(value: string): boolean {
 /** Only actual launchpad documents qualify for the renderer's admin bypass. */
 export function launchpadPage(url: string): boolean {
   const path = accessPath(url);
-  if (['/', '/launch', '/rules', '/burns', '/404'].includes(path)) return true;
+  if (
+    ['/', '/launch', '/launch-preview', '/otc', '/rules', '/burns', '/roadmap', '/404'].includes(
+      path
+    )
+  )
+    return true;
   const token = path.match(/^\/token\/([^/]+)$/);
   return !!token && mintAddress(token[1]!);
 }
@@ -86,7 +95,6 @@ export function publicApi(url: string, open = launchpadIsPublic()): boolean {
   const path = accessPath(url);
   if (
     [
-      '/api/whitelist',
       '/api/admin/session',
       '/api/health',
       '/api/og/brand',
@@ -106,9 +114,8 @@ export function publicApi(url: string, open = launchpadIsPublic()): boolean {
 export function publicPage(url: string, open = launchpadIsPublic()): boolean {
   const path = accessPath(url);
   return (
-    ['/whitelist', '/privacy', '/admin', '/logo.svg', '/favicon.ico', '/site.webmanifest'].includes(path) ||
+    ['/privacy', '/admin', '/logo.svg', '/favicon.ico', '/site.webmanifest'].includes(path) ||
     (Object.values(BRAND.assets) as readonly string[]).includes(path) ||
-    /^\/w\/[A-Za-z0-9]{8}$/.test(path) ||
     (open && (launchpadPage(path) || path === '/coins/unknown.svg' || DEMO_ARTWORK.has(path)))
   );
 }

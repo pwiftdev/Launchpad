@@ -4,6 +4,19 @@ const { Keypair, PublicKey } = require('@solana/web3.js');
 const { buildWalletLaunchTemplate } = require('./wallet-launch-template.cjs');
 const sdk = require('@meteora-ag/dynamic-bonding-curve-sdk');
 const BN = require('bn.js');
+
+test('hSOL uses the official mint, 80 hSOL target and creator-mode fee schedule', () => {
+  const config = buildWalletLaunchTemplate({
+    collector: Keypair.generate().publicKey,
+    treasury: Keypair.generate().publicKey,
+    policyVersion: 'hsol-v1',
+  });
+  assert.equal(config.quoteMint.toBase58(), 'he1iusmfkpAdwvxLNGV8Y1iSbj4rUy6yMhEA3fotn9A');
+  assert.equal(config.migrationQuoteThreshold.toString(), '80000000000');
+  assert.equal(config.enableFirstSwapWithMinFee, true);
+  assert.equal(config.migratedPoolFee.poolFeeBps, 125);
+  assert.equal(config.partnerPermanentLockedLiquidityPercentage, 100);
+});
 test('canonical SDK wallet config preserves reviewed schedule, supply and locked LP policy while explicitly replacing old recipients', () => {
   const collector = Keypair.generate().publicKey,
     treasury = Keypair.generate().publicKey,
@@ -74,7 +87,10 @@ test('canonical generator refuses native PDA and default recipients before prepa
 });
 
 test('MSKD modes: one-slot 99% guard, then a flat 1.25% before and after bonding', () => {
-  const wallets = { collector: Keypair.generate().publicKey, treasury: Keypair.generate().publicKey };
+  const wallets = {
+    collector: Keypair.generate().publicKey,
+    treasury: Keypair.generate().publicKey,
+  };
   // All three modes pair to SOL; MSKD differs only in paying holders in wXMR (off-chain routing)
   for (const policyVersion of ['mskd-v1', 'dev-v1', 'cashback-v1']) {
     const config = buildWalletLaunchTemplate({ ...wallets, policyVersion });

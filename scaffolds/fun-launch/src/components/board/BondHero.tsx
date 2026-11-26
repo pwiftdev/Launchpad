@@ -10,6 +10,7 @@ import { getDemoCoins } from '@/lib/demo';
 import { SCHEDULE, pct } from '@/lib/feeModes';
 import { LogoMark } from '../brand/Logo';
 import { Decrypt } from '../brand/Decrypt';
+import { ThesisModal } from '../brand/ThesisModal';
 import { CoinAvatar } from '../coin/CoinAvatar';
 import { CoinLink } from '../coin/CoinLink';
 import { BondFill } from '../coin/BondingBar';
@@ -32,7 +33,13 @@ export const BondHero = ({ coins }: { coins: Coin[] | undefined }) => {
     const next = list
       .filter((c) => !c.isMigrated)
       .reduce<Coin | null>((best, c) => (!best || c.progress > best.progress ? c : best), null);
-    return { total: list.length, bonded, bonding, rate: list.length ? bonded / list.length : 0, next };
+    return {
+      total: list.length,
+      bonded,
+      bonding,
+      rate: list.length ? bonded / list.length : 0,
+      next,
+    };
   }, [coins]);
   const loading = !coins;
 
@@ -79,13 +86,19 @@ export const BondHero = ({ coins }: { coins: Coin[] | undefined }) => {
         {/* Promise */}
         <div className="flex min-w-0 items-center">
           <div className="min-w-0">
-            <p className="flex items-center gap-2 font-term text-[11px] uppercase tracking-[0.14em] text-neutral-500">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inset-0 animate-ping rounded-full bg-signal opacity-60" />
-                <span className="relative h-1.5 w-1.5 rounded-full bg-signal" />
-              </span>
-              Privacy-first launchpad
-            </p>
+            <ThesisModal>
+              <button
+                type="button"
+                aria-label={`About ${BRAND.longName}`}
+                className="flex items-center gap-2 font-term text-[11px] uppercase tracking-[0.14em] text-neutral-500 transition-colors hover:text-foreground focus-visible:text-foreground"
+              >
+                <span className="relative flex h-1.5 w-1.5" aria-hidden>
+                  <span className="absolute inset-0 animate-ping rounded-full bg-signal opacity-60" />
+                  <span className="relative h-1.5 w-1.5 rounded-full bg-signal" />
+                </span>
+                Privacy-first launchpad
+              </button>
+            </ThesisModal>
             <h1
               aria-label={`${BRAND.headline.top} ${BRAND.headline.bottom}`}
               className="mt-4 font-display text-[28px] uppercase leading-[1.05] sm:text-[36px] xl:text-[44px]"
@@ -126,10 +139,21 @@ export const BondHero = ({ coins }: { coins: Coin[] | undefined }) => {
           <Tile label="Launched" value={loading ? '…' : String(stats.total)} />
           <Tile label="Bonding" value={loading ? '…' : String(stats.bonding)} />
           <Tile label="Bonded" value={loading ? '…' : String(stats.bonded)} accent />
-          <Tile label={market.preview ? 'Sample vol.' : 'Recent vol.'} value={market.volume === null ? '—' : usd(market.volume)} />
-          <Tile label={market.preview ? 'Sample swaps' : 'Swaps'} value={market.trades === null ? '—' : count.format(market.trades)} />
+          <Tile
+            label={market.preview ? 'Sample vol.' : 'Recent vol.'}
+            value={market.volume === null ? '—' : usd(market.volume)}
+          />
+          <Tile
+            label={market.preview ? 'Sample swaps' : 'Swaps'}
+            value={market.trades === null ? '—' : count.format(market.trades)}
+          />
           <Tile label="In curves" value={market.liquidity === null ? '…' : usd(market.liquidity)} />
-          <Tile label="SOL" value={price ? formatUsd(price) : '…'} className="col-span-2 sm:col-span-3" inline />
+          <Tile
+            label="SOL"
+            value={price ? formatUsd(price) : '…'}
+            className="col-span-2 sm:col-span-3"
+            inline
+          />
         </dl>
 
         {/* Live state */}
@@ -235,7 +259,9 @@ const Tile = ({
     className={`bg-panel px-3.5 py-3 ${inline ? 'flex items-baseline justify-between' : ''} ${className}`}
   >
     <dt className="font-term text-[10px] uppercase tracking-[0.12em] text-neutral-500">{label}</dt>
-    <dd className={`${inline ? '' : 'mt-1.5'} font-pixel text-[17px] leading-none tabular ${accent ? 'text-acid' : ''}`}>
+    <dd
+      className={`${inline ? '' : 'mt-1.5'} font-pixel text-[17px] leading-none tabular ${accent ? 'text-acid' : ''}`}
+    >
       {value}
     </dd>
   </div>

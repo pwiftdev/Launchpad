@@ -5,11 +5,7 @@ import { fileURLToPath } from 'node:url';
 const compat = new FlatCompat({ baseDirectory: path.dirname(fileURLToPath(import.meta.url)) });
 export default [
   {
-    ignores: [
-      '.next/**',
-      'node_modules/**',
-      'src/components/AdvancedTradingView/charting_library.d.ts',
-    ],
+    ignores: ['.next/**', 'node_modules/**'],
   },
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
   {

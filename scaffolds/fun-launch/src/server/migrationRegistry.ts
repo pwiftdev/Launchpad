@@ -155,7 +155,19 @@ export async function verifiedFinancialPool(
   if (!config) return false;
   const migrated = await loadMigratedPool(connection, config, new PublicKey(mint), 'finalized');
   if (migrated.address.toBase58() !== pool) return false;
-  if (['rinse-v1', 'wallet-v1', 'bond-v1', 'mskd-v1', 'dev-v1', 'cashback-v1'].includes(coin.policy_version))
+  if (
+    [
+      'rinse-v1',
+      'wallet-v1',
+      'bond-v1',
+      'mskd-v1',
+      'dev-v1',
+      'cashback-v1',
+      'hsol-v1',
+      'cashback-hsol-v1',
+      'mskd-hsol-v1',
+    ].includes(coin.policy_version)
+  )
     assertReleasedMigrationPolicy(
       migrated.state,
       new PublicKey(mint),

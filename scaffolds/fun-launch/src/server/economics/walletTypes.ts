@@ -2,7 +2,13 @@ import type { RegisteredCoin } from '../launchRegistry';
 import type { FinalizedEvidence } from './chainEvidence';
 export type WalletBucket = 'rinse_buyback' | 'creator' | 'community' | 'platform';
 export type WalletJobKind =
-  'collect' | 'buyback' | 'creator_claim' | 'community_claim' | 'platform_claim' | 'setup';
+  | 'collect'
+  | 'buyback'
+  | 'creator_claim'
+  | 'community_claim'
+  | 'platform_claim'
+  | 'setup'
+  | 'holder_conversion';
 export type WalletJobStatus =
   'queued' | 'prepared' | 'signed' | 'submitted' | 'manual_review' | 'finalized' | 'failed';
 export type WalletEventId = { signature: string; instructionIndex: number; eventIndex: number };
@@ -75,6 +81,7 @@ export type WalletEffectFacts = {
   collectorDebitLamports?: bigint;
   recipient?: string;
   paidLamports?: bigint;
+  receivedPayoutUnits?: bigint;
   operatingCostLamports?: bigint;
   /** Canonical same-slot ordering, needed to distinguish trades after a claim-all collection. */
   slotSignatures?: readonly string[];
@@ -91,6 +98,10 @@ export type WalletChainAdapter = {
     maximumSpendLamports: bigint;
   }): Promise<PreparedWalletExecution>;
   preparePayout(job: WalletJob): Promise<PreparedWalletExecution>;
+  prepareHolderConversion?(
+    job: WalletJob,
+    existing?: WalletExpectations
+  ): Promise<PreparedWalletExecution>;
   prepareSetup(input: { coin: RegisteredCoin }): Promise<PreparedWalletExecution>;
   verifyFinalized(job: WalletJob, evidence: FinalizedEvidence): Promise<WalletEffectFacts>;
 };

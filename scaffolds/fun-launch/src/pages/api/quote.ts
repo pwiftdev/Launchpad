@@ -7,6 +7,7 @@ import { tradeUnits } from '@/server/validation';
 import { migratedSwap } from '@/server/damm';
 import { NATIVE_MINT } from '@solana/spl-token';
 import { getBaseFeeNumerator } from '@meteora-ag/dynamic-bonding-curve-sdk';
+import { minimumTradeOutput } from '@/lib/tradeQuote';
 
 const LAMPORTS = 1e9;
 
@@ -40,6 +41,7 @@ export default async function handler(
         side,
         amountIn: amount,
         amountOut,
+        minimumAmountOut: minimumTradeOutput(quote.amountOut.toString()),
         feeSol: quote.feeSol * (found.coin.quoteToSol ?? 1),
         feePercent: tradeSol > 0 ? (quote.feeSol / tradeSol) * 100 : 0,
         taxPercent: 0,
@@ -91,6 +93,7 @@ export default async function handler(
       side,
       amountIn: amount,
       amountOut: out / (side === 'buy' ? 10 ** decimals : LAMPORTS),
+      minimumAmountOut: minimumTradeOutput(q.outputAmount.toString()),
       feeSol,
       feePercent: tradeSol > 0 ? (feeSol / tradeSol) * 100 : 0,
       taxPercent: tax,

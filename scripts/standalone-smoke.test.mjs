@@ -8,7 +8,13 @@ test(
   { timeout: 60_000 },
   async () => {
     const child = spawn(process.execPath, ['scripts/start.mjs'], {
-      env: { ...process.env, PORT: '3107', ADMIN_KEY_HASH: '', ADMIN_SESSION_SECRET: '' },
+      env: {
+        ...process.env,
+        PORT: '3107',
+        LAUNCHPAD_PUBLIC: 'false',
+        ADMIN_KEY_HASH: '',
+        ADMIN_SESSION_SECRET: '',
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let output = '';
@@ -31,7 +37,7 @@ test(
         await new Promise((resolve) => setTimeout(resolve, 250));
       }
       assert.ok(ready, `Standalone failed to become ready: ${output}`);
-      for (const url of ['/whitelist', '/privacy', '/admin', '/logo.svg']) {
+      for (const url of ['/privacy', '/admin', '/logo.svg']) {
         const response = await fetch(base + url);
         assert.equal(response.status, 200, url);
         assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
@@ -40,7 +46,7 @@ test(
       for (const url of ['/', '/launch', '/rules', '/burns', '/token/example']) {
         const response = await fetch(base + url, { redirect: 'manual' });
         assert.equal(response.status, 307, url);
-        assert.ok(response.headers.get('location').endsWith('/whitelist'));
+        assert.ok(response.headers.get('location').endsWith('/admin'));
       }
       for (const url of ['/api/upload', '/api/swap-tx', '/api/send-transaction']) {
         const response = await fetch(base + url, {
@@ -64,6 +70,14 @@ test(
         });
         assert.equal(response.status, 401, url);
       }
+      for (const url of ['/whitelist', '/w/ABCD2345']) {
+        const retired = await fetch(base + url, { redirect: 'manual' });
+        assert.equal(retired.status, 308, url);
+        assert.equal(retired.headers.get('location'), '/');
+      }
+      const retiredApi = await fetch(base + '/api/whitelist');
+      assert.equal(retiredApi.status, 410);
+      assert.equal(retiredApi.headers.get('cache-control'), 'no-store');
       const redirect = await fetch(`${base}/create-pool`, { redirect: 'manual' });
       assert.equal(redirect.status, 308);
       assert.equal(redirect.headers.get('location'), '/launch');

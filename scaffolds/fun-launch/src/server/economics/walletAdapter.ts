@@ -1,4 +1,5 @@
 import { isWalletPolicy } from '@/lib/launchModes';
+import modePolicy from '@/constants/modePolicy.json';
 import { randomUUID } from 'node:crypto';
 import { BorshInstructionCoder, type Idl } from '@coral-xyz/anchor';
 import {
@@ -41,6 +42,10 @@ import { assertWalletExecutionGate } from './walletGate';
 import { walletMigrationPosition } from './walletPosition';
 import { assertWalletRecipientCredit } from './walletRecipient';
 import { walletOperatingCosts } from './walletOperatingCosts';
+import { isHsolMode } from '@/lib/feeModes';
+import { isMskdMode } from '@/lib/launchModes';
+import { buildMskdSwap } from './walletMskdSwap';
+import { mskdPayoutMint } from './walletMskdPolicy';
 import type {
   PreparedWalletExecution,
   WalletChainAdapter,
@@ -125,7 +130,8 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
       allowDisabled: true,
       allowLegacy: true,
     });
-    if (coin.quote_mint && coin.quote_mint !== config.quoteMint.toBase58()) throw new Error('Quote asset differs from immutable coin');
+    if (coin.quote_mint && coin.quote_mint !== config.quoteMint.toBase58())
+      throw new Error('Quote asset differs from immutable coin');
     const tokenAta = getAssociatedTokenAddressSync(mint, this.collector),
       quoteAta = getAssociatedTokenAddressSync(config.quoteMint, this.collector);
     for (const address of [tokenAta, quoteAta]) {
@@ -191,7 +197,8 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
       maximumFee,
       typeof expectations.tokenAta === 'string' ? new PublicKey(expectations.tokenAta) : undefined,
       typeof expectations.quoteAta === 'string' ? new PublicKey(expectations.quoteAta) : undefined,
-      coin.policy_version === 'mskd-v1'
+      typeof expectations.payoutMint === 'string' ||
+        (!!coin.quote_mint && coin.quote_mint !== NATIVE_MINT.toBase58())
     );
     const wire = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
     if (wire.length > 1232) throw new Error('Wallet execution exceeds the transaction size limit');
@@ -329,7 +336,9 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
       [
         ...this.accounts(s),
         ix,
-        ...(s.config.quoteMint.equals(NATIVE_MINT) ? [createCloseAccountInstruction(s.quoteAta, this.collector, this.collector)] : []),
+        ...(s.config.quoteMint.equals(NATIVE_MINT)
+          ? [createCloseAccountInstruction(s.quoteAta, this.collector, this.collector)]
+          : []),
       ],
       {
         collector: this.collector.toBase58(),
@@ -501,15 +510,51 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
           : job.recipient;
     if (expected !== job.recipient || !PublicKey.isOnCurve(recipient.toBytes()))
       throw new Error('Payout beneficiary differs from the immutable mode');
-    if (!state.config.quoteMint.equals(NATIVE_MINT)) {
-      const mint = state.config.quoteMint;
+    const wrappedMonero = isMskdMode(coin.mode) && job.kind === 'community_claim';
+    if (wrappedMonero || isHsolMode(coin.mode)) {
+      const mint = wrappedMonero ? mskdPayoutMint(this.genesis) : state.config.quoteMint;
+      if (
+        !mint ||
+        (wrappedMonero && recipient.equals(this.collector)) ||
+        (isHsolMode(coin.mode) &&
+          !wrappedMonero &&
+          job.kind === 'community_claim' &&
+          coin.mode !== 'cashback-hsol') ||
+        (job.kind !== 'platform_claim' && job.details.assetMint !== mint.toBase58())
+      )
+        throw new Error('Token payout differs from the immutable asset and owner');
       const destination = getAssociatedTokenAddressSync(mint, recipient);
-      return this.prepared(coin, job.kind, [
-        createAssociatedTokenAccountIdempotentInstruction(this.collector, destination, recipient, mint),
-        createTransferCheckedInstruction(state.quoteAta, mint, destination, this.collector, amount, 9),
-      ], { collector: this.collector.toBase58(), pool: coin.dbc_pool, recipient: job.recipient,
-        quoteAta: destination.toBase58(), expectedLamports: amount.toString() });
+      return this.prepared(
+        coin,
+        job.kind,
+        [
+          createAssociatedTokenAccountIdempotentInstruction(
+            this.collector,
+            destination,
+            recipient,
+            mint
+          ),
+          createTransferCheckedInstruction(
+            getAssociatedTokenAddressSync(mint, this.collector),
+            mint,
+            destination,
+            this.collector,
+            amount,
+            wrappedMonero ? modePolicy.payouts.wxmr.decimals : modePolicy.quotes.hsol.decimals
+          ),
+        ],
+        {
+          collector: this.collector.toBase58(),
+          pool: coin.dbc_pool,
+          recipient: job.recipient,
+          quoteAta: destination.toBase58(),
+          ...(wrappedMonero ? { payoutMint: mint.toBase58() } : {}),
+          expectedLamports: amount.toString(),
+        }
+      );
     }
+    if (!state.config.quoteMint.equals(NATIVE_MINT))
+      throw new Error('Unreleased payout quote asset');
     await assertWalletRecipientCredit(this.rpc, recipient, amount);
     return this.prepared(
       coin,
@@ -528,6 +573,25 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
         expectedLamports: amount.toString(),
       }
     );
+  }
+  async prepareHolderConversion(job: WalletJob, existing?: WalletExpectations) {
+    const coin = await registeredCoin(this.genesis, job.mint);
+    if (
+      !coin ||
+      !isMskdMode(coin.mode) ||
+      job.details.sourceMint !== (isHsolMode(coin.mode) ? coin.quote_mint : undefined) ||
+      job.network_genesis !== this.genesis ||
+      job.kind !== 'holder_conversion'
+    )
+      throw new Error('Reviewed MSKD conversion job required');
+    await this.state(coin);
+    const { instructions, expectations } = await buildMskdSwap(
+      this.rpc,
+      this.collector,
+      job,
+      existing
+    );
+    return this.prepared(coin, job.kind, instructions, expectations);
   }
   verifyFinalized(job: WalletJob, evidence: Parameters<WalletChainAdapter['verifyFinalized']>[1]) {
     return verifyWalletEffect(this.rpc, job, evidence);

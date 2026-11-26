@@ -13,13 +13,21 @@ export async function walletOperatingCosts(
   if (maximumFee <= 0n) throw new Error('Positive operating fee bound required');
   if (kind.endsWith('_claim') && splQuote) {
     if (!quoteAta) throw new Error('Missing payout token account');
-    const [accounts, rent] = await Promise.all([rpc.getMultipleAccountsInfo([quoteAta], 'finalized'), rpc.getMinimumBalanceForRentExemption(165, 'finalized')]);
-    if (accounts.length !== 1 || !Number.isSafeInteger(rent) || rent <= 0) throw new Error('Recipient rent unavailable');
-    return { operatingCostLamports: maximumFee + (accounts[0] ? 0n : BigInt(rent)), temporaryFundingLamports: 0n };
+    const rent = await rpc.getMinimumBalanceForRentExemption(165, 'finalized');
+    if (!Number.isSafeInteger(rent) || rent <= 0) throw new Error('Recipient rent unavailable');
+    return { operatingCostLamports: maximumFee + BigInt(rent), temporaryFundingLamports: 0n };
   }
   if (kind.endsWith('_claim'))
     return { operatingCostLamports: maximumFee, temporaryFundingLamports: 0n };
   if (!tokenAta || !quoteAta) throw new Error('Explicit settlement token accounts required');
+  if (kind === 'holder_conversion') {
+    const rent = await rpc.getMinimumBalanceForRentExemption(165, 'finalized');
+    if (!Number.isSafeInteger(rent) || rent <= 0) throw new Error('Conversion rent unavailable');
+    return {
+      operatingCostLamports: maximumFee + BigInt(rent),
+      temporaryFundingLamports: BigInt(rent),
+    };
+  }
   const [accounts, rent] = await Promise.all([
     rpc.getMultipleAccountsInfo([tokenAta, quoteAta], 'finalized'),
     rpc.getMinimumBalanceForRentExemption(165, 'finalized'),

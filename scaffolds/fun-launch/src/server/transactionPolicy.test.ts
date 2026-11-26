@@ -18,6 +18,8 @@ import BN from 'bn.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { claimCommunityInstruction, claimCreatorInstruction } from '@/lib/vault/client';
 import { validateRelayTransaction } from './transactionPolicy';
+import { OFFICIAL_MSKD_RESERVED } from './officialMskd';
+import { QUOTES } from '@/lib/feeModes';
 
 const mocks = vi.hoisted(() => ({
   getCoin: vi.fn(),
@@ -48,19 +50,19 @@ const payer = Keypair.generate().publicKey,
   pool = Keypair.generate().publicKey,
   config = Keypair.generate().publicKey,
   program = Keypair.generate().publicKey;
-function swap(migrated = false) {
+function swap(migrated = false, quote = NATIVE_MINT, quoteIsA = false) {
   const idl = (migrated ? CpAmmIdl : DynamicBondingCurveIdl) as unknown as Idl;
   const definition = idl.instructions.find((ix) => ix.name === 'swap');
   if (!definition) throw new Error('Missing fixture instruction');
   const named: Record<string, PublicKey> = {
     payer,
     base_mint: mint,
-    quote_mint: NATIVE_MINT,
+    quote_mint: quote,
     config,
     pool,
-    token_a_mint: mint,
-    token_b_mint: NATIVE_MINT,
-    input_token_account: getAssociatedTokenAddressSync(NATIVE_MINT, payer),
+    token_a_mint: quoteIsA ? quote : mint,
+    token_b_mint: quoteIsA ? mint : quote,
+    input_token_account: getAssociatedTokenAddressSync(quote, payer),
     output_token_account: getAssociatedTokenAddressSync(mint, payer),
   };
   const keyFields = definition.accounts as {
@@ -150,6 +152,15 @@ describe('transaction relay instruction policy', () => {
       config: { tokenType: 0, quoteMint: NATIVE_MINT },
     });
     await expect(validateRelayTransaction(tx(instruction))).resolves.toBeUndefined();
+    const reserved = new TransactionInstruction({
+      programId: instruction.programId,
+      keys: instruction.keys,
+      data: new BorshCoder(DynamicBondingCurveIdl as unknown as Idl).instruction.encode(
+        definition.name,
+        { params: { name: 'Masked', symbol: 'MSKD', uri: 'https://example.test/meta.json' } }
+      ),
+    });
+    await expect(validateRelayTransaction(tx(reserved))).rejects.toThrow(OFFICIAL_MSKD_RESERVED);
     const unexpected = new TransactionInstruction({
       programId: program,
       keys: [],
@@ -208,13 +219,33 @@ describe('transaction relay instruction policy', () => {
     }
   });
   it('allows only a verified deterministic graduated DAMM pool', async () => {
-    mocks.getCoin.mockResolvedValue({ config: { quoteMint: NATIVE_MINT }, coin: { isMigrated: true, migratedPool: pool.toBase58() } });
+    mocks.getCoin.mockResolvedValue({
+      config: { quoteMint: NATIVE_MINT },
+      coin: { isMigrated: true, migratedPool: pool.toBase58() },
+    });
     await expect(validateRelayTransaction(tx(swap(true)))).resolves.toBeUndefined();
     mocks.getCoin.mockResolvedValue({
       coin: { isMigrated: true, migratedPool: Keypair.generate().publicKey.toBase58() },
     });
     await expect(validateRelayTransaction(tx(swap(true)))).rejects.toThrow('Unknown migrated');
   });
+  it.each([false, true])(
+    'validates migrated hSOL swaps with quote on either side (%s)',
+    async (quoteIsA) => {
+      const hsol = new PublicKey(QUOTES.hsol.mint);
+      mocks.getCoin.mockResolvedValue({
+        config: { quoteMint: hsol },
+        coin: { isMigrated: true, migratedPool: pool.toBase58(), mode: 'hsol' },
+      });
+      await expect(
+        validateRelayTransaction(tx(swap(true, hsol, quoteIsA)))
+      ).resolves.toBeUndefined();
+      expect(mocks.getCoin).toHaveBeenCalledWith(mint.toBase58());
+      await expect(validateRelayTransaction(tx(swap(true)))).rejects.toThrow(
+        'Invalid graduated quote mint'
+      );
+    }
+  );
   it('allows canonical creator claims only for the original deployer', async () => {
     const claim = claimCreatorInstruction(program, mint, payer, 100n);
     await expect(

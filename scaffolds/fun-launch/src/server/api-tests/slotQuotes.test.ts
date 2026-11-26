@@ -1,5 +1,12 @@
 import BN from 'bn.js';
-import { Keypair, PublicKey } from '@solana/web3.js';
+import {
+  ComputeBudgetInstruction,
+  ComputeBudgetProgram,
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+} from '@solana/web3.js';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
@@ -9,9 +16,11 @@ const mocks = vi.hoisted(() => ({
   quote: vi.fn(),
   swap: vi.fn(),
   block: vi.fn(),
+  migrated: vi.fn(),
 }));
 vi.mock('@/server/apiGuard', () => ({ apiGuard: () => true }));
 vi.mock('@/server/tradingAccess', () => ({ allowTrading: async () => true }));
+vi.mock('@/server/damm', () => ({ migratedSwap: mocks.migrated }));
 vi.mock('@/server/dbc', async () => {
   const { PublicKey } = await import('@solana/web3.js');
   return {
@@ -25,7 +34,13 @@ vi.mock('@/server/dbc', async () => {
 });
 import quoteHandler from '@/pages/api/quote';
 import swapHandler from '@/pages/api/swap-tx';
-const mint = Keypair.generate().publicKey.toBase58();
+const signer = Keypair.generate();
+const mint = signer.publicKey.toBase58();
+const swapInstruction = SystemProgram.transfer({
+  fromPubkey: signer.publicKey,
+  toPubkey: Keypair.generate().publicKey,
+  lamports: 1,
+});
 let activationType: number;
 const response = () => {
   const res = { status: vi.fn(), json: vi.fn() };
@@ -62,7 +77,7 @@ beforeEach(() => {
     outputAmount: new BN(1000000),
     minimumAmountOut: new BN(990000),
   });
-  mocks.swap.mockResolvedValue({ serialize: () => Buffer.from('unsigned-fixture') });
+  mocks.swap.mockImplementation(async () => new Transaction().add(swapInstruction));
   mocks.block.mockResolvedValue({
     context: { slot: 101 },
     value: { blockhash: PublicKey.default.toBase58(), lastValidBlockHeight: 500 },
@@ -80,6 +95,7 @@ it.each([
   );
   expect(res.status).toHaveBeenCalledWith(200);
   expect(res.json.mock.calls[0]?.[0].taxPercent).toBe(fee);
+  expect(res.json.mock.calls[0]?.[0].minimumAmountOut).toBe('970000');
   expect(mocks.clock).not.toHaveBeenCalled();
   expect(mocks.quote.mock.calls[0]?.[0].currentPoint.toNumber()).toBe(slot);
 });
@@ -88,7 +104,14 @@ it('prepares a slot-based trade without depending on a timestamp lookup', async 
   await swapHandler(
     {
       method: 'POST',
-      body: { mint, side: 'buy', amount: 1, wallet: mint, slippageBps: 100 },
+      body: {
+        mint,
+        side: 'buy',
+        amount: 1,
+        wallet: mint,
+        quotePool: mint,
+        minimumAmountOut: '970000',
+      },
     } as unknown as NextApiRequest,
     res as unknown as NextApiResponse
   );
@@ -96,6 +119,58 @@ it('prepares a slot-based trade without depending on a timestamp lookup', async 
   expect(mocks.clock).not.toHaveBeenCalled();
   expect(mocks.quote.mock.calls[0]?.[0].currentPoint.toNumber()).toBe(101);
   expect(mocks.quote.mock.calls[0]?.[0].eligibleForFirstSwapWithMinFee).toBe(false);
+  expect(mocks.swap.mock.calls[0]?.[0].minimumAmountOut.toString()).toBe('970000');
+  const tx = Transaction.from(Buffer.from(res.json.mock.calls[0]?.[0].tx, 'base64'));
+  const [budget, swap] = tx.instructions;
+  expect(budget && ComputeBudgetInstruction.decodeSetComputeUnitLimit(budget).units).toBe(400_000);
+  expect(swap?.data).toEqual(swapInstruction.data);
+  const message = tx.serializeMessage();
+  tx.sign(signer);
+  expect(tx.serializeMessage()).toEqual(message);
+  expect(tx.verifySignatures()).toBe(true);
+});
+it('preserves a migrated swap budget supplied by the SDK', async () => {
+  mocks.coin.mockResolvedValue({ coin: { isMigrated: true, tokenDecimals: 6 }, config: {} });
+  const budget = ComputeBudgetProgram.setComputeUnitLimit({ units: 325_000 });
+  mocks.migrated.mockResolvedValue({
+    transaction: new Transaction().add(budget, swapInstruction),
+  });
+  const res = response();
+  await swapHandler(
+    {
+      method: 'POST',
+      body: {
+        mint,
+        side: 'sell',
+        amount: 1,
+        wallet: mint,
+        quotePool: mint,
+        minimumAmountOut: '970000',
+      },
+    } as unknown as NextApiRequest,
+    res as unknown as NextApiResponse
+  );
+  expect(res.status).toHaveBeenCalledWith(200);
+  const payload = res.json.mock.calls[0]?.[0];
+  expect(payload).toMatchObject({ route: 'damm-v2', lastValidBlockHeight: 500, preparedSlot: 101 });
+  const tx = Transaction.from(Buffer.from(payload.tx, 'base64'));
+  expect(tx.instructions.map((ix) => ix.data)).toEqual([budget.data, swapInstruction.data]);
+});
+it.each([
+  { quotePool: mint, minimumAmountOut: '1000001' },
+  { quotePool: PublicKey.default.toBase58(), minimumAmountOut: '970000' },
+  {},
+])('requires a refreshed quote when its pool or minimum cannot be honored', async (reviewed) => {
+  const res = response();
+  await swapHandler(
+    {
+      method: 'POST',
+      body: { mint, side: 'buy', amount: 1, wallet: mint, ...reviewed },
+    } as unknown as NextApiRequest,
+    res as unknown as NextApiResponse
+  );
+  expect(res.status).toHaveBeenCalledWith(409);
+  expect(mocks.swap).not.toHaveBeenCalled();
 });
 it('keeps timestamp activation for historical configurations', async () => {
   activationType = 1;

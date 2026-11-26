@@ -13,6 +13,7 @@ import { ShareButton } from '../coin/ShareButton';
 import { SocialLinks } from '../coin/SocialLinks';
 import { ProfileEditorButton } from '../profiles/ProfileEditor';
 import { formatValue } from './PriceChart';
+import { quoteAsset } from '@/lib/feeModes';
 
 type CoinHeaderProps = {
   coin: Coin;
@@ -156,6 +157,8 @@ function Stats({
   holders?: HoldersResponse;
   className?: string;
 }) {
+  const quoteUnit = quoteAsset(coin.quoteMint).symbol;
+  const quotePrice = coin.priceSol / (coin.quoteToSol ?? 1);
   return (
     <dl className={cn('flex items-center gap-6', className)}>
       <Stat label="Market cap" title={`${formatReadableNumber(coin.marketCapSol)} SOL`}>
@@ -169,10 +172,10 @@ function Stats({
           </span>
         )}
       </Stat>
-      <Stat label="Price" title={`${coin.priceSol} SOL`}>
-        {solPrice
+      <Stat label="Price" title={`${quotePrice} ${quoteUnit}`}>
+        {solPrice && quoteUnit === 'SOL'
           ? `$${formatValue(coin.priceSol * solPrice)}`
-          : `${formatValue(coin.priceSol)} SOL`}
+          : `${formatValue(quotePrice)} ${quoteUnit}`}
       </Stat>
       <Stat label={coin.isDemo ? 'Sample vol' : '24h vol'}>
         {market ? usd(market.volumeSol) : '—'}

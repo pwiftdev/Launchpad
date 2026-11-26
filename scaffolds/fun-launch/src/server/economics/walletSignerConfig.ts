@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { PublicKey } from '@solana/web3.js';
 import { companyWallets } from '../../../../../scripts/company-wallets.cjs';
 import { expectedNetworkGenesis, NETWORK_GENESIS } from '../../../../../scripts/network-policy.cjs';
 import type { WalletSigningLimits } from './walletSigner';
@@ -11,6 +12,13 @@ export const WALLET_SIGNER_ENVIRONMENT = [
   'NEXT_PUBLIC_NETWORK',
   'FEE_COLLECTOR_PUBLIC_KEY',
   'TREASURY_PUBLIC_KEY',
+  'LAUNCH_POLICY_VERSION',
+  'POOL_CONFIG_KEY',
+  'MAINNET_CASHBACK_CONFIG_KEY',
+  'MAINNET_MSKD_CONFIG_KEY',
+  'MAINNET_HSOL_CONFIG_KEY',
+  'MAINNET_CASHBACK_HSOL_CONFIG_KEY',
+  'MAINNET_MSKD_HSOL_CONFIG_KEY',
   'WALLET_WORKER_ENABLED',
   'MAINNET_TRADING_ENABLED',
   'LOCAL_VALIDATOR_ENABLED',
@@ -18,6 +26,8 @@ export const WALLET_SIGNER_ENVIRONMENT = [
   'NEXT_PUBLIC_SITE_URL',
   'SITE_ALLOWED_ORIGINS',
   'NEXT_PUBLIC_LOCAL_VALIDATOR_RPC_URL',
+  'MSKD_PAYOUT_POOL',
+  'MSKD_DEVNET_PAYOUT_MINT',
 ] as const;
 export type WalletSignerConfig = {
   version: 1;
@@ -67,6 +77,11 @@ export function walletSignerConfig(value: unknown): WalletSignerConfig {
     },
     genesis = expectedNetworkGenesis(env);
   companyWallets(env, genesis, { allowLegacy: true });
+  if (genesis === NETWORK_GENESIS['mainnet-beta'] && env.LAUNCH_POLICY_VERSION === 'dev-v1') {
+    const configKey = env.POOL_CONFIG_KEY;
+    if (!configKey || new PublicKey(configKey).equals(PublicKey.default))
+      throw new Error('The mainnet Dev signer needs a reviewed pool config pin');
+  }
   const url = new URL(environment.RPC_URL!);
   if (
     url.username ||
@@ -89,6 +104,9 @@ export function walletSignerConfig(value: unknown): WalletSignerConfig {
     'maximumBuybackLamports',
     'maximumPayoutLamports',
     'maximumOperatingCostLamports',
+    ...(object(policy.limits) && Object.hasOwn(policy.limits, 'maximumPayoutWxmrUnits')
+      ? ['maximumPayoutWxmrUnits']
+      : []),
   ]);
   for (const v of Object.values(limits))
     if (

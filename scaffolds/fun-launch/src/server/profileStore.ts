@@ -3,8 +3,15 @@ import type { Pool } from 'pg';
 import { PublicKey } from '@solana/web3.js';
 import { z } from 'zod';
 import { database } from './database';
-import { verifyWalletMessage } from './whitelistAuth';
-import { safeAvatarUrl, socialMessage, type WalletProfile, type Callout } from '@/lib/profiles';
+import { verifyWalletMessage } from './verifyWalletMessage';
+import {
+  safeAvatarUrl,
+  socialMessage,
+  type WalletProfile,
+  type Callout,
+  type SocialPurpose,
+} from '@/lib/profiles';
+import { CHAT_MESSAGE_MAX } from '@/lib/tokenChat';
 
 export const socialWallet = z
   .string()
@@ -72,6 +79,18 @@ export const calloutDraft = z
     body: plain(500).refine((value) => value.length > 0),
   })
   .strict();
+export const chatJoinDraft = calloutDraft.omit({ body: true });
+const networkJoinDraft = chatJoinDraft.omit({ mint: true });
+const challengeDrafts = {
+  profile: profileDraft,
+  callout: calloutDraft,
+  chat: chatJoinDraft,
+  'launch-preview': networkJoinDraft,
+  otc: networkJoinDraft,
+};
+const challengeScope = (purpose: SocialPurpose) =>
+  purpose === 'chat' || purpose === 'launch-preview' || purpose === 'otc' ? `${purpose}-` : '';
+export const chatBody = plain(CHAT_MESSAGE_MAX).min(1);
 export const socialSignature = z.string().regex(/^[A-Za-z0-9+/]{86}==$/);
 export class SocialError extends Error {
   constructor(
@@ -112,12 +131,13 @@ export class ProfileStore {
       )
     ).rows;
   }
-  async challenge(wallet: string, purpose: 'profile' | 'callout', origin: string, raw: unknown) {
-    const payload = purpose === 'profile' ? profileDraft.parse(raw) : calloutDraft.parse(raw);
-    await this.limit('challenge-global', 2000);
-    await this.limit(`challenge:${wallet}`, 12);
-    if (purpose === 'callout') {
-      const p = calloutDraft.parse(payload);
+  async challenge(wallet: string, purpose: SocialPurpose, origin: string, raw: unknown) {
+    const payload = challengeDrafts[purpose].parse(raw);
+    const scope = challengeScope(purpose);
+    await this.limit(`${scope}challenge-global`, 2000);
+    await this.limit(`${scope}challenge:${wallet}`, 12);
+    if ('networkGenesis' in payload && 'mint' in payload) {
+      const p = payload;
       if (
         !(
           await this.db.query('SELECT 1 FROM launch_coins WHERE network_genesis=$1 AND mint=$2', [
@@ -136,7 +156,7 @@ export class ProfileStore {
       [nonce, wallet, purpose, origin, JSON.stringify(payload), message, expiresAt]
     );
     await this.db.query(
-      `DELETE FROM wallet_social_challenges WHERE nonce IN (SELECT nonce FROM wallet_social_challenges WHERE expires_at<now()-interval '1 day' AND (used_at IS NULL OR purpose='profile') LIMIT 100)`
+      `DELETE FROM wallet_social_challenges WHERE nonce IN (SELECT nonce FROM wallet_social_challenges WHERE expires_at<now()-interval '1 day' AND (used_at IS NULL OR purpose IN('profile','chat','launch-preview','otc')) LIMIT 100)`
     );
     await this.db.query(
       `DELETE FROM wallet_social_limits WHERE bucket IN (SELECT bucket FROM wallet_social_limits WHERE expires_at<now()-interval '1 day' LIMIT 100)`
@@ -145,12 +165,13 @@ export class ProfileStore {
   }
   async submit(
     wallet: string,
-    purpose: 'profile' | 'callout',
+    purpose: SocialPurpose,
     origin: string,
     nonce: string,
     signature: string
   ) {
-    await this.limit(`submit:${wallet}`, 24);
+    const scope = challengeScope(purpose);
+    await this.limit(`${scope}submit:${wallet}`, 24);
     const client = await this.db.connect();
     try {
       await client.query('BEGIN');
@@ -180,7 +201,7 @@ export class ProfileStore {
             [wallet, data.username, data.bio, data.avatarUrl]
           )
         ).rows[0];
-      } else {
+      } else if (purpose === 'callout') {
         const data = calloutDraft.parse(saved.payload);
         // Limit successful posts as well as challenges, across all instances.
         const count = await client.query(
@@ -196,7 +217,7 @@ export class ProfileStore {
             [data.networkGenesis, data.mint, wallet, data.body, nonce]
           )
         ).rows[0];
-      }
+      } else result = challengeDrafts[purpose].parse(saved.payload);
       await client.query('UPDATE wallet_social_challenges SET used_at=now() WHERE nonce=$1', [
         nonce,
       ]);

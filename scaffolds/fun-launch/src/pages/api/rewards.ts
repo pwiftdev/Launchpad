@@ -1,4 +1,9 @@
-import { hasCreatorRewards, isWalletPolicy } from '@/lib/launchModes';
+import {
+  hasBatchedHolderRewards,
+  hasCreatorRewards,
+  isCashbackMode,
+  isWalletPolicy,
+} from '@/lib/launchModes';
 import { createHash } from 'node:crypto';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { PublicKey } from '@solana/web3.js';
@@ -14,7 +19,14 @@ import { registeredCoin } from '@/server/launchRegistry';
 import { siteOriginForHeaders } from '@/server/siteOrigin';
 import { verifyClaimAuthorization } from '@/server/economics/claimAuthorization';
 import { WalletStore, type WalletJob } from '@/server/economics/walletStore';
-import { claimAuthorizationMessage, type RewardsView } from '@/lib/rewards';
+import { signedRewardMint } from '@/server/economics/walletMskdPolicy';
+import {
+  claimAuthorizationMessage,
+  MINIMUM_HOLDER_PAYOUT_LAMPORTS,
+  SOL_REWARD_MINT,
+  HSOL_REWARD_MINT,
+  type RewardsView,
+} from '@/lib/rewards';
 
 export const config = { api: { bodyParser: { sizeLimit: '3kb' } } };
 const address = z
@@ -44,6 +56,7 @@ const prepare = z
     mint: address,
     wallet: address,
     epoch: epoch.nullable(),
+    assetMint: address.optional(),
     amount: z
       .string()
       .regex(/^[1-9]\d{0,19}$/)
@@ -52,7 +65,11 @@ const prepare = z
     issuedAt: z.number().int(),
     signature: z.string().regex(/^[A-Za-z0-9+/]{86}==$/),
   })
-  .strict();
+  .strict()
+  .refine(
+    (input) =>
+      input.assetMint === undefined || input.assetMint === HSOL_REWARD_MINT || input.epoch !== null
+  );
 const check = z
   .object({
     action: z.enum(['settle', 'recover']),
@@ -68,6 +85,7 @@ const safeJob = (job: WalletJob, requestId?: string) => ({
   status: job.status,
   signature: job.signature,
   amount: job.lamports,
+  ...(typeof job.details?.assetMint === 'string' ? { assetMint: job.details.assetMint } : {}),
   ...(requestId ? { requestId } : {}),
 });
 
@@ -112,13 +130,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...empty,
         status: 'ready',
         availableLamports:
-          !hasCreatorRewards(coin.mode)
+          coin.mode === 'community'
             ? rows
                 .filter((row) => row.status === 'available')
                 .reduce((sum, row) => sum + BigInt(row.lamports), 0n)
                 .toString()
             : view.availableLamports,
         paidLamports: view.paidLamports,
+        reservedLamports: view.pendingPayout?.lamports ?? '0',
+        ...(view.holderClaim !== undefined ? { holderClaim: view.holderClaim } : {}),
         creatorReceipts: view.receipts,
         creatorJob: view.pendingPayout ? safeJob(view.pendingPayout) : null,
         request: request ? safeJob(request, input.data.requestId) : null,
@@ -129,6 +149,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           status: row.status === 'queued' ? 'pending' : row.status,
           jobId: row.jobId,
           signature: row.signature ?? null,
+          ...(hasBatchedHolderRewards(coin.mode)
+            ? { snapshotSlot: row.snapshot_slot, snapshotDigest: row.snapshot_digest }
+            : {}),
+          ...(row.conversion_signature ? { conversionSignature: row.conversion_signature } : {}),
         })),
       });
     }
@@ -159,6 +183,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const coin = await registeredCoin(genesis, input.mint);
       if (!coin || !isWalletPolicy(coin.policy_version))
         return res.status(409).json({ error: 'This token has no funded wallet reward policy' });
+      const asset = signedRewardMint(coin.mode, genesis);
+      if (asset === null || input.assetMint !== asset)
+        return res
+          .status(409)
+          .json({ error: 'The funded payout asset is unavailable. Refresh your rewards.' });
+      if (isCashbackMode(coin.mode) && BigInt(input.amount) < MINIMUM_HOLDER_PAYOUT_LAMPORTS) {
+        const unit = asset === HSOL_REWARD_MINT ? 'hSOL' : 'SOL';
+        return res.status(400).json({
+          error: `Earn at least 0.001 ${unit} before requesting a Cashback payout.`,
+        });
+      }
       if (
         hasCreatorRewards(coin.mode) &&
         (input.epoch !== null || input.wallet !== coin.original_deployer)
@@ -169,11 +204,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!hasCreatorRewards(coin.mode) && input.epoch === null)
         return res.status(400).json({ error: 'Select a funded hourly reward' });
       try {
-        await assertWalletRecipientCredit(
-          connection,
-          new PublicKey(input.wallet),
-          BigInt(input.amount)
-        );
+        if (!asset || asset === SOL_REWARD_MINT)
+          await assertWalletRecipientCredit(
+            connection,
+            new PublicKey(input.wallet),
+            BigInt(input.amount)
+          );
       } catch (error) {
         if (error instanceof WalletRecipientUnavailable)
           return res.status(400).json({
@@ -199,6 +235,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         epoch: input.epoch === null ? null : Number(input.epoch),
         amount: BigInt(input.amount),
         requestId: input.requestId,
+        ...(input.assetMint ? { assetMint: input.assetMint } : {}),
         authorizationDigest: createHash('sha256')
           .update(claimAuthorizationMessage(origin, input))
           .digest('hex'),

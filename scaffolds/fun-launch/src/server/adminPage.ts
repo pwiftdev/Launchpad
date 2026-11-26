@@ -6,11 +6,13 @@ import { launchpadIsPublic, launchpadPage } from '@/lib/accessRoutes';
 export function adminPageRedirect({ req, res, resolvedUrl }: GetServerSidePropsContext) {
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Vary', 'Cookie');
-  if (launchpadIsPublic() && typeof resolvedUrl === 'string' && launchpadPage(resolvedUrl))
-    return null;
+  if (launchpadIsPublic())
+    return typeof resolvedUrl === 'string' && launchpadPage(resolvedUrl)
+      ? null
+      : { notFound: true as const };
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   if (readAdminSession(req.cookies[ADMIN_COOKIE])) return null;
-  return { redirect: { destination: '/whitelist', permanent: false as const } };
+  return { redirect: { destination: '/admin', permanent: false as const } };
 }
 
 export const requireAdminPage: GetServerSideProps = async (context) =>

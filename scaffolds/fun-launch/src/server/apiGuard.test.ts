@@ -1,12 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import adminSessionHandler from '@/pages/api/admin/session';
 import { apiGuard, clientIp, takeLimit } from './apiGuard';
 import { ADMIN_COOKIE, signAdminSession } from './adminSession';
 
 const request = (headers = {}) =>
   ({
     method: 'POST',
-    url: '/api/whitelist',
+    url: '/api/admin/session',
     headers,
     socket: { remoteAddress: '127.0.0.1' },
   }) as NextApiRequest;
@@ -38,6 +39,36 @@ function admittedRequest(url = '/api/coins', method = 'GET', ip = '192.0.2.1') {
 }
 
 describe('API guard', () => {
+  it.each(['/api/upload', '/api/launch-previews'])(
+    'enforces access on %s without middleware',
+    (url) => {
+      vi.stubEnv('LAUNCHPAD_PUBLIC', 'false');
+      const req = admittedRequest(url, 'POST');
+      expect(apiGuard(req, response())).toBe(true);
+      req.cookies = {};
+      const unauthorized = response();
+      expect(apiGuard(req, unauthorized)).toBe(false);
+      expect(unauthorized.status).toHaveBeenCalledWith(401);
+      vi.stubEnv('LAUNCHPAD_PUBLIC', 'true');
+      expect(apiGuard(req, response())).toBe(true);
+      req.headers.origin = 'https://wrong.example';
+      const crossOrigin = response();
+      expect(apiGuard(req, crossOrigin)).toBe(false);
+      expect(crossOrigin.status).toHaveBeenCalledWith(403);
+    }
+  );
+  it('retires admin sign-in and rejects existing admin sessions on private APIs in public mode', async () => {
+    vi.stubEnv('LAUNCHPAD_PUBLIC', 'true');
+    for (const method of ['GET', 'POST']) {
+      const retired = response();
+      await adminSessionHandler(admittedRequest('/api/admin/session', method), retired);
+      expect(retired.status).toHaveBeenCalledWith(404);
+      expect(retired.setHeader).not.toHaveBeenCalledWith('Set-Cookie', expect.anything());
+    }
+    const privateApi = response();
+    expect(apiGuard(admittedRequest('/api/admin/config'), privateApi)).toBe(false);
+    expect(privateApi.status).toHaveBeenCalledWith(401);
+  });
   it('admits public user APIs without an admin cookie while preserving origin checks and private routes', () => {
     vi.stubEnv('LAUNCHPAD_PUBLIC', 'true');
     vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://launch.example');
@@ -150,21 +181,20 @@ describe('API guard', () => {
       for (const viewer of viewers)
         for (let n = 0; n < 3; n++) expect(apiGuard(viewer, response())).toBe(true);
     }
-    expect(apiGuard(admittedRequest('/api/whitelist', 'POST'), response())).toBe(true);
+    expect(apiGuard(admittedRequest('/api/admin/session', 'POST'), response())).toBe(true);
   });
-  it('keeps mutation/profile/challenge capacity independent of market traffic in both directions', () => {
-    const write = admittedRequest('/api/whitelist', 'POST');
+  it('keeps writes independent of market and interactive reads', () => {
+    const write = admittedRequest('/api/admin/session', 'POST');
     for (let n = 0; n < 240; n++) expect(apiGuard(write, response())).toBe(true);
     const writeRes = response();
     expect(apiGuard(write, writeRes)).toBe(false);
     expect(writeRes.status).toHaveBeenCalledWith(429);
     expect(apiGuard(admittedRequest('/api/coins'), response())).toBe(true);
-    // A profile GET is not promoted into the market bucket, nor is a challenge POST.
-    expect(apiGuard(admittedRequest('/api/profiles?wallets=test'), response())).toBe(false);
+    expect(apiGuard(admittedRequest('/api/profiles?wallets=test'), response())).toBe(true);
     expect(apiGuard(admittedRequest('/api/profiles', 'POST'), response())).toBe(false);
   });
-  it('uses only exact known market GET/HEAD routes, never suffixes, mutations or expensive operation routes', () => {
-    const control = admittedRequest('/api/whitelist', 'POST');
+  it('uses only exact known polling GET/HEAD routes', () => {
+    const control = admittedRequest('/api/admin/session', 'POST');
     for (let n = 0; n < 240; n++) expect(apiGuard(control, response())).toBe(true);
     for (const route of [
       '/api/coins',
@@ -175,6 +205,11 @@ describe('API guard', () => {
       '/api/burns',
       `/api/coins/${'1'.repeat(32)}`,
       `/api/coins/${'1'.repeat(32)}/live`,
+      '/api/quote',
+      '/api/rewards',
+      '/api/launch/status',
+      '/api/transaction-status',
+      '/api/callouts',
     ])
       expect(apiGuard(admittedRequest(route, 'GET'), response())).toBe(true);
     expect(apiGuard(admittedRequest('/api/coins', 'HEAD'), response())).toBe(true);
@@ -182,14 +217,42 @@ describe('API guard', () => {
       '/api/coins-attacker',
       '/api/coins/bad-mint/trades',
       `/api/coins/${'1'.repeat(32)}/trades/extra`,
-      '/api/quote',
-      '/api/rewards',
-      '/api/launch/status',
-      '/api/transaction-status',
-      '/api/callouts',
+      '/api/rewards/admin',
+      '/api/launch/confirm',
     ])
       expect(apiGuard(admittedRequest(route), response())).toBe(false);
     expect(apiGuard(admittedRequest('/api/coins', 'POST'), response())).toBe(false);
+  });
+  it('admits a minute of synchronized quote, balance and reward polling from 200 users', () => {
+    const viewers = Array.from({ length: 200 }, (_, index) => {
+      const ip = `192.0.2.${index + 1}`;
+      return [
+        admittedRequest('/api/quote', 'GET', ip),
+        admittedRequest('/api/rewards', 'GET', ip),
+        admittedRequest(`/api/coins/${'1'.repeat(32)}/balance`, 'GET', ip),
+      ] as const;
+    });
+    for (let second = 0; second < 60; second += 3) {
+      vi.mocked(Date.now).mockReturnValue(testTime + second * 1000);
+      for (const [quote, rewards, balance] of viewers) {
+        expect(apiGuard(quote, response())).toBe(true);
+        if (second % 15 === 0) {
+          expect(apiGuard(rewards, response())).toBe(true);
+          expect(apiGuard(balance, response())).toBe(true);
+        }
+      }
+    }
+    expect(apiGuard(admittedRequest('/api/send-transaction', 'POST'), response())).toBe(true);
+  });
+  it('caps aggregate interactive polling bursts without consuming write capacity', () => {
+    for (let viewer = 0; viewer < 20; viewer++) {
+      const req = admittedRequest('/api/quote', 'GET', `198.51.100.${viewer + 1}`);
+      for (let n = 0; n < 40; n++) expect(apiGuard(req, response())).toBe(true);
+    }
+    const res = response();
+    expect(apiGuard(admittedRequest('/api/rewards', 'GET', '198.51.100.99'), res)).toBe(false);
+    expect(res.setHeader).toHaveBeenCalledWith('Retry-After', '5');
+    expect(apiGuard(admittedRequest('/api/send-transaction', 'POST'), response())).toBe(true);
   });
   it('bounds market IP bursts and reports the remaining retry time instead of always 60 seconds', () => {
     const req = admittedRequest();
@@ -202,7 +265,7 @@ describe('API guard', () => {
     vi.mocked(Date.now).mockReturnValue(testTime + 5000);
     expect(apiGuard(req, response())).toBe(true);
     // The 80 market calls do not reduce the original 240 mutation allowance.
-    const write = admittedRequest('/api/whitelist', 'POST');
+    const write = admittedRequest('/api/admin/session', 'POST');
     for (let n = 0; n < 240; n++) expect(apiGuard(write, response())).toBe(true);
   });
   it('bounds sustained per-IP reads even when the short burst windows have reset', () => {
@@ -225,10 +288,12 @@ describe('API guard', () => {
     for (let n = 0; n < 1500; n++) expect(apiGuard(spam, response())).toBe(false);
     // Without atomic admission the repeated denials would exhaust the 1000-request process burst.
     expect(apiGuard(admittedRequest('/api/coins', 'GET', '192.0.2.2'), response())).toBe(true);
-    const write = admittedRequest('/api/whitelist', 'POST', '192.0.2.3');
+    const write = admittedRequest('/api/admin/session', 'POST', '192.0.2.3');
     for (let n = 0; n < 240; n++) expect(apiGuard(write, response())).toBe(true);
     for (let n = 0; n < 1500; n++) expect(apiGuard(write, response())).toBe(false);
-    expect(apiGuard(admittedRequest('/api/whitelist', 'POST', '192.0.2.4'), response())).toBe(true);
+    expect(apiGuard(admittedRequest('/api/admin/session', 'POST', '192.0.2.4'), response())).toBe(
+      true
+    );
   });
   it('bounds aggregate market bursts without blocking writes and leaves auth/origin protection intact', () => {
     for (let viewer = 0; viewer < 20; viewer++) {
@@ -238,7 +303,7 @@ describe('API guard', () => {
     const res = response();
     expect(apiGuard(admittedRequest('/api/coins', 'GET', '198.51.100.99'), res)).toBe(false);
     expect(res.setHeader).toHaveBeenCalledWith('Retry-After', '5');
-    expect(apiGuard(admittedRequest('/api/whitelist', 'POST'), response())).toBe(true);
+    expect(apiGuard(admittedRequest('/api/admin/session', 'POST'), response())).toBe(true);
     const anonymous = admittedRequest();
     anonymous.cookies = {};
     const unauthorized = response();
@@ -252,17 +317,17 @@ describe('API guard', () => {
   });
   it('retains the original aggregate protected budget and accurate remaining minute retry', () => {
     for (let client = 0; client < 6; client++) {
-      const req = admittedRequest('/api/whitelist', 'POST', `203.0.113.${client + 1}`);
+      const req = admittedRequest('/api/admin/session', 'POST', `203.0.113.${client + 1}`);
       for (let n = 0; n < 200; n++) expect(apiGuard(req, response())).toBe(true);
     }
     vi.mocked(Date.now).mockReturnValue(testTime + 22_100);
     const res = response();
-    expect(
-      apiGuard(admittedRequest('/api/profiles?wallets=test', 'GET', '203.0.113.99'), res)
-    ).toBe(false);
+    expect(apiGuard(admittedRequest('/api/send-transaction', 'POST', '203.0.113.99'), res)).toBe(
+      false
+    );
     expect(res.setHeader).toHaveBeenCalledWith('Retry-After', '38');
     expect(apiGuard(admittedRequest('/api/coins'), response())).toBe(true);
     vi.mocked(Date.now).mockReturnValue(testTime + 60_000);
-    expect(apiGuard(admittedRequest('/api/whitelist', 'POST'), response())).toBe(true);
+    expect(apiGuard(admittedRequest('/api/admin/session', 'POST'), response())).toBe(true);
   });
 });

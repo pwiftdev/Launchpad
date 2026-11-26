@@ -4,13 +4,26 @@ import Page from '@/components/ui/Page/Page';
 import { Decrypt } from '@/components/brand/Decrypt';
 import { FeeSplit } from '@/components/fees/FeeSplit';
 import { BRAND } from '@/constants/brand';
-import { FEE_MODE_IDS, SCHEDULE, SPLIT, feeMode, pct } from '@/lib/feeModes';
-export { requireAdminPage as getServerSideProps } from '@/server/adminPage';
+import {
+  REWARD_MODES,
+  pairingMode,
+  SCHEDULE,
+  SPLIT,
+  feeMode,
+  pct,
+  type FeeModeId,
+} from '@/lib/feeModes';
+import { adminPageRedirect } from '@/server/adminPage';
+import { hsolLaunchModes } from '@/server/tradingAccess';
+import type { GetServerSideProps } from 'next';
+
+export const getServerSideProps: GetServerSideProps<{ hsolModes: FeeModeId[] }> = async (context) =>
+  adminPageRedirect(context) ?? { props: { hsolModes: await hsolLaunchModes() } };
 
 const RULES: [string, string][] = [
   [
     'One-slot launch guard',
-    `The slot a coin is created in charges ${pct(SCHEDULE.startingFeeBps)} on buys and sells, so bots cannot snipe it. From the next slot the fee is ${pct(SCHEDULE.endingFeeBps)}. The creator's first buy, bundled with creation, pays ${pct(SCHEDULE.endingFeeBps)}. Dynamic fees are off.`,
+    `The slot a coin is created in charges ${pct(SCHEDULE.startingFeeBps)} on buys and sells to discourage sniping. From the next slot the fee is ${pct(SCHEDULE.endingFeeBps)}. The creator's first buy, bundled with creation, pays ${pct(SCHEDULE.endingFeeBps)}. Dynamic fees are off.`,
   ],
   [
     `${pct(SCHEDULE.endingFeeBps)} flat`,
@@ -28,13 +41,9 @@ const RULES: [string, string][] = [
     'No accounts, no KYC',
     'You never sign up, verify an identity or share an email. A wallet signature is the only login, and we never ask for a recovery phrase.',
   ],
-  [
-    'Anti-copy checks',
-    'Ticker, name, artwork and source-post checks help protect existing launches from copies. They are best-effort moderation, not proof of ownership or token safety.',
-  ],
 ];
 
-export default function Rules() {
+export default function Rules({ hsolModes }: { hsolModes: FeeModeId[] }) {
   return (
     <Page>
       <Head>
@@ -49,7 +58,7 @@ export default function Rules() {
           <span className="text-neutral-500">Before and after bonding.</span>
         </h1>
         <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-neutral-400">
-          Every trade pays the same fee in every mode. Meteora keeps {pct(SPLIT.meteoraBps)}, the
+          All launch modes have the same standard fee. Meteora keeps {pct(SPLIT.meteoraBps)}, the
           house keeps {pct(SPLIT.houseBps)}, and the mode you launch in decides who gets the other{' '}
           {pct(SPLIT.beneficiaryBps)}.
         </p>
@@ -58,17 +67,17 @@ export default function Rules() {
       {/* Modes */}
       <section aria-labelledby="modes" className="border-t border-neutral-850 pt-8">
         <h2 id="modes" className="eyebrow">
-          Three modes
+          Launch modes
         </h2>
         <div className="mt-5 grid gap-3 md:grid-cols-3">
-          {FEE_MODE_IDS.map((id) => {
+          {REWARD_MODES.map((id) => {
             const mode = feeMode(id);
             return (
               <article key={id} className="surface flex flex-col p-6">
                 <div className="flex items-center justify-between">
                   <h3 className="font-display text-[15px] uppercase">{mode.label}</h3>
                   <span className="rounded-md border border-neutral-800 px-1.5 py-0.5 font-mono text-[11px] text-neutral-400">
-                    {mode.quoteSymbol}
+                    {hsolModes.includes(pairingMode(id, 'hsol')) ? 'SOL · hSOL' : 'SOL'}
                   </span>
                 </div>
                 <p className="mt-1.5 text-[13px] text-neutral-400">{mode.tagline}</p>
@@ -77,7 +86,7 @@ export default function Rules() {
                 </p>
                 <p className="mt-1.5 text-[13px] text-neutral-500">
                   of every trade to {mode.beneficiary === 'creator' ? 'the creator' : 'holders'}
-                  {mode.quote !== 'sol' ? `, paid in ${mode.payoutSymbol}` : ''}
+                  {mode.payoutSymbol !== mode.quoteSymbol ? `, paid in ${mode.payoutSymbol}` : ''}
                 </p>
                 <FeeSplit mode={mode} compact className="mt-6" />
               </article>
@@ -85,10 +94,9 @@ export default function Rules() {
           })}
         </div>
         <p className="mt-4 max-w-3xl text-[12px] leading-relaxed text-neutral-500">
-          MSKD mode trades against SOL like every mode, but pays the holder share in wXMR, a
-          Solana token issued by a bridge that holds Monero, and holders can cash out to real Monero.
-          wXMR depends on that issuer: it can mint more and processes redemptions. Trades on Solana
-          are public in every mode.
+          MSKD pays the holder share in wXMR, a Solana token issued by a bridge that holds Monero.
+          The issuer controls minting and handles redemptions. In-app redemption is planned. Trades
+          on Solana are public in every mode.
         </p>
       </section>
 

@@ -4,12 +4,15 @@ import {
   FEE_MODE_IDS,
   SCHEDULE,
   SPLIT,
+  REWARD_MODES,
   feeMode,
   feeModeByPolicy,
   isFeeModeId,
+  pairingMode,
   pct,
   payoutMintFor,
   quoteMintFor,
+  rewardMode,
   splitRows,
 } from './feeModes';
 
@@ -31,9 +34,33 @@ describe('fee modes', () => {
     expect(BENEFICIARY_NET_BPS).toBe(6000);
   });
 
-  it('defines MSKD, Regular Dev and Regular Cashback', () => {
-    expect(FEE_MODE_IDS).toEqual(['mskd', 'dev', 'cashback']);
-    expect(feeMode('mskd')).toMatchObject({ quoteSymbol: 'SOL', payoutSymbol: 'wXMR', payoutName: 'Monero', beneficiary: 'holders' });
+  it('resolves each reward mode with SOL or hSOL while retaining its beneficiary', () => {
+    expect(REWARD_MODES.map((mode) => pairingMode(mode, 'hsol'))).toEqual([
+      'mskd-hsol',
+      'hsol',
+      'cashback-hsol',
+    ]);
+    for (const mode of REWARD_MODES) {
+      const hsol = pairingMode(mode, 'hsol');
+      expect(rewardMode(hsol)).toBe(mode);
+      expect(pairingMode(mode, 'sol')).toBe(mode);
+      expect(feeMode(hsol).beneficiary).toBe(feeMode(mode).beneficiary);
+    }
+    expect(feeMode('cashback-hsol').payoutSymbol).toBe('hSOL');
+    expect(feeMode('mskd-hsol').payoutSymbol).toBe('wXMR');
+    expect(FEE_MODE_IDS).toContain('hsol');
+    expect(feeMode('hsol')).toMatchObject({
+      quoteSymbol: 'hSOL',
+      payoutSymbol: 'hSOL',
+      bondingTarget: 80,
+      beneficiary: 'creator',
+    });
+    expect(feeMode('mskd')).toMatchObject({
+      quoteSymbol: 'SOL',
+      payoutSymbol: 'wXMR',
+      payoutName: 'Monero',
+      beneficiary: 'holders',
+    });
     expect(feeMode('dev')).toMatchObject({ quoteSymbol: 'SOL', beneficiary: 'creator' });
     expect(feeMode('cashback')).toMatchObject({ quoteSymbol: 'SOL', beneficiary: 'holders' });
     expect(feeModeByPolicy('cashback-v1')?.id).toBe('cashback');
@@ -51,12 +78,18 @@ describe('fee modes', () => {
     expect(pct(SCHEDULE.endingFeeBps)).toBe('1.25%');
   });
 
-  it('pairs every mode to SOL; MSKD pays holders in wXMR', () => {
-    for (const id of FEE_MODE_IDS)
+  it('pins the quote and reward mints independently for SOL, hSOL and wXMR', () => {
+    for (const id of REWARD_MODES)
       expect(quoteMintFor(id)).toBe('So11111111111111111111111111111111111111112');
-    expect(payoutMintFor('mskd', 'mainnet-beta')).toBe('WXMRyRZhsa19ety5erZhHg4N3xj3EVN92u94422teJp');
+    expect(quoteMintFor('hsol')).toBe('he1iusmfkpAdwvxLNGV8Y1iSbj4rUy6yMhEA3fotn9A');
+    expect(payoutMintFor('hsol', 'mainnet-beta')).toBe(quoteMintFor('hsol'));
+    expect(payoutMintFor('mskd', 'mainnet-beta')).toBe(
+      'WXMRyRZhsa19ety5erZhHg4N3xj3EVN92u94422teJp'
+    );
     expect(payoutMintFor('mskd', 'devnet')).toBeNull();
     expect(payoutMintFor('mskd', 'devnet', { MSKD_DEVNET_PAYOUT_MINT: 'Mock111' })).toBe('Mock111');
-    expect(payoutMintFor('cashback', 'mainnet-beta')).toBe('So11111111111111111111111111111111111111112');
+    expect(payoutMintFor('cashback', 'mainnet-beta')).toBe(
+      'So11111111111111111111111111111111111111112'
+    );
   });
 });

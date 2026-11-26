@@ -2,6 +2,7 @@ import { useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useWallet } from '@jup-ag/wallet-adapter';
 import type { Coin, HoldersResponse, Trade, TradesResponse } from '@/lib/coin';
+import { quoteAsset } from '@/lib/feeModes';
 import { explorerUrl } from '@/constants/network';
 import { BASE_FEE_PERCENT } from '@/constants/launch';
 import { formatReadableNumber } from '@/lib/format/number';
@@ -209,7 +210,12 @@ export const HoldersPanel = ({
             />
           )
         ) : tab === 'trades' ? (
-          <TradeRows coin={coin} rows={shownTrades} identity={identity} />
+          <TradeRows
+            coin={coin}
+            rows={shownTrades}
+            identity={identity}
+            quoteToSol={trades?.quoteToSol ?? coin.quoteToSol ?? 1}
+          />
         ) : tab === 'holders' ? (
           <>
             <VirtualTable
@@ -340,13 +346,16 @@ function TradeRows({
   coin,
   rows,
   identity,
+  quoteToSol,
 }: {
   coin: Coin;
   rows: Trade[];
   identity: (wallet: string) => ReactNode;
+  quoteToSol: number;
 }) {
   const now = useNow(1000, coin.isDemo);
   const { usd } = useUsd();
+  const quoteUnit = quoteAsset(coin.quoteMint).symbol;
   return (
     <VirtualTable
       rows={rows}
@@ -394,8 +403,13 @@ function TradeRows({
                 {trade.side === 'buy' ? 'Buy' : 'Sell'}
               </span>
             </td>
-            <td className={cn(td, 'text-right text-neutral-200')} title={`${trade.sol} SOL`}>
-              {usd(trade.sol)}
+            <td
+              className={cn(td, 'text-right text-neutral-200')}
+              title={`${trade.sol / quoteToSol} ${quoteUnit}`}
+            >
+              {quoteUnit === 'SOL'
+                ? usd(trade.sol)
+                : `${formatReadableNumber(trade.sol / quoteToSol)} ${quoteUnit}`}
             </td>
             <td className={cn(td, 'text-right text-neutral-400')}>
               {formatReadableNumber(trade.tokens)}

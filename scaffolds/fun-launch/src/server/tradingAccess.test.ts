@@ -3,6 +3,7 @@ import { Keypair } from '@solana/web3.js';
 import type { NextApiResponse } from 'next';
 import { allowTrading, verifiedTradingAccess } from './tradingAccess';
 import { NETWORK_GENESIS } from '../../../../scripts/network-policy.cjs';
+import devCompany from '../../../../docs/mskd-mainnet-dev-wallets.public.json';
 const rpc = vi.hoisted(() => ({ getGenesisHash: vi.fn(), getLaunchConfig: vi.fn() }));
 vi.mock('./dbc', () => ({ connection: rpc, getLaunchConfig: rpc.getLaunchConfig }));
 const response = () => {
@@ -25,6 +26,9 @@ beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_NETWORK', 'devnet');
   vi.stubEnv('SOLANA_NETWORK', '');
   vi.stubEnv('MAINNET_TRADING_ENABLED', '');
+  vi.stubEnv('LAUNCH_POLICY_VERSION', '');
+  vi.stubEnv('MAINNET_CASHBACK_CONFIG_KEY', '');
+  vi.stubEnv('MAINNET_MSKD_CONFIG_KEY', '');
   vi.stubEnv('LOCAL_VALIDATOR_ENABLED', '');
   vi.stubEnv('LOCAL_VALIDATOR_GENESIS_HASH', '');
   vi.stubEnv('NEXT_PUBLIC_LOCAL_VALIDATOR_RPC_URL', '');
@@ -37,15 +41,21 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('wallet policy financial rollout gate', () => {
-  it.each(['dev','cashback','mskd'] as const)('admits the reviewed %s config on devnet only', async mode => {
-    for (const network of ['devnet','mainnet-beta'] as const) {
-      vi.stubEnv('NEXT_PUBLIC_NETWORK', network);
-      vi.stubEnv('MAINNET_TRADING_ENABLED', 'true');
-      rpc.getGenesisHash.mockResolvedValue(NETWORK_GENESIS[network]);
-      rpc.getLaunchConfig.mockResolvedValue({ genesis: NETWORK_GENESIS[network], record: {policy_version: mode + '-v1', enabled_for_launch:true} });
-      expect(await allowTrading(response(), mode)).toBe(network === 'devnet');
+  it.each(['dev', 'cashback', 'mskd'] as const)(
+    'admits the reviewed %s config on devnet only',
+    async (mode) => {
+      for (const network of ['devnet', 'mainnet-beta'] as const) {
+        vi.stubEnv('NEXT_PUBLIC_NETWORK', network);
+        vi.stubEnv('MAINNET_TRADING_ENABLED', 'true');
+        rpc.getGenesisHash.mockResolvedValue(NETWORK_GENESIS[network]);
+        rpc.getLaunchConfig.mockResolvedValue({
+          genesis: NETWORK_GENESIS[network],
+          record: { policy_version: mode + '-v1', enabled_for_launch: true },
+        });
+        expect(await allowTrading(response(), mode)).toBe(network === 'devnet');
+      }
     }
-  });
+  );
   it('allows verified devnet wallet policy without requiring a custom program', async () => {
     const res = response();
     expect(await allowTrading(res)).toBe(true);
@@ -68,6 +78,25 @@ describe('wallet policy financial rollout gate', () => {
     admitted(NETWORK_GENESIS.devnet);
     expect(await allowTrading(response())).toBe(false);
   });
+  it('admits only reviewed Dev on an explicit mainnet Dev release', async () => {
+    const genesis = NETWORK_GENESIS['mainnet-beta'];
+    vi.stubEnv('NEXT_PUBLIC_NETWORK', 'mainnet-beta');
+    vi.stubEnv('LAUNCH_POLICY_VERSION', 'dev-v1');
+    vi.stubEnv('FEE_COLLECTOR_PUBLIC_KEY', devCompany.collector);
+    vi.stubEnv('TREASURY_PUBLIC_KEY', devCompany.treasury);
+    rpc.getGenesisHash.mockResolvedValue(genesis);
+    rpc.getLaunchConfig.mockResolvedValue({
+      genesis,
+      record: { policy_version: 'dev-v1', enabled_for_launch: true },
+    });
+    expect(await allowTrading(response(), 'dev')).toBe(false);
+    vi.stubEnv('MAINNET_TRADING_ENABLED', 'true');
+    expect(await allowTrading(response(), 'dev')).toBe(true);
+    for (const mode of ['bond', 'cashback', 'mskd'] as const)
+      expect(await allowTrading(response(), mode)).toBe(false);
+    rpc.getLaunchConfig.mockRejectedValue(new Error('Configuration not reviewed'));
+    expect(await allowTrading(response(), 'dev')).toBe(false);
+  });
   it('rejects mainnet fee-wallet aliases despite the enable flag and a reviewed config', async () => {
     vi.stubEnv('NEXT_PUBLIC_NETWORK', 'mainnet-beta');
     vi.stubEnv('MAINNET_TRADING_ENABLED', 'true');
@@ -75,6 +104,38 @@ describe('wallet policy financial rollout gate', () => {
     vi.stubEnv('FEE_COLLECTOR_PUBLIC_KEY', Keypair.generate().publicKey.toBase58());
     expect(await allowTrading(response())).toBe(false);
   });
+  it.each([
+    ['cashback', 'MAINNET_CASHBACK_CONFIG_KEY'],
+    ['mskd', 'MAINNET_MSKD_CONFIG_KEY'],
+  ] as const)(
+    'admits only an enabled registry record on the exact mainnet %s pin',
+    async (mode, setting) => {
+      const genesis = NETWORK_GENESIS['mainnet-beta'];
+      const key = Keypair.generate().publicKey;
+      vi.stubEnv('NEXT_PUBLIC_NETWORK', 'mainnet-beta');
+      vi.stubEnv('MAINNET_TRADING_ENABLED', 'true');
+      vi.stubEnv('LAUNCH_POLICY_VERSION', 'dev-v1');
+      vi.stubEnv('FEE_COLLECTOR_PUBLIC_KEY', devCompany.collector);
+      vi.stubEnv('TREASURY_PUBLIC_KEY', devCompany.treasury);
+      admitted(genesis);
+      const approved = {
+        genesis,
+        key,
+        record: { policy_version: `${mode}-v1`, enabled_for_launch: true },
+      };
+      rpc.getLaunchConfig.mockResolvedValue(approved);
+      expect(await allowTrading(response(), mode)).toBe(false);
+      vi.stubEnv(setting, Keypair.generate().publicKey.toBase58());
+      expect(await allowTrading(response(), mode)).toBe(false);
+      vi.stubEnv(setting, key.toBase58());
+      expect(await allowTrading(response(), mode)).toBe(true);
+      rpc.getLaunchConfig.mockResolvedValue({
+        ...approved,
+        record: { ...approved.record, enabled_for_launch: false },
+      });
+      expect(await allowTrading(response(), mode)).toBe(false);
+    }
+  );
   it('requires enabled reviewed wallet-v1 and refuses legacy native policy or failed config verification', async () => {
     for (const record of [
       { policy_version: 'rinse-v1', enabled_for_launch: true },

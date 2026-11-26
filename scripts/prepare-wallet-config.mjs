@@ -3,16 +3,27 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { prepareWalletConfiguration } from './wallet-config-preparation.cjs';
-import { companyWallets } from './company-wallets.cjs';
+import { companyWallets, pinnedMainnetCompanyWallets } from './company-wallets.cjs';
 import { NETWORK_GENESIS } from './network-policy.cjs';
+import { modeForPolicy } from './launch-policy.cjs';
 const args = process.argv.slice(2);
 if (args.length === 1 && args[0] === '--help') {
   console.log(
-    'Prepare the existing Meteora launch configuration: --connection-file .local/mainnet-connection.private.json --output .local/wallet-config.private.json. Creates one private configuration-account key and an unsigned transaction for the owner wallet. Never signs, broadcasts, deploys a program, changes the database or opens trading.'
+    'Prepare a Meteora config without signing or broadcasting. Mainnet accepts --mainnet-dev, --mainnet-cashback, --mainnet-mskd or --mainnet-hsol followed by a private connection file and --output with a new private path. Bond it. uses --connection-file. Devnet uses --devnet mskd|dev|cashback with explicit FEE_COLLECTOR_PUBLIC_KEY and TREASURY_PUBLIC_KEY.'
   );
 } else {
   try {
-    if (args.length !== 4 || args[0] !== '--connection-file' || args[2] !== '--output')
+    const devnet = args[0] === '--devnet';
+    const mainnetMode = /^--mainnet-(dev|cashback|mskd|hsol|cashback-hsol|mskd-hsol)$/.exec(
+      args[0] ?? ''
+    )?.[1];
+    const policyVersion = devnet ? `${args[1]}-v1` : mainnetMode ? `${mainnetMode}-v1` : 'bond-v1';
+    if (
+      args.length !== 4 ||
+      (!devnet && !mainnetMode && args[0] !== '--connection-file') ||
+      args[2] !== '--output' ||
+      (devnet && !modeForPolicy(policyVersion))
+    )
       throw Error('Invalid preparation arguments');
     const workspace = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
       local = path.join(workspace, '.local');
@@ -26,21 +37,29 @@ if (args.length === 1 && args[0] === '--help') {
         throw Error('Ignored local private path required');
       return file;
     }
-    const connectionFile = privatePath(args[1]),
-      output = privatePath(args[3]),
-      stat = fs.lstatSync(connectionFile);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 32768 || fs.existsSync(output))
-      throw Error('New output and bounded private connection input required');
-    const connection = JSON.parse(fs.readFileSync(connectionFile, 'utf8')),
-      url = new URL(connection.rpcUrl);
+    const output = privatePath(args[3]);
+    if (fs.existsSync(output)) throw Error('A new ignored private output path is required');
+    const expectedGenesis = NETWORK_GENESIS[devnet ? 'devnet' : 'mainnet-beta'];
+    let connection = {
+      rpcUrl: process.env.RPC_URL || 'https://api.devnet.solana.com',
+      expectedGenesis,
+    };
+    if (!devnet) {
+      const filename = privatePath(args[1]);
+      const stat = fs.lstatSync(filename);
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 32768)
+        throw Error('A bounded private connection input is required');
+      connection = JSON.parse(fs.readFileSync(filename, 'utf8'));
+    }
+    const url = new URL(connection.rpcUrl);
     if (
-      connection.expectedGenesis !== NETWORK_GENESIS['mainnet-beta'] ||
+      connection.expectedGenesis !== expectedGenesis ||
       url.protocol !== 'https:' ||
       url.username ||
       url.password ||
       url.hash
     )
-      throw Error('Pinned private mainnet connection required');
+      throw Error('Pinned HTTPS RPC connection required');
     const app = createRequire(new URL('../scaffolds/fun-launch/package.json', import.meta.url)),
       { Connection, Keypair } = app('@solana/web3.js');
     const rpc = new Connection(url.href, {
@@ -49,14 +68,15 @@ if (args.length === 1 && args[0] === '--help') {
       fetch: (url, init) =>
         fetch(url, { ...init, redirect: 'error', signal: AbortSignal.timeout(15000) }),
     });
-    const publicRoles = JSON.parse(
-      fs.readFileSync(new URL('../docs/mainnet-authorities.public.json', import.meta.url), 'utf8')
-    );
+    const publicRoles = pinnedMainnetCompanyWallets(policyVersion);
     const { collector, treasury } = companyWallets(
-      {
-        FEE_COLLECTOR_PUBLIC_KEY: publicRoles.company?.collector ?? publicRoles.vault.operator,
-        TREASURY_PUBLIC_KEY: publicRoles.company?.treasury ?? publicRoles.vault.treasury,
-      },
+      devnet
+        ? process.env
+        : {
+            FEE_COLLECTOR_PUBLIC_KEY: publicRoles.collector,
+            TREASURY_PUBLIC_KEY: publicRoles.treasury,
+            LAUNCH_POLICY_VERSION: policyVersion,
+          },
       connection.expectedGenesis
     );
     const configKey = Keypair.generate();
@@ -67,6 +87,7 @@ if (args.length === 1 && args[0] === '--help') {
         collector,
         treasury,
         configKey: configKey.publicKey,
+        policyVersion,
       });
       fs.writeFileSync(
         output,
@@ -84,8 +105,11 @@ if (args.length === 1 && args[0] === '--help') {
       console.log(
         JSON.stringify({
           prepared: true,
-          policy: 'bond-v1',
+          policy: prepared.policy,
           configKey: prepared.configKey,
+          collector: prepared.collector,
+          treasury: prepared.treasury,
+          networkFeeLamports: prepared.networkFeeLamports,
           transactionBytes: prepared.transactionBytes,
           transactionsSigned: 0,
           transactionsBroadcast: 0,

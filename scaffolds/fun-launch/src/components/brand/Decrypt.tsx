@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 const GLYPHS = '▓▒░█<>/\\|_#$%&*+=?01';
-const glyph = () => GLYPHS[(Math.random() * GLYPHS.length) | 0];
+/** One random noise character, shared with the splash loading counter. */
+export const glyph = () => GLYPHS.charAt(Math.floor(Math.random() * GLYPHS.length));
 
 /**
  * Text that resolves from noise, left to right with jitter. Waits for the intro to finish
@@ -26,7 +27,10 @@ export const Decrypt = ({
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     let raf = 0,
       start = 0;
-    const order = [...text].map((_, i) => (i / Math.max(1, text.length)) * 0.55 + Math.random() * 0.45);
+    const order = [...text].map((character, i) => ({
+      character,
+      revealAt: (i / Math.max(1, text.length)) * 0.55 + Math.random() * 0.45,
+    }));
     const tick = (now: number) => {
       if (!start) start = now + delay;
       const p = (now - start) / duration;
@@ -35,7 +39,11 @@ export const Decrypt = ({
         return;
       }
       setShown(
-        [...text].map((ch, i) => (ch === ' ' ? ' ' : p > order[i] ? ch : glyph())).join('')
+        order
+          .map(({ character, revealAt }) =>
+            character === ' ' || p > revealAt ? character : glyph()
+          )
+          .join('')
       );
       raf = requestAnimationFrame(tick);
     };

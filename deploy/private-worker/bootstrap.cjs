@@ -16,12 +16,41 @@ const PINS = {
   legacyConfigKey: '3FPuMxbaagtAn45zvufthsLkZnSenTPta7nuY7ZVshsE',
   legacyCollector: '5iskTyXpKn7HeqvNUFBFc1rv2C2EoFNBNyFmXgGFztgS',
 };
+const DEV_PINS = {
+  configKey: '56pQWoQgHcAu5Cykb6cEVQ3ifcxFhFyjQcVwe26XsMn',
+  configDigest: 'ed011260cbce54c2097b16d38e2889d7086e51336099bbd7761c3cbc388a529e',
+  collector: 'FiFmAXm5cTx1sCH5zSUpBbDFt9rVgCfuGhMVahDWLmHm',
+  collectorHex: 'da951ef7e3067f8d2dbab5c73ffc0d56ed6433042184877d04c6595e8fde45c4',
+  treasury: 'GHCkJgsWsy5PGZHQuwoJtBv6BgyQQB7FA8KgRStyoqwH',
+};
 const fail = (code) => {
   const error = new Error(code);
   error.code = code;
   throw error;
 };
 const digest = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
+const REWARD_ENVIRONMENT = [
+  'MAINNET_CASHBACK_CONFIG_KEY',
+  'MAINNET_MSKD_CONFIG_KEY',
+  'MAINNET_HSOL_CONFIG_KEY',
+  'MAINNET_CASHBACK_HSOL_CONFIG_KEY',
+  'MAINNET_MSKD_HSOL_CONFIG_KEY',
+  'MSKD_PAYOUT_POOL',
+];
+
+function rewardEnvironment(manifest, env) {
+  const values = Object.fromEntries(
+    REWARD_ENVIRONMENT.filter((key) => env[key]).map((key) => [key, env[key]])
+  );
+  if (
+    (Object.keys(values).length && manifest.policyVersion !== 'dev-v1') ||
+    Object.values(values).some((key) => !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(key)) ||
+    Boolean(values.MAINNET_MSKD_CONFIG_KEY) !== Boolean(values.MSKD_PAYOUT_POOL) ||
+    new Set([manifest.configKey, ...Object.values(values)]).size !== Object.keys(values).length + 1
+  )
+    fail('PRIVATE_WORKER_REWARD_CONFIG_INVALID');
+  return values;
+}
 function boundedFile(file, maximum) {
   const before = fs.lstatSync(file);
   if (!before.isFile() || before.isSymbolicLink() || before.size > maximum)
@@ -92,13 +121,15 @@ function verifyPackage() {
     )
       fail('PACKAGE_HASH_MISMATCH');
   }
+  const pins = manifest.policyVersion === 'dev-v1' ? DEV_PINS : PINS;
   if (
+    (manifest.policyVersion !== undefined && manifest.policyVersion !== 'dev-v1') ||
     manifest.genesis !== '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d' ||
-    manifest.configKey !== PINS.configKey ||
-    manifest.configDigest !== PINS.configDigest ||
-    manifest.collector !== PINS.collector ||
-    manifest.collectorHex !== PINS.collectorHex ||
-    manifest.treasury !== PINS.treasury
+    manifest.configKey !== pins.configKey ||
+    manifest.configDigest !== pins.configDigest ||
+    manifest.collector !== pins.collector ||
+    manifest.collectorHex !== pins.collectorHex ||
+    manifest.treasury !== pins.treasury
   )
     fail('PACKAGE_MAINNET_PINS_INVALID');
   return manifest;
@@ -128,7 +159,8 @@ function configuration(manifest, env) {
     env.POOL_CONFIG_KEY !== manifest.configKey ||
     env.WALLET_CONFIG_SHA256 !== manifest.configDigest ||
     env.FEE_COLLECTOR_PUBLIC_KEY !== manifest.collector ||
-    env.TREASURY_PUBLIC_KEY !== manifest.treasury
+    env.TREASURY_PUBLIC_KEY !== manifest.treasury ||
+    (manifest.policyVersion && env.LAUNCH_POLICY_VERSION !== manifest.policyVersion)
   )
     fail('PRIVATE_WORKER_REVIEWED_CONFIG_REQUIRED');
   if ((env.DYNO && !/^worker\.\d+$/.test(env.DYNO)) || env.HEROKU_APP_NAME === 'rinsed-launchpad')
@@ -181,6 +213,7 @@ function configuration(manifest, env) {
   const automatic = env.WALLET_AUTOMATIC_ENABLED === 'true';
   return {
     automatic,
+    rewardEnvironment: rewardEnvironment(manifest, env),
     cycles: integer(env, 'WALLET_SERVICE_CYCLES', 240, 1, 10000),
     intervalMs: integer(env, 'WALLET_RESTART_INTERVAL_MS', 15000, 1000, 3600000),
     timeoutMs: integer(env, 'WALLET_CYCLE_TIMEOUT_MS', 900000, 30000, 3600000),
@@ -226,6 +259,8 @@ function decodeSigningKey(raw, collectorHex) {
   }
 }
 function cycleProfile(cycle, childEnv, automatic) {
+  if (childEnv.LAUNCH_POLICY_VERSION === 'dev-v1')
+    return { name: 'dev', automatic, environment: childEnv };
   const legacy = cycle % 2 === 1;
   return {
     name: legacy ? 'historical' : 'bond',
@@ -340,6 +375,8 @@ async function run() {
     TREASURY_PUBLIC_KEY: manifest.treasury,
     WALLET_WORKER_ENABLED: 'true',
     MAINNET_TRADING_ENABLED: 'true',
+    ...settings.rewardEnvironment,
+    ...(manifest.policyVersion ? { LAUNCH_POLICY_VERSION: manifest.policyVersion } : {}),
   };
   try {
     if (settings.automatic) {
@@ -363,8 +400,10 @@ async function run() {
           'TREASURY_PUBLIC_KEY',
           'WALLET_WORKER_ENABLED',
           'MAINNET_TRADING_ENABLED',
+          'LAUNCH_POLICY_VERSION',
+          ...REWARD_ENVIRONMENT,
         ]
-          .filter((name) => name !== 'POOL_CONFIG_KEY')
+          .filter((name) => childEnv[name] !== undefined)
           .map((name) => [name, childEnv[name]])
       );
       fs.writeFileSync(
@@ -415,7 +454,9 @@ async function run() {
         String(settings.maximumJobs),
         '--slippage-bps',
         String(settings.slippageBps),
-        ...(settings.buyback ? ['--max-spend-lamports', settings.buyback] : []),
+        ...(settings.buyback && !manifest.policyVersion
+          ? ['--max-spend-lamports', settings.buyback]
+          : []),
         ...automaticArguments(profile.automatic, commandFile),
       ];
       const result = await new Promise((resolve) => {
@@ -468,6 +509,13 @@ async function run() {
                   summary[name] = value[name];
               if (['completed', 'stopped', 'busy'].includes(value.status))
                 summary.status = value.status;
+              if (Array.isArray(value.alerts))
+                summary.alerts = value.alerts
+                  .filter(
+                    (code) =>
+                      typeof code === 'string' && /^(WALLET|SIGNER)_[A-Z_]{1,50}$/.test(code)
+                  )
+                  .slice(0, 20);
             } catch {}
           }
           resolve({ code, overflow, summary });
@@ -526,6 +574,7 @@ module.exports = {
   cycleProfile,
   automaticArguments,
   PINS,
+  DEV_PINS,
 };
 if (require.main === module)
   run().catch((error) => {

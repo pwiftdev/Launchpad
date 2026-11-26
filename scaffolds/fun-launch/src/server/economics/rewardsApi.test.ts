@@ -2,7 +2,7 @@
 import { generateKeyPairSync, sign } from 'node:crypto';
 import { PublicKey } from '@solana/web3.js';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { claimAuthorizationMessage, type ClaimAuthorization } from '@/lib/rewards';
+import { claimAuthorizationMessage, SOL_REWARD_MINT, type ClaimAuthorization } from '@/lib/rewards';
 const mocks = vi.hoisted(() => ({
   job: vi.fn(),
   view: vi.fn(),
@@ -116,6 +116,30 @@ it('rejects tiny payouts to absent or below-rent recipients before reserving an 
   });
   expect((await call('POST', { action: 'prepare', ...authorization() })).code).toBe(202);
   expect(mocks.request).toHaveBeenCalledOnce();
+});
+it('requires a signature bound to the launch, asset, exact rollover amount and covered hours', async () => {
+  mocks.coin.mockResolvedValue({ mint, mode: 'cashback', policy_version: 'cashback-v1' });
+  mocks.request.mockResolvedValue({
+    ...payout,
+    kind: 'community_claim',
+    lamports: '1200000',
+    details: { assetMint: SOL_REWARD_MINT },
+  });
+  const input = authorization({ epoch: '12', amount: '1200000', assetMint: SOL_REWARD_MINT });
+  for (const patch of [
+    { epoch: '13' },
+    { amount: '1200001' },
+    { assetMint: mint },
+    { mint: wallet },
+  ])
+    expect((await call('POST', { action: 'prepare', ...input, ...patch })).code).toBe(401);
+  expect(mocks.request).not.toHaveBeenCalled();
+  expect((await call('POST', { action: 'prepare', ...input })).body.assetMint).toBe(
+    SOL_REWARD_MINT
+  );
+  expect(mocks.request).toHaveBeenCalledWith(
+    expect.objectContaining({ epoch: 12, amount: 1_200_000n, assetMint: SOL_REWARD_MINT })
+  );
 });
 it('marks failed pre-reservation RPC reads unaccepted and withholds provider details', async () => {
   mocks.account.mockRejectedValueOnce(new Error('https://private.provider/?key=DO_NOT_DISCLOSE'));

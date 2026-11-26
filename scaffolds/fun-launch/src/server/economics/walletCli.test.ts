@@ -3,6 +3,9 @@ import { Connection } from '@solana/web3.js';
 import { fixtureWallet } from './financialFixtures';
 const fake = vi.hoisted(() => ({
   pending: vi.fn(),
+  candidates: vi.fn(),
+  claimAge: vi.fn(),
+  custody: vi.fn(),
   plan: vi.fn(),
   reconcile: vi.fn(),
   sign: vi.fn(),
@@ -24,6 +27,9 @@ vi.mock('../database', () => ({
 vi.mock('./walletStore', () => ({
   WalletStore: class {
     pendingJobs = fake.pending;
+    executionCandidates = fake.candidates;
+    oldestUserClaimSeconds = fake.claimAge;
+    custodyRequirement = fake.custody;
   },
 }));
 vi.mock('./walletWorker', () => ({
@@ -60,6 +66,10 @@ beforeEach(() => {
   vi.stubEnv('TREASURY_PUBLIC_KEY', fixtureWallet().publicKey.toBase58());
   vi.stubEnv('WALLET_WORKER_ENABLED', 'true');
   vi.spyOn(Connection.prototype, 'getGenesisHash').mockResolvedValue(genesis);
+  vi.spyOn(Connection.prototype, 'getBalanceAndContext').mockResolvedValue({
+    context: { slot: 1 },
+    value: 1_000_000,
+  });
   vi.spyOn(console, 'log').mockImplementation(() => {});
   fake.database.mockClear();
   fake.plan.mockReset();
@@ -70,6 +80,9 @@ beforeEach(() => {
   fake.prepare.mockReset();
   fake.required.mockReset();
   fake.pending.mockResolvedValue([{ id: 'saved', signature: 'already-signed' }]);
+  fake.candidates.mockResolvedValue([{ id: 'saved' }]);
+  fake.claimAge.mockResolvedValue(121);
+  fake.custody.mockResolvedValue({ liability: 0n, operating: 0n, minimumSlot: 1 });
   fake.discover.mockResolvedValue(mints);
 });
 afterEach(() => {
@@ -137,7 +150,9 @@ it('automatic expired attempt recovery requires positive proof and waits until a
   fake.acquire.mockResolvedValue(lease);
   fake.discover.mockResolvedValue([mints[0]]);
   fake.pending.mockResolvedValue([{ id: 'saved', signature: 'old-signature' }]);
-  fake.required.mockResolvedValue({ id: 'saved', status: 'submitted' });
+  fake.required
+    .mockResolvedValueOnce({ id: 'saved', status: 'submitted', signature: 'old-signature' })
+    .mockResolvedValueOnce({ id: 'saved', status: 'prepared', signature: null });
   fake.relay.mockRejectedValueOnce(new WalletMessageExpired());
   fake.recover.mockResolvedValue({ id: 'saved', status: 'queued' });
   fake.prepare.mockResolvedValue({ id: 'saved', status: 'prepared' });
@@ -154,5 +169,9 @@ it('automatic expired attempt recovery requires positive proof and waits until a
   expect(fake.prepare).toHaveBeenCalledWith('saved');
   expect(fake.sign).not.toHaveBeenCalled();
   expect(fake.relay).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(vi.mocked(console.log).mock.lastCall![0]).alerts).toEqual([
+    'WALLET_USER_PAYOUT_WAITING',
+    'WALLET_COLLECTOR_HEADROOM_LOW',
+  ]);
   expect(lease.release).toHaveBeenCalledOnce();
 });

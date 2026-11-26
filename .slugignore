@@ -1,14 +1,12 @@
 /.git
 /.claude
 /.local
-/brand
 /skills
 /studio/src/tests
 /node_modules
 /scaffolds/fun-launch/node_modules
 /scaffolds/fun-launch/.next/cache
 /scaffolds/fun-launch/.env*
-/scaffolds/fun-launch/rebrandedimages
 **/*.tsbuildinfo
 **/target
 **/.worker

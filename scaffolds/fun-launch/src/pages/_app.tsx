@@ -9,28 +9,32 @@ import { SolflareWalletAdapter } from '@solana/wallet-adapter-solflare';
 import { useMemo } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useWindowWidthListener } from '@/lib/device';
-import { Geist, Geist_Mono, Silkscreen } from 'next/font/google';
+import localFont from 'next/font/local';
 import Head from 'next/head';
 import { BRAND } from '@/constants/brand';
 import { WALLET_NETWORK } from '@/constants/network';
+import { CommunityInvite } from '@/components/brand/CommunityInvite';
 import { Splash } from '@/components/brand/Splash';
 import { GrainField } from '@/components/brand/GrainField';
 import { WalletModalBranding } from '@/components/brand/WalletModalBranding';
-import { ThesisModal } from '@/components/brand/ThesisModal';
 
-const fontSans = Geist({ subsets: ['latin'], variable: '--font-sans', display: 'swap' });
+const fontSans = localFont({
+  src: '../assets/fonts/Geist.woff2',
+  weight: '100 900',
+  display: 'swap',
+});
 // Pixel face: headlines, labels, buttons and big numbers. Body copy stays in the sans.
-const fontPixel = Silkscreen({
-  subsets: ['latin'],
-  weight: ['400', '700'],
-  variable: '--font-pixel',
+const fontPixel = localFont({
+  src: [
+    { path: '../assets/fonts/Silkscreen-Regular.woff2', weight: '400' },
+    { path: '../assets/fonts/Silkscreen-Bold.woff2', weight: '700' },
+  ],
   display: 'swap',
 });
 // True monospace for code, addresses and the ASCII renderer's character grid
-const fontTerm = Geist_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
-  variable: '--font-term',
+const fontTerm = localFont({
+  src: '../assets/fonts/GeistMono.woff2',
+  weight: '100 900',
   display: 'swap',
 });
 
@@ -42,10 +46,9 @@ const fontRootStyle = `:root {
   --font-pixel: ${fontPixel.style.fontFamily};
   --font-code: ${fontTerm.style.fontFamily};
   --brand-mark-image: url("${BRAND.logo}");
-  --portal-image: url("${BRAND.assets.portal}");
 }`;
 
-function AppProviders({ Component, pageProps }: AppProps) {
+function AppProviders({ Component, pageProps, router }: AppProps) {
   const { resolvedTheme } = useTheme();
 
   const wallets: Adapter[] = useMemo(() => {
@@ -128,8 +131,7 @@ function AppProviders({ Component, pageProps }: AppProps) {
           }}
         />
         <GrainField />
-        <Splash />
-        <ThesisModal />
+        <Splash afterSplash={router.pathname !== '/admin' && <CommunityInvite />} />
         <Component {...pageProps} />
       </UnifiedWalletProvider>
     </QueryClientProvider>
@@ -151,7 +153,7 @@ export default function App(props: AppProps & { nonce?: string }) {
   );
 }
 
-// Per-request script nonces require request-time HTML, including the public whitelist.
+// Per-request script nonces require request-time HTML.
 App.getInitialProps = async (context: AppContext) => {
   const initial = await NextApp.getInitialProps(context);
   const incoming = context.ctx.req?.headers['x-rinsed-nonce'];

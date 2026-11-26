@@ -8,9 +8,13 @@ export const SOCIAL_LABELS: Record<SocialKind, string> = {
   telegram: 'Telegram',
   discord: 'Discord',
 };
-export const SOCIAL_MAX_LENGTH = 200;
+export const socialMaxLength = (kind: SocialKind) => (kind === 'twitter' ? 2048 : 200);
 
-const X_RESERVED = new Set(['home', 'search', 'explore', 'i', 'intent', 'share', 'settings']);
+export function isSourcePostUrl(url: string): boolean {
+  return /^https:\/\/(?:www\.|mobile\.)?(?:x|twitter)\.com\/[A-Za-z0-9_]{1,15}\/status\/\d{5,25}\/?(?:[?#].*)?$/.test(
+    url.trim()
+  );
+}
 
 /**
  * Canonical https link for one social field, or null when the value is not that kind of link.
@@ -20,7 +24,7 @@ const X_RESERVED = new Set(['home', 'search', 'explore', 'i', 'intent', 'share',
 export function normalizeSocial(kind: SocialKind, input: unknown): string | null {
   if (typeof input !== 'string') return null;
   const raw = input.trim();
-  if (!raw || raw.length > SOCIAL_MAX_LENGTH || /[\s<>"'`\\]/.test(raw)) return null;
+  if (!raw || raw.length > socialMaxLength(kind) || /[\s<>"'`\\]/.test(raw)) return null;
   if (kind === 'twitter' && /^@?[A-Za-z0-9_]{1,15}$/.test(raw))
     return `https://x.com/${raw.replace(/^@/, '')}`;
   if (kind === 'telegram' && /^@[A-Za-z0-9_]{4,32}$/.test(raw))
@@ -40,12 +44,12 @@ export function normalizeSocial(kind: SocialKind, input: unknown): string | null
     case 'website':
       return `https://${url.hostname.toLowerCase()}${path}${url.search}`;
     case 'twitter': {
-      if (host !== 'x.com' && host !== 'twitter.com') return null;
-      const profile = path.match(/^\/([A-Za-z0-9_]{1,15})$/);
-      if (profile?.[1] && !X_RESERVED.has(profile[1].toLowerCase()))
-        return `https://x.com/${profile[1]}`;
-      const community = path.match(/^\/i\/communities\/(\d{5,25})$/);
-      return community ? `https://x.com/i/communities/${community[1]}` : null;
+      const primary = host === 'x.com' || host === 'twitter.com';
+      if (!primary && !host.endsWith('.x.com') && !host.endsWith('.twitter.com')) return null;
+      const canonicalHost = primary ? 'x.com' : url.hostname;
+      const pathname = primary ? path || '/' : url.pathname;
+      const link = `https://${canonicalHost}${pathname}${url.search}${url.hash}`;
+      return link.length <= socialMaxLength(kind) ? link : null;
     }
     case 'telegram': {
       if (host !== 't.me' && host !== 'telegram.me') return null;

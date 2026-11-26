@@ -1,57 +1,19 @@
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
+import type { ReactElement } from 'react';
 import Link from 'next/link';
 import { Dialog } from 'radix-ui';
 import { BRAND } from '@/constants/brand';
 import { cn } from '@/lib/utils';
 import { LogoMark } from './Logo';
-import { FEE_MODE_IDS, SCHEDULE, SPLIT, feeMode, pct } from '@/lib/feeModes';
-
-// Pages that are not the launchpad itself (campaign, legal, admin) never get the thesis.
-const QUIET_PATHS = ['/whitelist', '/privacy', '/admin', '/w/[code]', '/404'];
-// Upper bound on waiting for the first-load splash, which releases itself by 4s anyway
-const SPLASH_WAIT_MS = 4500;
+import { REWARD_MODES, SCHEDULE, SPLIT, feeMode, pct } from '@/lib/feeModes';
 
 /** Staggered entrance for each block of the card: `className={cn(RISE, …)} style={delay(n)}`. */
 const RISE = 'animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-700';
 const delay = (step: number) => ({ animationDelay: `${120 + step * 90}ms` });
 
-/**
- * The thesis, shown every time the launchpad is opened (each full page load), right after the
- * splash. Client-side navigation does not re-open it.
- */
-export const ThesisModal = () => {
-  const { pathname } = useRouter();
-  const [open, setOpen] = useState(false);
-  const [quiet] = useState(() => QUIET_PATHS.includes(pathname));
-
-  useEffect(() => {
-    if (quiet) return;
-    const root = document.documentElement;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const show = () => {
-      observer.disconnect();
-      clearTimeout(timer);
-      // Let the splash finish fading before the card rises
-      timer = setTimeout(() => setOpen(true), 260);
-    };
-    const observer = new MutationObserver(() => {
-      if (root.classList.contains('no-splash')) show();
-    });
-    if (root.classList.contains('no-splash')) show();
-    else {
-      observer.observe(root, { attributes: true, attributeFilter: ['class'] });
-      timer = setTimeout(show, SPLASH_WAIT_MS);
-    }
-    return () => {
-      observer.disconnect();
-      clearTimeout(timer);
-    };
-  }, [quiet]);
-
-
+export const ThesisModal = ({ children }: { children: ReactElement }) => {
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root>
+      <Dialog.Trigger asChild>{children}</Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:duration-200 data-[state=open]:duration-500" />
         <div className="pointer-events-none fixed inset-0 z-[91] flex items-end justify-center p-3 sm:items-center sm:p-6">
@@ -107,7 +69,7 @@ export const ThesisModal = () => {
                   </p>
                 </div>
                 <ul className="mt-5 divide-y divide-neutral-850 border-y border-neutral-850">
-                  {FEE_MODE_IDS.map((id) => {
+                  {REWARD_MODES.map((id) => {
                     const mode = feeMode(id);
                     return (
                       <li key={id} className="flex items-center gap-3 py-3">
@@ -136,13 +98,14 @@ export const ThesisModal = () => {
                   Enter {BRAND.name}
                 </Dialog.Close>
                 <p className="mt-3 text-center text-[12px] text-neutral-500">
-                  <Link
-                    href="/rules"
-                    onClick={() => setOpen(false)}
-                    className="underline-offset-4 hover:text-foreground hover:underline"
-                  >
-                    How fees work
-                  </Link>
+                  <Dialog.Close asChild>
+                    <Link
+                      href="/rules"
+                      className="underline-offset-4 hover:text-foreground hover:underline"
+                    >
+                      How fees work
+                    </Link>
+                  </Dialog.Close>
                   <span className="mx-2 text-neutral-700">·</span>
                   Check the live quote before you sign.
                 </p>

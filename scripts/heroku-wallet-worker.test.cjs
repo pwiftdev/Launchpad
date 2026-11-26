@@ -7,6 +7,7 @@ const {
   cycleProfile,
   automaticArguments,
   PINS,
+  DEV_PINS,
 } = require('../deploy/private-worker/bootstrap.cjs');
 function environment() {
   return {
@@ -74,6 +75,23 @@ test('a swapped collector, mixed public role or unrelated secret cannot start th
       LEGACY_WALLET_SIGNER_SECRET_KEY_JSON: 'rollback-only',
     }).automatic,
     true
+  );
+});
+test('the Dev worker keeps every cycle on its pinned mainnet policy', () => {
+  const manifest = { ...DEV_PINS, policyVersion: 'dev-v1' };
+  const env = {
+    ...environment(),
+    LAUNCH_POLICY_VERSION: 'dev-v1',
+    POOL_CONFIG_KEY: DEV_PINS.configKey,
+    WALLET_CONFIG_SHA256: DEV_PINS.configDigest,
+    FEE_COLLECTOR_PUBLIC_KEY: DEV_PINS.collector,
+    TREASURY_PUBLIC_KEY: DEV_PINS.treasury,
+  };
+  assert.equal(configuration(manifest, env).automatic, true);
+  assert.deepEqual(cycleProfile(1, env, true), { name: 'dev', automatic: true, environment: env });
+  assert.throws(
+    () => configuration(manifest, { ...env, LAUNCH_POLICY_VERSION: 'bond-v1' }),
+    /REVIEWED_CONFIG/
   );
 });
 test('signer setup validates the seed and derived collector, rather than trusting the public half', () => {

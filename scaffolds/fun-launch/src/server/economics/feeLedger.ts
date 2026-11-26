@@ -1,5 +1,5 @@
 // Server-only accounting for the upcoming policy. These are accrued budgets, never proof of funding.
-import { BENEFICIARY_NET_BPS, isFeeModeId } from '@/lib/feeModes';
+import { BENEFICIARY_NET_BPS, feeMode, isFeeModeId } from '@/lib/feeModes';
 import bondPolicy from '@/constants/bondPolicy.json';
 import type { LaunchMode } from '@/lib/launchModes';
 export type { LaunchMode } from '@/lib/launchModes';
@@ -51,10 +51,18 @@ export function allocateExecutedFee({
     throw new Error('Invalid executed fee amounts');
   const available = total - protocol - referral;
   if (isFeeModeId(mode)) {
+    const paysCreator = feeMode(mode).beneficiary === 'creator';
     const share = BigInt(BENEFICIARY_NET_BPS);
-    const beneficiary = ((previousPhaseNet + available) * share) / 10_000n - (previousPhaseNet * share) / 10_000n;
-    return { protocol, referral, rinseBuyback: 0n, creator: mode === 'dev' ? beneficiary : 0n,
-      community: mode === 'dev' ? 0n : beneficiary, platform: available - beneficiary };
+    const beneficiary =
+      ((previousPhaseNet + available) * share) / 10_000n - (previousPhaseNet * share) / 10_000n;
+    return {
+      protocol,
+      referral,
+      rinseBuyback: 0n,
+      creator: paysCreator ? beneficiary : 0n,
+      community: paysCreator ? 0n : beneficiary,
+      platform: available - beneficiary,
+    };
   }
   if (mode === 'bond' && phase === undefined)
     throw new Error('Bond it. fees require a verified DBC or DAMM phase');
@@ -78,23 +86,28 @@ export function allocateExecutedFee({
   };
 }
 
-export function allocateHolderSnapshot(
-  budget: bigint,
-  snapshot: {
-    complete: boolean;
-    finalized: boolean;
-    balances: { wallet: string; tokens: bigint }[];
-    excluded: ReadonlySet<string>;
-  }
-) {
+type HolderBalances = {
+  complete: boolean;
+  finalized: boolean;
+  balances: { wallet: string; tokens: bigint }[];
+  excluded: ReadonlySet<string>;
+};
+
+export function eligibleHolderBalances(snapshot: HolderBalances) {
   if (!snapshot.complete || !snapshot.finalized)
     throw new Error('A complete finalized holder snapshot is required');
-  if (budget < 0n) throw new Error('Invalid reward budget');
   const owners = new Map<string, bigint>();
   for (const { wallet, tokens } of snapshot.balances) {
     if (!wallet || tokens < 0n) throw new Error('Invalid holder balance');
-    if (!snapshot.excluded.has(wallet)) owners.set(wallet, (owners.get(wallet) ?? 0n) + tokens);
+    if (tokens > 0n && !snapshot.excluded.has(wallet))
+      owners.set(wallet, (owners.get(wallet) ?? 0n) + tokens);
   }
+  return owners;
+}
+
+export function allocateHolderSnapshot(budget: bigint, snapshot: HolderBalances) {
+  if (budget < 0n) throw new Error('Invalid reward budget');
+  const owners = eligibleHolderBalances(snapshot);
   const totalTokens = [...owners.values()].reduce((sum, value) => sum + value, 0n);
   const allocations = [...owners]
     .sort(([left], [right]) => left.localeCompare(right, 'en'))

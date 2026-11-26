@@ -4,8 +4,19 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUnifiedWalletContext, useWallet } from '@jup-ag/wallet-adapter';
 import { toast } from 'sonner';
 import type { Coin } from '@/lib/coin';
-import { hasCreatorRewards, isWalletPolicy } from '@/lib/launchModes';
-import { type ClaimAuthorization, type RewardPayout, type RewardsView } from '@/lib/rewards';
+import modePolicy from '@/constants/modePolicy.json';
+import {
+  hasBatchedHolderRewards,
+  hasCreatorRewards,
+  isWalletPolicy,
+  isMskdMode,
+} from '@/lib/launchModes';
+import {
+  rewardHourEnd,
+  type ClaimAuthorization,
+  type RewardPayout,
+  type RewardsView,
+} from '@/lib/rewards';
 import {
   clearRewardRequest,
   clearUnrecordedRewardRequest,
@@ -15,7 +26,7 @@ import {
 } from '@/lib/rewardRequest';
 import { explorerUrl } from '@/constants/network';
 import { Button } from '../ui/button';
-import { formatSol as sol } from '@/lib/tokenUnits';
+import { formatSol as sol, formatTokenUnits } from '@/lib/tokenUnits';
 
 class RejectedPayoutRequest extends Error {}
 async function request(body: object): Promise<RewardPayout> {
@@ -44,6 +55,13 @@ export function RewardsPanel({ coin }: { coin: Coin }) {
 function WalletRewards({ coin }: { coin: Coin }) {
   const { publicKey, signMessage } = useWallet();
   const { setShowModal } = useUnifiedWalletContext();
+  const wrappedMonero = !!coin.mode && isMskdMode(coin.mode);
+  const hsol = coin.quoteMint === modePolicy.quotes.hsol.mint;
+  const asset = wrappedMonero ? 'wXMR' : hsol ? 'hSOL' : 'SOL';
+  const formatAmount = (amount: string) =>
+    wrappedMonero || hsol
+      ? `${formatTokenUnits(amount, wrappedMonero ? modePolicy.payouts.wxmr.decimals : modePolicy.quotes.hsol.decimals)} ${asset}`
+      : sol(amount);
   const cache = useQueryClient(),
     wallet = publicKey?.toBase58();
   const [busy, setBusy] = useState(false),
@@ -96,7 +114,7 @@ function WalletRewards({ coin }: { coin: Coin }) {
       setReceipt(null);
       setNotice(
         job.status === 'finalized'
-          ? 'Your SOL reward is confirmed.'
+          ? `Your ${asset} reward is confirmed.`
           : 'This payout did not complete. Refresh the funded balance before requesting it again.'
       );
     } catch {
@@ -104,7 +122,7 @@ function WalletRewards({ coin }: { coin: Coin }) {
         'Payment status is available, but this browser could not update its saved receipt.'
       );
     }
-  }, [data?.request, data?.networkGenesis, receipt]);
+  }, [asset, data?.request, data?.networkGenesis, receipt]);
   if (coin.isDemo || !coin.mode) return null;
   if (!isWalletPolicy(coin.feePolicyVersion ?? ''))
     return (
@@ -126,8 +144,8 @@ function WalletRewards({ coin }: { coin: Coin }) {
         clearRewardRequest(window.localStorage, saved);
         setReceipt(null);
       }
-      setNotice('Your SOL reward is confirmed.');
-      toast.success('SOL reward paid');
+      setNotice(`Your ${asset} reward is confirmed.`);
+      toast.success(`${asset} reward paid`);
     } else if (job.status === 'failed') {
       if (saved) {
         clearRewardRequest(window.localStorage, saved);
@@ -186,7 +204,7 @@ function WalletRewards({ coin }: { coin: Coin }) {
       setBusy(false);
     }
   }
-  async function claim(epoch: string | null, amount: string) {
+  async function claim(epoch: string | null, amount: string, assetMint?: string) {
     if (!publicKey) return setShowModal(true);
     if (!signMessage)
       return setNotice('Use a wallet that supports message signing to request your reward.');
@@ -204,6 +222,7 @@ function WalletRewards({ coin }: { coin: Coin }) {
         amount,
         requestId: crypto.randomUUID(),
         issuedAt: Date.now(),
+        ...(assetMint ? { assetMint } : {}),
       };
       if (!input.networkGenesis)
         throw new Error('Verified network is unavailable. Reload before requesting a payout.');
@@ -238,10 +257,17 @@ function WalletRewards({ coin }: { coin: Coin }) {
   }
   const available = data?.availableLamports ?? '0';
   const pending = receipt || data?.creatorJob;
+  const batched = hasBatchedHolderRewards(coin.mode);
+  const holderClaim = data?.holderClaim;
+  const hourly = coin.mode === 'community' || batched;
   return (
     <section aria-label="Token rewards" className="px-4 pb-4">
       <p className="flex h-10 items-center text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
-        {hasCreatorRewards(coin.mode) ? 'Creator rewards' : 'Community rewards'}
+        {hasCreatorRewards(coin.mode)
+          ? 'Creator rewards'
+          : batched
+            ? 'Holder rewards'
+            : 'Community rewards'}
       </p>
       {coin.mode === 'bond' && (
         <p className="mb-3 text-xs leading-relaxed text-neutral-500">
@@ -252,7 +278,7 @@ function WalletRewards({ coin }: { coin: Coin }) {
       {!wallet ? (
         <>
           <p className="mt-2 text-xs text-neutral-500">
-            Connect your wallet to view funded SOL rewards.
+            Connect your wallet to view funded {asset} rewards.
           </p>
           <Button variant="outline" className="mt-3 w-full" onClick={() => setShowModal(true)}>
             Connect wallet
@@ -260,13 +286,17 @@ function WalletRewards({ coin }: { coin: Coin }) {
         </>
       ) : (
         <>
-          <p className="mt-2 font-mono text-xl text-foreground">{sol(available)}</p>
+          <p className="mt-2 font-mono text-xl text-foreground">{formatAmount(available)}</p>
           <p className="mt-1 text-xs text-neutral-500">
-            {coin.mode === 'community' ? 'Available on this page' : 'Available SOL rewards'} · paid
-            to this wallet
+            {coin.mode === 'community' ? 'Available on this page' : `Available ${asset} rewards`}
           </p>
+          {data?.reservedLamports && BigInt(data.reservedLamports) > 0n && (
+            <p className="mt-2 text-xs text-neutral-400">
+              Reserved for payout: {formatAmount(data.reservedLamports)}
+            </p>
+          )}
           {data?.paidLamports && BigInt(data.paidLamports) > 0n && (
-            <p className="mt-2 text-xs text-neutral-400">Paid: {sol(data.paidLamports)}</p>
+            <p className="mt-2 text-xs text-neutral-400">Paid: {formatAmount(data.paidLamports)}</p>
           )}
           {hasCreatorRewards(coin.mode) &&
             data?.creatorReceipts?.map((item) => (
@@ -313,24 +343,71 @@ function WalletRewards({ coin }: { coin: Coin }) {
               </Button>
             )}
           {!pending && hasCreatorRewards(coin.mode) && BigInt(available) > 0n && (
-            <Button className="mt-3 w-full" disabled={busy} onClick={() => claim(null, available)}>
-              {busy ? 'Requesting…' : 'Request SOL payout'}
+            <Button
+              className="mt-3 w-full"
+              disabled={busy}
+              onClick={() =>
+                claim(
+                  null,
+                  available,
+                  coin.mode === 'hsol' ? modePolicy.quotes.hsol.mint : undefined
+                )
+              }
+            >
+              {busy ? 'Requesting…' : `Request ${asset} payout`}
             </Button>
           )}
-          {coin.mode === 'community' &&
+          {!pending && holderClaim && (
+            <Button
+              className="mt-3 w-full"
+              disabled={busy}
+              onClick={() =>
+                claim(holderClaim.throughEpoch, holderClaim.amount, holderClaim.assetMint)
+              }
+            >
+              {busy ? 'Requesting…' : `Request ${asset} payout`}
+            </Button>
+          )}
+          {!holderClaim && !pending && batched && BigInt(available) > 0n && (
+            <p className="mt-3 text-xs text-neutral-500">
+              Your rewards roll over until you reach {wrappedMonero ? 'the equivalent of ' : ''}
+              0.001 {hsol ? 'hSOL' : 'SOL'}.
+            </p>
+          )}
+          {hourly &&
             data?.epochs.map((epoch) => (
               <div
                 key={epoch.epoch}
                 className="mt-3 flex items-center justify-between gap-2 border-t border-neutral-850 pt-3 text-xs"
               >
                 <div>
-                  <p className="font-mono text-neutral-200">{sol(epoch.lamports)}</p>
-                  <p className="mt-1 text-neutral-500">
-                    Hour {epoch.epoch} ·{' '}
-                    {epoch.status === 'pending' ? 'payment pending' : epoch.status}
+                  <p className="font-mono text-neutral-200">{formatAmount(epoch.lamports)}</p>
+                  <p
+                    className="mt-1 text-neutral-500"
+                    title={
+                      epoch.snapshotDigest
+                        ? `Snapshot slot ${epoch.snapshotSlot} · ${epoch.snapshotDigest}`
+                        : undefined
+                    }
+                  >
+                    {batched
+                      ? rewardHourEnd(epoch.epoch).toISOString().slice(0, 16).replace('T', ' ') +
+                        ' UTC'
+                      : `Hour ${epoch.epoch}`}{' '}
+                    · {epoch.status === 'pending' ? 'payment pending' : epoch.status}
                   </p>
+                  {epoch.conversionSignature && (
+                    <a
+                      className="mt-1 inline-block text-primary"
+                      target="_blank"
+                      rel="noreferrer"
+                      href={explorerUrl(`tx/${epoch.conversionSignature}`)}
+                    >
+                      Conversion receipt
+                    </a>
+                  )}
                 </div>
-                {epoch.status === 'available' ? (
+                {epoch.status === 'available' && !batched ? (
                   <Button
                     size="sm"
                     disabled={busy || !!pending}
@@ -359,7 +436,7 @@ function WalletRewards({ coin }: { coin: Coin }) {
                 ) : null}
               </div>
             ))}
-          {coin.mode === 'community' && (beforeEpoch || data?.nextEpoch) && (
+          {hourly && (beforeEpoch || data?.nextEpoch) && (
             <div className="mt-3 flex gap-3 text-xs">
               {beforeEpoch && (
                 <button
@@ -384,8 +461,8 @@ function WalletRewards({ coin }: { coin: Coin }) {
             </div>
           )}
           <p className="mt-3 text-[11px] leading-relaxed text-neutral-500">
-            Sign a message to request SOL to this wallet. {BRAND.name} pays the network fee. No token
-            approval, transaction signature, or claim account is needed.
+            Sign a message to request {asset} to this wallet. {BRAND.name} pays the network fee. No
+            token approval, transaction signature, or claim account is needed.
           </p>
         </>
       )}

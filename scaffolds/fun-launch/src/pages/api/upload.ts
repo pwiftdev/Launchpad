@@ -2,15 +2,14 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { PublicKey } from '@solana/web3.js';
 import { DynamicBondingCurveClient } from '@meteora-ag/dynamic-bonding-curve-sdk';
 import BN from 'bn.js';
-import { DEV_BUY_MAX_PERCENT_OF_SUPPLY } from '@/constants/launch';
+import { DEV_BUY_MAX_PERCENT_OF_SUPPLY, LAUNCH_IMAGE_MAX_MB } from '@/constants/launch';
 import { quoteDevBuy } from '@/server/devBuy';
-import { checkLaunch } from '@/server/antivamp';
 import { apiGuard, clientIp, takeLimit } from '@/server/apiGuard';
 import { siteOriginForHeaders } from '@/server/siteOrigin';
 import { verifyLaunch } from '@/server/launchAuth';
 import { consumeLaunchUpload } from '@/server/launchUploadBudget';
 import { uploadSchema } from '@/server/validation';
-import { normalizeLaunchImage } from '@/server/launchImage';
+import { decodeDataUrl, normalizeLaunchImage } from '@/server/launchImage';
 import type { LaunchPayload } from '@/lib/launchAuth';
 import { DEFAULT_IPFS_GATEWAY, imageSources } from '@/lib/ipfs';
 import { verifiedTradingAccess } from '@/server/tradingAccess';
@@ -24,15 +23,15 @@ import { normalizeSocials, type Socials } from '@/lib/socials';
 import { buildLaunchMetadata } from '@/server/launchMetadata';
 import { tokenImages } from '@/server/tokenImageCache';
 import { cacheUploadedMetadata } from '@/server/dbc';
+import { allowsMskdIdentity, OFFICIAL_MSKD_RESERVED } from '@/server/officialMskd';
 
 // Environment variables with type assertions
 const PINATA_JWT = process.env.PINATA_JWT as string;
 const IPFS_GATEWAY_URL = (process.env.IPFS_GATEWAY_URL || DEFAULT_IPFS_GATEWAY).replace(/\/$/, '');
 const RPC_URL = process.env.RPC_URL as string;
 
-
-// Logos arrive as base64 data URLs (max 2MB file -> ~2.7MB encoded)
-export const config = { api: { bodyParser: { sizeLimit: '4mb' } } };
+// Leave room for the base64 image and JSON metadata within the request limit.
+export const config = { api: { bodyParser: { sizeLimit: '8mb' } } };
 
 // Types
 type MetadataUploadParams = {
@@ -56,15 +55,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-
   const parsed = uploadSchema.safeParse(req.body);
   if (!parsed.success)
     return res.status(400).json({ error: 'Invalid launch fields, address, or authorization' });
+  if (
+    !allowsMskdIdentity({
+      name: parsed.data.tokenName,
+      symbol: parsed.data.tokenSymbol,
+      mint: parsed.data.mint,
+      deployer: parsed.data.userWallet,
+    })
+  )
+    return res.status(403).json({ error: OFFICIAL_MSKD_RESERVED });
   if (!PINATA_JWT || !RPC_URL) {
     return res.status(503).json({ error: 'Launch service is not configured' });
   }
   const approved = await verifiedTradingAccess(parsed.data.mode).catch((): null => null);
-  if (!approved) return res.status(503).json({ error: 'Selected mode has no reviewed launch config' });
+  if (!approved)
+    return res.status(503).json({ error: 'Selected mode has no reviewed launch config' });
   if (parsed.data.configKey && parsed.data.configKey !== approved.key.toBase58())
     return res.status(409).json({ error: 'Selected config changed. Refresh and sign again.' });
   if (!takeLimit(`upload-ip:${clientIp(req)}`, 5, 3600_000)) {
@@ -147,18 +155,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     const image = await normalizeLaunchImage(decodeDataUrl(tokenLogo)).catch((): null => null);
     if (!image) {
-      return res.status(400).json({ error: 'Image must be a PNG, JPG, GIF or WebP data URL' });
-    }
-
-    // Anti-vamp rules run before anything is uploaded or signed
-    const rejection = await checkLaunch({
-      name: tokenName,
-      symbol: tokenSymbol,
-      sourceUrl: sourceUrl || undefined,
-      image: image.buffer,
-    });
-    if (rejection) {
-      return res.status(422).json({ error: rejection.error, field: rejection.field });
+      return res
+        .status(400)
+        .json({ error: `Use a PNG, JPG, GIF or WebP image up to ${LAUNCH_IMAGE_MAX_MB} MB.` });
     }
 
     // Upload image and metadata
@@ -218,18 +217,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } finally {
     activeUploads--;
   }
-}
-
-/** Decodes a base64 image data URL, accepting only the image types the launch form allows. */
-function decodeDataUrl(dataUrl: string): { contentType: string; buffer: Buffer } | null {
-  const matches = dataUrl.match(
-    /^data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/]+={0,2})$/
-  );
-  if (!matches?.[1] || !matches[2]) return null;
-  const buffer = Buffer.from(matches[2], 'base64');
-  if (!buffer.length || buffer.length > 2 * 1024 * 1024 || buffer.toString('base64') !== matches[2])
-    return null;
-  return { contentType: matches[1], buffer };
 }
 
 async function uploadImage(

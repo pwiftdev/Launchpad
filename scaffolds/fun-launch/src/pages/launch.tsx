@@ -9,15 +9,30 @@ import { toast } from 'sonner';
 import Page from '@/components/ui/Page/Page';
 import { Button } from '@/components/ui/button';
 import { LaunchSuccess, type LaunchReceipt } from '@/components/launch/LaunchSuccess';
-import { CoinAvatar } from '@/components/coin/CoinAvatar';
-import { BondingBar } from '@/components/coin/BondingBar';
+import { LaunchPreviewCard } from '@/components/launch/LaunchPreviewCard';
+import { PrivatePreviewControls } from '@/components/launch/PrivatePreviewControls';
+import type { GetServerSideProps } from 'next';
 import { BRAND } from '@/constants/brand';
-import { BASE_FEE_PERCENT, DEV_BUY_MAX_PERCENT_OF_SUPPLY, TOTAL_SUPPLY } from '@/constants/launch';
-import { normalizeTicker } from '@/lib/antivamp/normalizeTicker';
+import {
+  BASE_FEE_PERCENT,
+  DEV_BUY_MAX_PERCENT_OF_SUPPLY,
+  LAUNCH_IMAGE_MAX_BYTES,
+  LAUNCH_IMAGE_MAX_MB,
+  TICKER_CHARACTERS,
+  TOTAL_SUPPLY,
+} from '@/constants/launch';
 import { useUsd } from '@/hooks/useUsd';
 import { getDemoCoin } from '@/lib/demo';
 import { ACTIVE_LAUNCH_MODE } from '@/lib/launchModes';
-import { DEFAULT_FEE_MODE, SCHEDULE, SPLIT, feeMode, pct, type FeeMode, type FeeModeId } from '@/lib/feeModes';
+import {
+  DEFAULT_FEE_MODE,
+  SCHEDULE,
+  SPLIT,
+  feeMode,
+  pct,
+  type FeeMode,
+  type FeeModeId,
+} from '@/lib/feeModes';
 import { ModePicker } from '@/components/launch/ModePicker';
 import { Decrypt } from '@/components/brand/Decrypt';
 import { FeeSplit } from '@/components/fees/FeeSplit';
@@ -36,16 +51,21 @@ import {
   normalizeSocials,
   SOCIAL_KINDS,
   SOCIAL_LABELS,
-  SOCIAL_MAX_LENGTH,
+  socialMaxLength,
   hasSocials,
   type SocialKind,
 } from '@/lib/socials';
-import { SOCIAL_ICONS, SocialLinks } from '@/components/coin/SocialLinks';
-export { requireAdminPage as getServerSideProps } from '@/server/adminPage';
+import { SOCIAL_ICONS } from '@/components/coin/SocialLinks';
+import { adminPageRedirect } from '@/server/adminPage';
+import { launchPreviewKey } from '@/server/privateEncryption';
+import { hsolLaunchModes } from '@/server/tradingAccess';
+import { readLaunchImage, restorePreviewImage, type LaunchPreviewDraft } from '@/lib/launchPreview';
 
-const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
-const TWEET_URL = /^https:\/\/(x|twitter)\.com\/[A-Za-z0-9_]{1,15}\/status\/\d+\/?(\?.*)?$/;
-
+type LaunchProps = { previewsEnabled: boolean; hsolModes: FeeModeId[] };
+export const getServerSideProps: GetServerSideProps<LaunchProps> = async (context) =>
+  adminPageRedirect(context) ?? {
+    props: { previewsEnabled: !!launchPreviewKey(), hsolModes: await hsolLaunchModes() },
+  };
 
 type DevBuyQuote = { tokens: number; costQuote: number; feeQuote: number; quoteSymbol: string };
 
@@ -57,25 +77,28 @@ const EMPTY_LINKS: Record<SocialKind, string> = {
 };
 const LINK_PLACEHOLDERS: Record<SocialKind, string> = {
   website: 'maskedfrog.xyz',
-  twitter: '@maskedfrog or x.com/i/communities/…',
+  twitter: '@maskedfrog or https://x.com/…',
   telegram: 't.me/maskedfrog',
   discord: 'discord.gg/maskedfrog',
 };
 
-export default function Launch() {
+export default function Launch({ previewsEnabled, hsolModes }: LaunchProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { publicKey, signTransaction, signMessage } = useWallet();
   const { setShowModal } = useUnifiedWalletContext();
 
+  const wallet = publicKey?.toBase58();
+  const [restoredFor, setRestoredFor] = useState<string>();
   const [name, setName] = useState('');
   const [ticker, setTicker] = useState('');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [tweetUrl, setTweetUrl] = useState('');
   const [links, setLinks] = useState(EMPTY_LINKS);
-  const [feeModeId, setFeeModeId] = useState<FeeModeId>(DEFAULT_FEE_MODE);
+  const [feeModeId, setFeeModeId] = useState<FeeModeId>(
+    NETWORK === 'mainnet-beta' ? 'dev' : DEFAULT_FEE_MODE
+  );
   const mode = feeModeId;
   const selectedMode = feeMode(feeModeId);
   const availability = useLaunchAvailability(feeModeId);
@@ -116,15 +139,26 @@ export default function Launch() {
   }, [router.query.preview]);
   const receipt = launched ?? previewReceipt;
 
-  function resetLaunch() {
-    setLaunched(null);
+  function clearMetadata() {
+    setRestoredFor(undefined);
     setName('');
     setTicker('');
     setDescription('');
     setImage(null);
-    setTweetUrl('');
     setLinks(EMPTY_LINKS);
     setDevBuyPercent(0);
+  }
+
+  useEffect(() => {
+    if (restoredFor && restoredFor !== wallet) {
+      clearMetadata();
+      setFeeModeId(NETWORK === 'mainnet-beta' ? 'dev' : DEFAULT_FEE_MODE);
+    }
+  }, [restoredFor, wallet]);
+
+  function resetLaunch() {
+    setLaunched(null);
+    clearMetadata();
     if (previewReceipt) void router.replace('/launch');
   }
 
@@ -138,33 +172,18 @@ export default function Launch() {
     return () => URL.revokeObjectURL(url);
   }, [image]);
 
-  const normalized = useMemo(() => normalizeTicker(ticker), [ticker]);
-  const check = useLaunchCheck(name.trim(), ticker.trim(), tweetUrl);
-  // Rejection returned by the server on submit (e.g. a copied image), cleared on any edit
-  const [serverError, setServerError] = useState<{ field: string; error: string } | null>(null);
-  useEffect(() => setServerError(null), [name, ticker, tweetUrl, image]);
-  const ruleError = (field: string) =>
-    (serverError?.field === field && serverError.error) ||
-    (check.status === 'rejected' && check.field === field ? check.error : null);
-
   const errors = {
     name:
       name.trim().length === 0
         ? 'Give your coin a name'
         : name.length > 32
           ? 'Max 32 characters'
-          : ruleError('name'),
-    ticker:
-      normalized.length === 0
-        ? 'Add a ticker'
-        : ticker.length > 10
-          ? 'Max 10 characters'
-          : ruleError('ticker'),
-    image: image ? ruleError('image') : 'Add an image',
-    tweet:
-      tweetUrl && !TWEET_URL.test(tweetUrl)
-        ? 'Paste a link to a single post on X'
-        : ruleError('source'),
+          : null,
+    ticker: !TICKER_CHARACTERS.test(ticker)
+      ? 'Add a ticker with a letter or number'
+      : ticker.length > 10
+        ? 'Max 10 characters'
+        : null,
   };
   const linkErrors = Object.fromEntries(
     SOCIAL_KINDS.map((kind) => [
@@ -173,7 +192,7 @@ export default function Launch() {
         ? kind === 'website'
           ? 'Enter a website address'
           : kind === 'twitter'
-            ? 'Use an X handle, profile or community link'
+            ? 'Enter an X handle or link'
             : kind === 'telegram'
               ? 'Use a t.me link'
               : 'Use a discord.gg invite'
@@ -183,7 +202,34 @@ export default function Launch() {
   const socials = normalizeSocials(links);
   const isValid = !Object.values(errors).some(Boolean) && !Object.values(linkErrors).some(Boolean);
   const creationFee = availability.data?.poolCreationFeeSol ?? 0;
-  const totalCost = creationFee + (devBuyPercent > 0 ? (devBuy.data?.costQuote ?? 0) : 0);
+  const hsolBuy = selectedMode.quote === 'hsol' && devBuyPercent > 0;
+  const totalCost =
+    creationFee + (devBuyPercent > 0 && !hsolBuy ? (devBuy.data?.costQuote ?? 0) : 0);
+
+  async function draftFromForm(): Promise<LaunchPreviewDraft> {
+    if (!isValid || !image) throw new Error('Add a valid name, ticker and artwork first.');
+    return {
+      tokenLogo: await readLaunchImage(image),
+      tokenName: name.trim(),
+      tokenSymbol: ticker.trim().replace(/^\$+/, '').toUpperCase(),
+      devBuyPercent,
+      description: description.trim() || undefined,
+      socials: hasSocials(socials) ? socials : undefined,
+      mode,
+    };
+  }
+
+  function restoreDraft(draft: LaunchPreviewDraft) {
+    const artwork = restorePreviewImage(draft.tokenLogo);
+    setRestoredFor(wallet);
+    setImage(artwork);
+    setName(draft.tokenName);
+    setTicker(draft.tokenSymbol);
+    setDescription(draft.description ?? '');
+    setLinks({ ...EMPTY_LINKS, ...draft.socials });
+    setFeeModeId(draft.mode);
+    setDevBuyPercent(draft.devBuyPercent);
+  }
 
   async function launch() {
     if (launchLock.current) return;
@@ -202,26 +248,13 @@ export default function Launch() {
     setSubmitting(true);
     try {
       if (!signMessage) throw new Error('Use a wallet that supports signing launch authorizations');
-      const tokenLogo = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.onerror = () => reject(new Error('Could not read the image'));
-        reader.readAsDataURL(image);
-      });
       const mintKeypair = Keypair.generate();
       const payload: LaunchPayload = {
-        tokenLogo,
+        ...(await draftFromForm()),
         mint: mintKeypair.publicKey.toBase58(),
-        tokenName: name.trim(),
-        tokenSymbol: ticker.trim().replace(/^\$+/, '').toUpperCase(),
         userWallet: publicKey.toBase58(),
-        devBuyPercent,
-        sourceUrl: tweetUrl || undefined,
-        description: description.trim() || undefined,
-        socials: hasSocials(socials) ? socials : undefined,
         burnShare: 0,
         configKey: availability.data.configKey,
-        mode,
       };
       const issuedAt = Date.now();
       const message = await launchMessage(payload, window.location.origin, issuedAt);
@@ -237,10 +270,6 @@ export default function Launch() {
         }),
       });
       const upload = await uploadResponse.json();
-      if (uploadResponse.status === 422) {
-        setServerError({ field: upload.field, error: upload.error });
-        throw new Error(upload.error);
-      }
       if (!uploadResponse.ok) throw new Error(upload.error);
 
       const transaction = Transaction.from(Buffer.from(upload.poolTx, 'base64'));
@@ -315,7 +344,7 @@ export default function Launch() {
           </h1>
           <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-neutral-400">
             {NETWORK === 'mainnet-beta'
-              ? 'Create a coin on Solana Mainnet. Transactions use real SOL.'
+              ? 'Create a coin on Solana Mainnet. Network fees use SOL.'
               : `Create a test coin on ${NETWORK_LABEL}. Test-network SOL has no real-world value.`}{' '}
             {pct(SCHEDULE.endingFeeBps)} flat after the {pct(SCHEDULE.startingFeeBps)} launch slot,
             before and after bonding.
@@ -348,30 +377,7 @@ export default function Launch() {
                       onChange={(e) => setName(e.target.value)}
                     />
                   </Field>
-                  <Field
-                    label="Ticker"
-                    htmlFor="ticker"
-                    error={ticker ? errors.ticker : null}
-                    hint={
-                      !normalized ? (
-                        'Lookalikes like P3PE or Cyrillic letters count as the same ticker.'
-                      ) : check.status === 'checking' ? (
-                        <>
-                          Checking <span className="font-mono text-neutral-200">{normalized}</span>…
-                        </>
-                      ) : check.status === 'ok' ? (
-                        <span className="text-emerald">
-                          <span className="iconify mr-1 h-3 w-3 align-[-2px] ph--check-bold" />
-                          <span className="font-mono">${normalized}</span> is free to launch
-                        </span>
-                      ) : (
-                        <>
-                          Duplicate check runs on{' '}
-                          <span className="font-mono text-neutral-200">{normalized}</span>
-                        </>
-                      )
-                    }
-                  >
+                  <Field label="Ticker" htmlFor="ticker" error={ticker ? errors.ticker : null}>
                     <div className="relative">
                       <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-neutral-500">
                         $
@@ -401,29 +407,8 @@ export default function Launch() {
                       onChange={(e) => setDescription(e.target.value)}
                     />
                   </Field>
-                  <Field
-                    label="Source post on X"
-                    optional
-                    htmlFor="tweet"
-                    error={errors.tweet}
-                    hint="Each post can be used for one launch only."
-                  >
-                    <input
-                      id="tweet"
-                      type="url"
-                      inputMode="url"
-                      className={inputClass}
-                      placeholder="https://x.com/user/status/123…"
-                      value={tweetUrl}
-                      onChange={(e) => setTweetUrl(e.target.value.trim())}
-                    />
-                  </Field>
                 </div>
-                <ImageDrop
-                  preview={imagePreview}
-                  onFile={setImage}
-                  error={image ? errors.image : null}
-                />
+                <ImageDrop preview={imagePreview} onFile={setImage} />
               </div>
             </Step>
 
@@ -453,7 +438,7 @@ export default function Launch() {
                         inputMode="url"
                         autoComplete="off"
                         spellCheck={false}
-                        maxLength={SOCIAL_MAX_LENGTH}
+                        maxLength={socialMaxLength(kind)}
                         className={cn(inputClass, 'pl-9')}
                         placeholder={LINK_PLACEHOLDERS[kind]}
                         value={links[kind]}
@@ -476,7 +461,13 @@ export default function Launch() {
               title="Mode"
               subtitle={`${pct(SCHEDULE.endingFeeBps)} flat, before and after bonding. The mode decides who gets the ${pct(SPLIT.beneficiaryBps)}.`}
             >
-              <ModePicker value={feeModeId} onChange={setFeeModeId} />
+              <ModePicker value={feeModeId} onChange={setFeeModeId} hsolModes={hsolModes} />
+              {selectedMode.quote === 'hsol' && (
+                <p className="mt-3 text-sm text-neutral-400">
+                  The pool bonds at {selectedMode.bondingTarget} hSOL. Use hSOL for the optional
+                  first buy and keep SOL for network fees and account rent.
+                </p>
+              )}
               <FeeSplit mode={selectedMode} className="mt-4" />
               <p className="mt-3 text-xs leading-relaxed text-neutral-500">
                 {selectedMode.beneficiary === 'holders'
@@ -492,8 +483,22 @@ export default function Launch() {
               optional
               subtitle={`Buy up to ${DEV_BUY_MAX_PERCENT_OF_SUPPLY}% of supply in the launch transaction, at the ${BASE_FEE_PERCENT}% fee. You pay for it.`}
             >
-              <DevBuyPicker percent={devBuyPercent} onChange={setDevBuyPercent} quote={devBuy} />
+              <DevBuyPicker
+                percent={devBuyPercent}
+                onChange={setDevBuyPercent}
+                quote={devBuy}
+                quoteSymbol={selectedMode.quoteSymbol}
+              />
             </Step>
+
+            {previewsEnabled && (
+              <a
+                href="#private-launch-preview"
+                className="w-fit text-sm font-medium text-primary underline-offset-4 hover:underline lg:hidden"
+              >
+                Save a private preview
+              </a>
+            )}
 
             <div className="holo-border flex flex-col gap-4 rounded-2xl bg-panel p-5 sm:flex-row sm:items-center sm:justify-between">
               <dl className="text-sm">
@@ -507,15 +512,21 @@ export default function Launch() {
                   <div className="flex gap-2">
                     <dt className="text-neutral-400">Dev buy</dt>
                     <dd className="font-mono">
-                      {devBuy.data ? `${devBuy.data.costQuote.toFixed(4)} ${devBuy.data.quoteSymbol}` : '…'}
+                      {devBuy.data
+                        ? `${devBuy.data.costQuote.toFixed(4)} ${devBuy.data.quoteSymbol}`
+                        : '…'}
                     </dd>
                   </div>
                 )}
                 <div className="mt-1 flex gap-2 text-base font-bold">
                   <dt>Total</dt>
                   <dd className="font-mono">
-                    ≈ {totalCost.toFixed(4)} SOL
-                    {price && (
+                    {hsolBuy
+                      ? devBuy.data
+                        ? `${devBuy.data.costQuote.toFixed(4)} hSOL + ${creationFee} SOL`
+                        : 'Checking…'
+                      : `≈ ${totalCost.toFixed(4)} SOL`}
+                    {!hsolBuy && price && (
                       <span className="ml-2 text-sm font-normal text-neutral-400">
                         {usd(totalCost)}
                       </span>
@@ -558,13 +569,24 @@ export default function Launch() {
           </form>
 
           <aside className="flex flex-col gap-5 lg:sticky lg:top-24 lg:self-start">
-            <PreviewCard
+            <LaunchPreviewCard
               name={name}
               ticker={ticker}
               image={imagePreview}
               socials={socials}
               mode={selectedMode}
             />
+            {previewsEnabled && (
+              <PrivatePreviewControls
+                key={wallet ?? 'disconnected'}
+                wallet={wallet}
+                signMessage={signMessage}
+                connect={() => setShowModal(true)}
+                draftFromForm={draftFromForm}
+                restoreDraft={restoreDraft}
+                canSave={isValid && !!image && !submitting}
+              />
+            )}
             <ScheduleCard mode={selectedMode} />
           </aside>
         </div>
@@ -674,16 +696,7 @@ const Field = ({
   </div>
 );
 
-const ImageDrop = ({
-  preview,
-  onFile,
-  error,
-}: {
-  preview: string | null;
-  onFile: (f: File) => void;
-  /** Rejection from the server, e.g. a copied image */
-  error?: string | null;
-}) => {
+const ImageDrop = ({ preview, onFile }: { preview: string | null; onFile: (f: File) => void }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -691,8 +704,8 @@ const ImageDrop = ({
     if (!file) return;
     if (!/^image\/(png|jpe?g|gif|webp)$/.test(file.type)) {
       toast.error('Use a PNG, JPG, GIF or WebP image');
-    } else if (file.size > MAX_IMAGE_BYTES) {
-      toast.error('Image must be 2 MB or smaller');
+    } else if (file.size > LAUNCH_IMAGE_MAX_BYTES) {
+      toast.error(`Image must be ${LAUNCH_IMAGE_MAX_MB} MB or smaller`);
     } else {
       onFile(file);
     }
@@ -737,7 +750,9 @@ const ImageDrop = ({
           <>
             <span className="iconify h-8 w-8 text-neutral-500 ph--image-square-bold" />
             <span className="mt-2 px-3 text-xs text-neutral-400">Drop or click</span>
-            <span className="text-2xs text-neutral-600">PNG, JPG, GIF, WebP · 2 MB</span>
+            <span className="text-2xs text-neutral-600">
+              PNG, JPG, GIF, WebP · {LAUNCH_IMAGE_MAX_MB} MB
+            </span>
           </>
         )}
       </button>
@@ -749,15 +764,6 @@ const ImageDrop = ({
         onChange={(e) => accept(e.target.files?.[0])}
       />
       <p className="mt-2 text-[11px] text-neutral-500">GIFs use the first frame.</p>
-      {error ? (
-        <p className="mt-1.5 text-xs text-rose" role="alert">
-          {error}
-        </p>
-      ) : (
-        <p className="mt-1.5 text-2xs text-neutral-500">
-          Copies of existing coin images are refused.
-        </p>
-      )}
     </div>
   );
 };
@@ -766,10 +772,12 @@ const DevBuyPicker = ({
   percent,
   onChange,
   quote,
+  quoteSymbol,
 }: {
   percent: number;
   onChange: (p: number) => void;
   quote: { data: DevBuyQuote | null; loading: boolean };
+  quoteSymbol: string;
 }) => {
   const { usd, price } = useUsd();
   return (
@@ -814,18 +822,28 @@ const DevBuyPicker = ({
           label="You pay"
           value={
             percent === 0
-              ? '0 SOL'
+              ? `0 ${quoteSymbol}`
               : quote.data
                 ? `${quote.data.costQuote.toFixed(4)} ${quote.data.quoteSymbol}`
                 : quote.loading
                   ? '…'
                   : '—'
           }
-          sub={percent > 0 && quote.data?.quoteSymbol === 'SOL' && price ? usd(quote.data.costQuote) : undefined}
+          sub={
+            percent > 0 && quote.data?.quoteSymbol === 'SOL' && price
+              ? usd(quote.data.costQuote)
+              : undefined
+          }
         />
         <Stat
           label="Fee"
-          value={percent === 0 ? '—' : quote.data ? `${quote.data.feeQuote.toFixed(4)} ${quote.data.quoteSymbol}` : '…'}
+          value={
+            percent === 0
+              ? '—'
+              : quote.data
+                ? `${quote.data.feeQuote.toFixed(4)} ${quote.data.quoteSymbol}`
+                : '…'
+          }
         />
       </div>
       <p className="mt-2 text-xs text-neutral-500">
@@ -844,45 +862,17 @@ const Stat = ({ label, value, sub }: { label: string; value: string; sub?: strin
   </div>
 );
 
-type LaunchCheck =
-  { status: 'idle' | 'checking' | 'ok' } | { status: 'rejected'; field: string; error: string };
-
-/** Live anti-vamp pre-check (ticker, name copies, source post) while the creator types. */
-function useLaunchCheck(name: string, symbol: string, sourceUrl: string): LaunchCheck {
-  const [state, setState] = useState<LaunchCheck>({ status: 'idle' });
-  useEffect(() => {
-    if (!normalizeTicker(symbol)) {
-      setState({ status: 'idle' });
-      return undefined;
-    }
-    setState({ status: 'checking' });
-    const controller = new AbortController();
-    const id = setTimeout(async () => {
-      try {
-        const params = new URLSearchParams({ name, symbol, sourceUrl });
-        const res = await fetch(`/api/launch-check?${params}`, { signal: controller.signal });
-        const body = await res.json();
-        if (!res.ok) setState({ status: 'idle' });
-        else if (body.ok) setState({ status: 'ok' });
-        else setState({ status: 'rejected', field: body.field, error: body.error });
-      } catch {
-        // superseded by newer input
-      }
-    }, 450);
-    return () => {
-      clearTimeout(id);
-      controller.abort();
-    };
-  }, [name, symbol, sourceUrl]);
-  return state;
-}
-
 function useDevBuyQuote(percent: number, mode: FeeModeId) {
-  const [data, setData] = useState<DevBuyQuote | null>(null);
+  const [result, setResult] = useState<{
+    percent: number;
+    mode: FeeModeId;
+    data: DevBuyQuote;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   useEffect(() => {
     if (percent <= 0) {
-      setData(null);
+      setResult(null);
+      setLoading(false);
       return undefined;
     }
     setLoading(true);
@@ -893,11 +883,11 @@ function useDevBuyQuote(percent: number, mode: FeeModeId) {
           signal: controller.signal,
         });
         const body = await res.json();
-        if (!controller.signal.aborted) setData(res.ok ? body : null);
+        if (!controller.signal.aborted) setResult(res.ok ? { percent, mode, data: body } : null);
       } catch {
         // aborted by a newer input
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }, 250);
     return () => {
@@ -905,48 +895,14 @@ function useDevBuyQuote(percent: number, mode: FeeModeId) {
       controller.abort();
     };
   }, [percent, mode]);
-  return { data: data?.quoteSymbol === 'SOL' ? data : null, loading };
+  const data =
+    result?.mode === mode &&
+    result.percent === percent &&
+    result.data.quoteSymbol === feeMode(mode).quoteSymbol
+      ? result.data
+      : null;
+  return { data, loading };
 }
-
-const PreviewCard = ({
-  name,
-  ticker,
-  image,
-  socials,
-  mode: launchMode,
-}: {
-  name: string;
-  ticker: string;
-  image: string | null;
-  socials: ReturnType<typeof normalizeSocials>;
-  mode: FeeMode;
-}) => (
-  <div className="surface p-5">
-    <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-      Preview on the board
-    </p>
-    <div className="mt-3 flex gap-3 rounded-xl border border-neutral-850 bg-neutral-950 p-3">
-      <CoinAvatar image={image} symbol={ticker || 'P'} className="h-16 w-16 text-2xl" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-bold">{name || 'Your coin'}</p>
-        <p className="truncate font-mono text-xs text-neutral-500">
-          ${(ticker || 'TICKER').toUpperCase()}
-        </p>
-        <div className="mt-1.5 flex flex-wrap gap-1.5">
-          <span className="inline-flex items-center gap-1 rounded-full bg-rose/15 px-2 py-0.5 font-mono text-2xs font-bold text-rose">
-            <span className="iconify h-3 w-3 ph--crosshair-fill" />
-            Launch slot {pct(SCHEDULE.startingFeeBps)}
-          </span>
-          <span className="border border-neutral-700 px-2 py-0.5 font-term text-2xs font-semibold uppercase tracking-wide text-neutral-300">
-            {launchMode.label}
-          </span>
-        </div>
-        <BondingBar progress={0} className="mt-2 h-1.5" />
-      </div>
-    </div>
-    <SocialLinks socials={socials} className="mt-2 -ml-1.5" />
-  </div>
-);
 
 const ScheduleCard = ({ mode: launchMode }: { mode: FeeMode }) => (
   <div className="surface p-5">

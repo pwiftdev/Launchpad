@@ -1,6 +1,6 @@
 import { apiGuard } from '@/server/apiGuard';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { isFeeModeId } from '@/lib/feeModes';
+import { feeMode, isFeeModeId } from '@/lib/feeModes';
 import { getLaunchConfig } from '@/server/dbc';
 import { quoteDevBuy } from '@/server/devBuy';
 
@@ -10,13 +10,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   try {
     const mode = req.query.mode;
-    if (mode !== undefined && !isFeeModeId(mode)) return res.status(400).json({ error: 'Invalid launch mode' });
+    if (mode !== undefined && !isFeeModeId(mode))
+      return res.status(400).json({ error: 'Invalid launch mode' });
     const config = isFeeModeId(mode) ? (await getLaunchConfig(mode)).config : undefined;
+    const quoteSymbol = isFeeModeId(mode) ? feeMode(mode).quoteSymbol : 'SOL';
     const q = await quoteDevBuy(Number(req.query.percent), config);
     res.setHeader('Cache-Control', 'private, no-store');
-    res
-      .status(200)
-      .json({ percent: q.percent, tokens: q.tokens, quoteSymbol: 'SOL', costQuote: q.costSol, feeQuote: q.feeSol, costSol: q.costSol, feeSol: q.feeSol });
+    res.status(200).json({
+      percent: q.percent,
+      tokens: q.tokens,
+      quoteSymbol,
+      costQuote: q.costSol,
+      feeQuote: q.feeSol,
+      ...(quoteSymbol === 'SOL' ? { costSol: q.costSol, feeSol: q.feeSol } : {}),
+    });
   } catch {
     res
       .status(400)

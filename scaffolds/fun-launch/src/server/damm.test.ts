@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
 import { NATIVE_MINT, TOKEN_PROGRAM_ID, MintLayout } from '@solana/spl-token';
 import {
   CpAmmIdl,
+  CpAmm,
   CP_AMM_PROGRAM_ID,
   MIN_SQRT_PRICE,
   MAX_SQRT_PRICE,
@@ -138,5 +139,29 @@ describe('verified graduation routing', () => {
     expect(quote.feeSolIsEstimate).toBe(true);
     expect(quote.feeAmount).toBeGreaterThan(0);
     expect(quote.feeSol).toBeCloseTo(quote.feeAmount * 0.001, 12);
+  });
+  it('puts the reviewed minimum into the migrated transaction and rejects a worse quote', async () => {
+    const connection = rpc();
+    const units = new BN(1_000_000_000);
+    const owner = Keypair.generate().publicKey;
+    const market = await migratedSwap(connection, config, mint, 'buy', units, 0);
+    const swap = vi.spyOn(CpAmm.prototype, 'swap').mockResolvedValue(new Transaction());
+    try {
+      const minimum = market.amountOut.subn(10);
+      const reviewed = { pool: market.pool, minimumAmountOut: minimum };
+      await expect(
+        migratedSwap(connection, config, mint, 'buy', units, 0, owner, 'confirmed', reviewed)
+      ).resolves.toHaveProperty('minimumAmountOut', minimum);
+      expect(swap.mock.calls[0]?.[0].minimumAmountOut).toBe(minimum);
+      await expect(
+        migratedSwap(connection, config, mint, 'buy', units, 0, owner, 'confirmed', {
+          ...reviewed,
+          minimumAmountOut: market.amountOut.addn(1),
+        })
+      ).rejects.toThrow('Review the updated trade');
+      expect(swap).toHaveBeenCalledOnce();
+    } finally {
+      swap.mockRestore();
+    }
   });
 });

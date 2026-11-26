@@ -38,7 +38,6 @@ function runMigration(settings = {}) {
         ...process.env,
         DATABASE_URL: '',
         DATABASE_SSL_CA: ca,
-        WHITELIST_ENABLED: 'false',
         FINANCIAL_WORKER_ENABLED: 'false',
         LAUNCH_POLICY_VERSION: '',
         VAULT_PROGRAM_ID: '',
@@ -70,7 +69,7 @@ test('skips migrations only when no database feature or configured database exis
   assert.deepEqual(result.events, []);
   assert.match(result.stdout, /no migration needed/);
 });
-test('migrates configured financial storage with whitelist registration disabled', () => {
+test('migrates configured financial storage when configured', () => {
   const result = runMigration({
     DATABASE_URL: 'postgres://fixture:private-password@127.0.0.1:1/isolated',
   });
@@ -81,9 +80,8 @@ test('migrates configured financial storage with whitelist registration disabled
   assert.match(result.stdout, /Application database schema ready/);
   assert.doesNotMatch(result.stdout + result.stderr, /private-password/);
 });
-test('fails closed without storage for enabled registration or financial features', () => {
+test('fails closed without storage for enabled financial features', () => {
   for (const settings of [
-    { WHITELIST_ENABLED: 'true' },
     { FINANCIAL_WORKER_ENABLED: 'true' },
     { LAUNCH_POLICY_VERSION: 'rinse-v1' },
     { VAULT_PROGRAM_ID: 'fixture-program' },

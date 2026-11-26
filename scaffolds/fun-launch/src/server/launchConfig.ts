@@ -7,11 +7,16 @@ import {
 import { inspectLaunchConfig, reviewedQuote } from '../../../../scripts/launch-policy.cjs';
 import { registeredConfig, registeredConfigKeys, type LaunchMode } from './launchRegistry';
 import { vaultAddresses } from '@/lib/vault/client';
-import { NETWORK_GENESIS, expectedNetworkGenesis } from '../../../../scripts/network-policy.cjs';
+import {
+  NETWORK_GENESIS,
+  expectedNetworkGenesis,
+  mainnetConfigPin,
+  mainnetLaunchPolicy,
+} from '../../../../scripts/network-policy.cjs';
 import { companyWallets } from '../../../../scripts/company-wallets.cjs';
 import { ACTIVE_LAUNCH_POLICY, isWalletPolicy } from '@/lib/launchModes';
 
-import { FEE_MODE_IDS, isFeeModeId, isModePolicyVersion } from '@/lib/feeModes';
+import { FEE_MODE_IDS, feeModeByPolicy, isFeeModeId, isModePolicyVersion } from '@/lib/feeModes';
 
 /** Explicit company wallets; legacy program IDs never supply new-launch fee authority. */
 export function configuredCompanyWallets(
@@ -60,8 +65,27 @@ export async function verifiedGenesis(connection: Pick<Connection, 'getGenesisHa
 export async function discoverableConfigKeys(genesis: string) {
   // Historical configs remain in the immutable registry for private settlement and auditing.
   // Neither an old active environment key nor LEGACY_POOL_CONFIG_KEYS makes them public again.
-  const policies = genesis === NETWORK_GENESIS['mainnet-beta'] ? [ACTIVE_LAUNCH_POLICY] : [ACTIVE_LAUNCH_POLICY, ...FEE_MODE_IDS.map(id => `${id}-v1` as const)];
-  return [...new Set((await Promise.all(policies.map(policy => registeredConfigKeys(genesis, policy)))).flat())];
+  const mainnet = genesis === NETWORK_GENESIS['mainnet-beta'];
+  const primary = mainnet ? mainnetLaunchPolicy() : ACTIVE_LAUNCH_POLICY;
+  const policies = [
+    primary,
+    ...FEE_MODE_IDS.map((id) => `${id}-v1` as const).filter(
+      (policy) => policy !== primary && (!mainnet || mainnetConfigPin(policy))
+    ),
+  ];
+  return [
+    ...new Set(
+      (
+        await Promise.all(
+          policies.map(async (policy) => {
+            const keys = await registeredConfigKeys(genesis, policy);
+            const pin = mainnet && policy !== primary ? mainnetConfigPin(policy) : null;
+            return pin ? keys.filter((key) => key === pin) : keys;
+          })
+        )
+      ).flat()
+    ),
+  ];
 }
 
 export async function verifyConfigAccount(
@@ -86,13 +110,23 @@ export async function verifyLaunchConfig(
   const record = await registeredConfig(genesis, key.toBase58());
   if (
     !record ||
-    (isModePolicyVersion(record.policy_version) && genesis === NETWORK_GENESIS['mainnet-beta']) ||
+    (feeModeByPolicy(record.policy_version)?.quote === 'hsol' &&
+      genesis !== NETWORK_GENESIS['mainnet-beta']) ||
+    (isModePolicyVersion(record.policy_version) &&
+      genesis === NETWORK_GENESIS['mainnet-beta'] &&
+      key.toBase58() !== mainnetConfigPin(record.policy_version)) ||
     (!record.enabled_for_launch && !options.allowDisabled) ||
-    (record.policy_version !== ACTIVE_LAUNCH_POLICY && !isModePolicyVersion(record.policy_version) &&
+    (record.policy_version !== ACTIVE_LAUNCH_POLICY &&
+      !isModePolicyVersion(record.policy_version) &&
       !(options.allowLegacy && ['rinse-v1', 'wallet-v1'].includes(record.policy_version)))
   )
     throw new Error('A reviewed launch configuration is required for this mode');
-  if (!mode || ((isFeeModeId(mode) || mode === 'bond') ? record.policy_version !== `${mode}-v1` : isModePolicyVersion(record.policy_version) || record.policy_version === 'bond-v1'))
+  if (
+    !mode ||
+    (isFeeModeId(mode) || mode === 'bond'
+      ? record.policy_version !== `${mode}-v1`
+      : isModePolicyVersion(record.policy_version) || record.policy_version === 'bond-v1')
+  )
     throw new Error('Launch mode differs from the reviewed economic policy');
   if (record.config_digest !== digest)
     throw new Error('Configuration differs from its reviewed record');
@@ -120,7 +154,7 @@ export async function verifyLaunchConfig(
     if (!config.feeClaimer.equals(feeAuthority))
       throw new Error('Legacy fee authority must be the custody program PDA');
   }
-  const quote = reviewedQuote();
+  const quote = reviewedQuote(record.policy_version);
   if (isModePolicyVersion(record.policy_version) && record.quote_mint !== quote.quoteMint)
     throw new Error('Registry quote mint differs from the reviewed policy');
   const issues = inspectLaunchConfig(config, {
@@ -132,7 +166,8 @@ export async function verifyLaunchConfig(
   if (issues.length) throw new Error('Configuration does not match the release policy');
   // All economics rely on timestamp boundaries and permanently locked fee rights.
   if (
-    config.activationType !== (record.policy_version === 'bond-v1' || isModePolicyVersion(record.policy_version) ? 0 : 1) ||
+    config.activationType !==
+      (record.policy_version === 'bond-v1' || isModePolicyVersion(record.policy_version) ? 0 : 1) ||
     config.collectFeeMode !== 0 ||
     config.creatorTradingFeePercentage !== 0
   )

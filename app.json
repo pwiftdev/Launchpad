@@ -39,24 +39,19 @@
     "IPFS_GATEWAY_URL": {
       "value": "https://gateway.pinata.cloud"
     },
-    "WHITELIST_ENABLED": {
-      "value": "true"
-    },
     "LAUNCHPAD_PUBLIC": {
       "value": "false"
     },
-    "NEXT_PUBLIC_WHITELIST_ENABLED": {
-      "value": "true"
-    },
     "WHITELIST_SECRET": {
-      "generator": "secret"
+      "generator": "secret",
+      "description": "Secret for hashing admin sign-in rate-limit keys."
     },
     "MAINNET_TRADING_ENABLED": {
       "value": "false"
     },
     "ADMIN_KEY_HASH": {
       "required": false,
-      "description": "Set privately with scripts/setup-admin.mjs; absent keeps the launchpad locked"
+      "description": "Set privately with scripts/setup-admin.mjs; leave unset to disable admin sign-in"
     },
     "ADMIN_SESSION_SECRET": {
       "generator": "secret",

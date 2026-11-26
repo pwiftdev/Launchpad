@@ -11,12 +11,13 @@ export function validScriptNonce(value: unknown): value is string {
 /** Inline styles remain necessary for chart dimensions, wallet portals and component positioning. */
 export function contentSecurityPolicy(
   nonce: string,
-  development = process.env.NODE_ENV !== 'production'
+  development = process.env.NODE_ENV !== 'production',
+  allowWasm = false
 ) {
   if (!validScriptNonce(nonce)) throw new Error('Invalid script nonce');
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development ? " 'unsafe-eval'" : ''}`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development ? " 'unsafe-eval'" : allowWasm ? " 'wasm-unsafe-eval'" : ''}`,
     "script-src-attr 'none'",
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: https:${development ? ' http://127.0.0.1:* http://localhost:*' : ''}`,

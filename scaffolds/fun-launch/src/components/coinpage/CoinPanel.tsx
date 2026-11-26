@@ -12,6 +12,7 @@ import { RewardsPanel } from './RewardsPanel';
 import { TokenCallouts } from '@/components/profiles/TokenCallouts';
 import { TokenAbout } from './TokenAbout';
 import { MarketConnection } from './MarketConnection';
+import { TokenChatRoom } from './TokenChatRoom';
 
 type CoinPanelProps = {
   coin: Coin;
@@ -53,9 +54,9 @@ export const CoinPanel = ({ coin, headerActions, className }: CoinPanelProps) =>
         actions={headerActions}
       />
 
-      <div className="grid flex-1 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid flex-1 grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_360px]">
         {/* Market column */}
-        <div className="flex min-w-0 flex-col lg:border-r lg:border-neutral-850">
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:border-r lg:border-neutral-850">
           <PriceChart
             coin={coin}
             trades={trades.data}
@@ -64,7 +65,7 @@ export const CoinPanel = ({ coin, headerActions, className }: CoinPanelProps) =>
             onRetry={() => void trades.refetch()}
             className="h-[420px] border-b border-neutral-850 sm:h-[480px] lg:h-[clamp(440px,62vh,680px)]"
           />
-          <div className="border-b border-neutral-850 lg:hidden">
+          <div className="order-1 border-b border-neutral-850 lg:hidden">
             {tax}
             <TradeBox coin={coin} />
           </div>
@@ -78,25 +79,28 @@ export const CoinPanel = ({ coin, headerActions, className }: CoinPanelProps) =>
             holdersError={holders.error}
             onRetryTrades={() => void trades.refetch()}
             onRetryHolders={() => void holders.refetch()}
-            className="border-b border-neutral-850 lg:border-b-0"
+            className="order-3 border-b border-neutral-850 lg:border-b-0"
           />
           {!coin.isDemo && (
-            <div className="border-t border-neutral-850 p-4">
+            <div className="order-4 border-t border-neutral-850 p-4">
               <TokenCallouts mint={coin.mint} />
             </div>
           )}
         </div>
 
         {/* Order and facts column */}
-        <aside className="flex min-w-0 flex-col divide-y divide-neutral-850">
+        <aside className="contents lg:flex lg:min-w-0 lg:flex-col lg:divide-y lg:divide-neutral-850">
           <div className="hidden lg:block">
             {tax}
             <TradeBox coin={coin} />
           </div>
-          <PotMeter coin={coin} pot={trades.data?.pot} />
-          <TokenAbout coin={coin} />
-          <FairnessCard holders={holders.data} coin={coin} />
-          <RewardsPanel coin={coin} />
+          {!coin.isDemo && <TokenChatRoom mint={coin.mint} symbol={coin.symbol} />}
+          <div className="order-5 min-w-0 divide-y divide-neutral-850">
+            <PotMeter coin={coin} pot={trades.data?.pot} />
+            <TokenAbout coin={coin} />
+            <FairnessCard holders={holders.data} coin={coin} />
+            <RewardsPanel coin={coin} />
+          </div>
         </aside>
       </div>
     </div>

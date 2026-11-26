@@ -15,9 +15,14 @@ import { describe, expect, it } from 'vitest';
 import bs58 from 'bs58';
 import { registerCoinInstruction } from '@/lib/vault/client';
 import { proveLaunchCreation } from './launchProof';
+import { OFFICIAL_MSKD_RESERVED } from './officialMskd';
 
 const coder = new BorshCoder(DynamicBondingCurveIdl as unknown as Idl);
-function fixture(mode: 'creator' | 'community' = 'community', includeVault = true) {
+function fixture(
+  mode: 'creator' | 'community' = 'community',
+  includeVault = true,
+  symbol = 'TEST'
+) {
   const creator = Keypair.generate(),
     mint = Keypair.generate(),
     config = Keypair.generate().publicKey,
@@ -45,7 +50,7 @@ function fixture(mode: 'creator' | 'community' = 'community', includeVault = tru
       isWritable: Boolean('writable' in a && a.writable),
     })),
     data: coder.instruction.encode(definition.name, {
-      params: { name: 'Example', symbol: 'TEST', uri: 'ipfs://example' },
+      params: { name: 'Example', symbol, uri: 'ipfs://example' },
     }),
   });
   const tx = new Transaction({
@@ -84,6 +89,16 @@ function fixture(mode: 'creator' | 'community' = 'community', includeVault = tru
   return { proof, expected };
 }
 describe('immutable launch confirmation proof', () => {
+  it('rejects a finalized creation with a reserved ticker from an unrelated deployer', () => {
+    const { proof, expected } = fixture('creator', false, 'MSKD');
+    expect(() =>
+      proveLaunchCreation(proof, {
+        ...expected,
+        vaultProgram: undefined,
+        policyVersion: 'wallet-v1',
+      })
+    ).toThrow(OFFICIAL_MSKD_RESERVED);
+  });
   it('proves wallet-v1 launch from signed creator/mint/config and immutable intent without native registration', () => {
     const { proof, expected } = fixture('creator', false),
       walletExpected = {

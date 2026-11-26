@@ -1,5 +1,6 @@
 import type { GetServerSidePropsContext } from 'next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getServerSideProps as adminSignInPage } from '@/pages/admin';
 import { adminPageRedirect, requireAdminPage } from './adminPage';
 function context(path: string) {
   return {
@@ -13,7 +14,7 @@ describe('renderer admission independent of middleware', () => {
   it('keeps the launchpad closed unless the exact runtime switch is enabled', async () => {
     vi.stubEnv('LAUNCHPAD_PUBLIC', 'false');
     expect(adminPageRedirect(context('/launch'))).toMatchObject({
-      redirect: { destination: '/whitelist' },
+      redirect: { destination: '/admin' },
     });
     vi.stubEnv('LAUNCHPAD_PUBLIC', 'true');
     const page = context('/launch?mode=community');
@@ -31,14 +32,18 @@ describe('renderer admission independent of middleware', () => {
       '/token/not-a-mint',
       '/whitelist',
     ])
-      expect(adminPageRedirect(context(path))).toMatchObject({
-        redirect: { destination: '/whitelist' },
-      });
+      expect(adminPageRedirect(context(path))).toEqual({ notFound: true });
     expect(
       adminPageRedirect(context('/token/So11111111111111111111111111111111111111112'))
     ).toBeNull();
     const missing = context('/launch');
     delete (missing as Partial<GetServerSidePropsContext>).resolvedUrl;
-    expect(adminPageRedirect(missing)).toMatchObject({ redirect: { destination: '/whitelist' } });
+    expect(adminPageRedirect(missing)).toEqual({ notFound: true });
+  });
+  it('redirects the admin sign-in page to the public launchpad', async () => {
+    vi.stubEnv('LAUNCHPAD_PUBLIC', 'true');
+    expect(await adminSignInPage(context('/admin'))).toEqual({
+      redirect: { destination: '/', permanent: false },
+    });
   });
 });

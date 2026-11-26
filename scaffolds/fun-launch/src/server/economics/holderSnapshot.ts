@@ -73,6 +73,8 @@ export async function collectHolderSnapshot(
     const blockTime = await rpc.getBlockTime(response.context.slot);
     if (!Number.isSafeInteger(blockTime) || blockTime! < 0)
       throw new Error('Finalized snapshot time unavailable');
+    if ((await rpc.getGenesisHash()) !== input.networkGenesis)
+      throw new Error('Snapshot RPC network changed');
     const excluded = new Set(input.excludedOwners);
     // Program-address holdings stay in the complete supply proof, then are excluded from this direct wallet claim path.
     for (const account of accounts)

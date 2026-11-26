@@ -1,12 +1,20 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
-import { middleware } from './middleware';
+import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
+import { config, middleware } from './middleware';
 import { NONCE_HEADER, validScriptNonce } from './server/securityHeaders';
 
 afterEach(() => vi.unstubAllEnvs());
+it('leaves artwork request bodies with their handlers while matching adjacent routes', () => {
+  const matches = (url: string) => unstable_doesMiddlewareMatch({ config, url });
+  for (const path of ['/api/upload', '/api/launch-previews/']) expect(matches(path)).toBe(false);
+  for (const path of ['/api/upload/admin', '/api/launch/confirm', '/launch'])
+    expect(matches(path)).toBe(true);
+});
+
 describe('document nonce forwarding', () => {
   it('replaces attacker-provided nonce/policy and binds one fresh value to request and response', () => {
-    const request = new NextRequest('https://launch.example/whitelist', {
+    const request = new NextRequest('https://launch.example/admin', {
       headers: {
         [NONCE_HEADER]: 'attacker',
         'Content-Security-Policy': 'script-src *',
@@ -20,7 +28,7 @@ describe('document nonce forwarding', () => {
       response.headers.get('Content-Security-Policy')
     );
     expect(response.headers.get('Cache-Control')).toBe('private, no-store');
-    const next = middleware(new NextRequest('https://launch.example/whitelist'));
+    const next = middleware(new NextRequest('https://launch.example/admin'));
     expect(next.headers.get(`x-middleware-request-${NONCE_HEADER}`)).not.toBe(nonce);
   });
   it('keeps unauthorized APIs and redirects closed while applying the same script protections', () => {
@@ -33,7 +41,32 @@ describe('document nonce forwarding', () => {
       new NextRequest('https://launch.example/launch', { headers: { host: 'launch.example' } })
     );
     expect(page.status).toBe(307);
-    expect(page.headers.get('Location')).toBe('https://launch.example/whitelist');
+    expect(page.headers.get('Location')).toBe('https://launch.example/admin');
+  });
+  it('allows WebAssembly only on OTC documents and keeps JavaScript eval blocked', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('LAUNCHPAD_PUBLIC', 'true');
+    const policy = (path: string) =>
+      middleware(new NextRequest(`https://launch.example${path}`)).headers.get(
+        'Content-Security-Policy'
+      );
+    expect(policy('/otc?deal=example')).toContain("'wasm-unsafe-eval'");
+    expect(policy('/otc')).not.toContain("'unsafe-eval'");
+    expect(policy('/api/otc')).not.toContain("'wasm-unsafe-eval'");
+    expect(policy('/')).not.toContain("'wasm-unsafe-eval'");
+  });
+  it('returns gone for retired registration without admitting similar API paths', () => {
+    for (const value of ['true', 'false']) {
+      vi.stubEnv('LAUNCHPAD_PUBLIC', value);
+      const gone = middleware(
+        new NextRequest('https://launch.example/api/whitelist', { method: 'POST' })
+      );
+      expect(gone.status).toBe(410);
+      expect(gone.headers.get('Cache-Control')).toBe('no-store');
+      expect(middleware(new NextRequest('https://launch.example/api/whitelist/admin')).status).toBe(
+        401
+      );
+    }
   });
   it('opens known documents and APIs at runtime while preserving nonce policy and unknown/admin restrictions', () => {
     vi.stubEnv('LAUNCHPAD_PUBLIC', 'true');
@@ -43,6 +76,7 @@ describe('document nonce forwarding', () => {
       '/launch',
       '/rules',
       '/burns',
+      '/roadmap',
       '/404',
       '/token/So11111111111111111111111111111111111111112',
       '/api/coins',
@@ -65,7 +99,7 @@ describe('document nonce forwarding', () => {
       new NextRequest('https://launch.example/private', { headers: { host: 'launch.example' } })
     );
     expect(unknown.status).toBe(307);
-    expect(unknown.headers.get('Location')).toBe('https://launch.example/whitelist');
+    expect(unknown.headers.get('Location')).toBe('https://launch.example/');
     vi.stubEnv('LAUNCHPAD_PUBLIC', 'false');
     expect(middleware(new NextRequest('https://launch.example/api/coins')).status).toBe(401);
   });

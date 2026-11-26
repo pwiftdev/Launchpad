@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 import type { Pool, PoolClient } from 'pg';
+import { HSOL_REWARD_MINT, SOL_REWARD_MINT } from '@/lib/rewards';
 import { beforeAll, beforeEach, afterAll, describe, it, expect, vi } from 'vitest';
 import { SystemProgram, VersionedTransaction, PublicKey } from '@solana/web3.js';
 import { WalletStore } from './walletStore';
@@ -15,6 +16,24 @@ import { messageDigest, FinalizedVerifier } from './chainEvidence';
 import type { WalletJob, WalletEffectFacts } from './walletTypes';
 import owner from '../../../../../docs/mainnet-authorities.public.json';
 const proof = vi.hoisted(() => new WeakSet<object>());
+const companyFixture = vi.hoisted(() => ({ collector: '', treasury: '' }));
+vi.mock('../../../../../scripts/company-wallets.cjs', async (load) => {
+  const real = await load<typeof import('../../../../../scripts/company-wallets.cjs')>();
+  return {
+    ...real,
+    companyWallets: (...args: Parameters<typeof real.companyWallets>) => {
+      const [env, genesis] = args;
+      if (
+        companyFixture.collector &&
+        env.FEE_COLLECTOR_PUBLIC_KEY === companyFixture.collector &&
+        env.TREASURY_PUBLIC_KEY === companyFixture.treasury &&
+        ['cashback-hsol-v1', 'mskd-hsol-v1'].includes(env.LAUNCH_POLICY_VERSION ?? '')
+      )
+        return real.companyWallets(env, fixtureGenesis);
+      return real.companyWallets(env, genesis, args[2]);
+    },
+  };
+});
 vi.mock('./walletEvidence', () => ({
   assertVerifiedWalletEffect: (value: object) => {
     if (!proof.has(value)) throw new Error('Verified finalized effect required');
@@ -51,6 +70,7 @@ beforeAll(async () => {
   } as Pick<Pool, 'connect' | 'query'>);
 }, 20000);
 beforeEach(async () => {
+  companyFixture.collector = companyFixture.treasury = '';
   await db.exec('DROP SCHEMA public CASCADE;CREATE SCHEMA public;');
   await db.exec(migration('003-launch-registry.sql'));
   await db.exec(migration('017-wallet-settlement.sql'));
@@ -72,6 +92,73 @@ beforeEach(async () => {
   );
 });
 afterAll(async () => db.close());
+
+it('keeps hSOL liabilities out of the SOL ledger and reserves an exact creator claim once', async () => {
+  for (const file of [
+    '024-bond-it-policy.sql',
+    '025-mskd-modes.sql',
+    '026-mskd-sol-pair.sql',
+    '027-holder-payout-allocations.sql',
+    '033-hsol-launch-pair.sql',
+  ]) {
+    await db.exec(migration(file));
+  }
+  const network = owner.networkGenesis;
+  const collectorKey = collector.publicKey.toBase58();
+  const creatorKey = creator.publicKey.toBase58();
+  const hsolConfig = fixtureWallet().publicKey.toBase58();
+  const hsolMint = fixtureWallet().publicKey.toBase58();
+  const hsolPool = fixtureWallet().publicKey.toBase58();
+  for (const [key, policy, quote] of [
+    [config, 'dev-v1', SOL_REWARD_MINT],
+    [hsolConfig, 'hsol-v1', HSOL_REWARD_MINT],
+  ]) {
+    await db.query(
+      'INSERT INTO launch_configs(network_genesis,config_key,policy_version,expected_fee_claimer,expected_leftover_receiver,config_digest,verified_slot,quote_mint) VALUES($1,$2,$3,$4,$5,$6,1,$7)',
+      [network, key, policy, collectorKey, treasury.publicKey.toBase58(), 'a'.repeat(64), quote]
+    );
+  }
+  for (const [token, tokenPool, key, mode, quote] of [
+    [mint, pool, config, 'dev', SOL_REWARD_MINT],
+    [hsolMint, hsolPool, hsolConfig, 'hsol', HSOL_REWARD_MINT],
+  ]) {
+    await db.query(
+      'INSERT INTO launch_coins(network_genesis,mint,dbc_pool,config_key,original_deployer,mode,recipient,policy_version,activation_point,activation_time,creation_signature,finalized_slot,quote_mint) VALUES($1,$2,$3,$4,$5,$6,$5,$7,1000,1000,$8,1,$9)',
+      [network, token, tokenPool, key, creatorKey, mode, mode + '-v1', mode + '-creation', quote]
+    );
+  }
+  await db.query(
+    "INSERT INTO wallet_balances(network_genesis,mint,bucket,funded) VALUES($1,$2,'creator',11),($1,$3,'creator',100),($1,$3,'platform',40)",
+    [network, mint, hsolMint]
+  );
+  expect((await store.custodyRequirement(network, collectorKey)).liability).toBe(11n);
+  expect(
+    (await store.tokenCustodyRequirement(network, collectorKey, HSOL_REWARD_MINT)).liability
+  ).toBe(140n);
+  const request = {
+    networkGenesis: network,
+    mint: hsolMint,
+    wallet: creatorKey,
+    epoch: null as null,
+    amount: 100n,
+    requestId: randomUUID(),
+    authorizationDigest: 'b'.repeat(64),
+  };
+  await expect(store.requestClaim({ ...request, assetMint: SOL_REWARD_MINT })).rejects.toThrow(
+    'asset'
+  );
+  const claim = await store.requestClaim({ ...request, assetMint: HSOL_REWARD_MINT });
+  expect(claim).toMatchObject({
+    kind: 'creator_claim',
+    lamports: '100',
+    details: { assetMint: HSOL_REWARD_MINT },
+  });
+  expect((await store.requestClaim({ ...request, assetMint: HSOL_REWARD_MINT })).id).toBe(claim.id);
+  expect((await store.balances(network, hsolMint))[0]).toMatchObject({
+    reserved: '100',
+    spent: '0',
+  });
+});
 async function fund(bucket = 'creator', value = '100') {
   await db.query(
     'INSERT INTO wallet_balances(network_genesis,mint,bucket,funded)VALUES($1,$2,$3,$4)',
@@ -180,7 +267,33 @@ const claim = (id = randomUUID(), value = 100n) =>
     requestId: id,
     authorizationDigest: 'b'.repeat(64),
   });
-async function prepare(job: WalletJob) {
+it('queues the full claim ahead of earlier treasury work and serializes durable signatures', async () => {
+  await fund('creator', '1444866467');
+  await fund('platform', '1000');
+  const treasuryJob = (await store.queueBudget({
+    networkGenesis: fixtureGenesis,
+    mint,
+    kind: 'platform_claim',
+    maximumLamports: 100n,
+    intentKey: 'platform:quarter-hour:priority',
+  }))!;
+  const userJob = await claim(randomUUID(), 1444866467n);
+  const collectorAddress = collector.publicKey.toBase58();
+  const candidates = () => store.executionCandidates(fixtureGenesis, collectorAddress, 20);
+  const treasuryAttempt = await prepare(treasuryJob, {}, false);
+  expect(await candidates()).toEqual([{ id: userJob.id }, { id: treasuryJob.id }]);
+  const userAttempt = await prepare(userJob, {}, false);
+  const savedTreasury = await store.attachSigned(treasuryJob.id, treasuryAttempt.wire);
+  expect(await candidates()).toEqual([{ id: savedTreasury.id }, { id: userJob.id }]);
+  await expect(store.attachSigned(userJob.id, userAttempt.wire)).rejects.toThrow(
+    'Reconcile the existing signed collector attempt'
+  );
+  expect((await store.job(userJob.id))?.signature).toBeNull();
+  await store.settle(savedTreasury.id, effect(savedTreasury));
+  expect(await candidates()).toEqual([{ id: userJob.id }]);
+  expect((await store.attachSigned(userJob.id, userAttempt.wire)).lamports).toBe('1444866467');
+});
+async function prepare(job: WalletJob, extra: Record<string, unknown> = {}, attach = true) {
   const f = transactionFixture(
     [
       SystemProgram.transfer({
@@ -192,7 +305,7 @@ async function prepare(job: WalletJob) {
     collector
   );
   const prepared = await store.prepareJob(job.id, {
-    networkGenesis: fixtureGenesis,
+    networkGenesis: job.network_genesis,
     mint: job.mint,
     kind: job.kind,
     transactionBase64: unsignedTransaction(f.tx),
@@ -206,19 +319,17 @@ async function prepare(job: WalletJob) {
       expectedLamports: job.lamports,
       maximumFeeLamports: '5000',
       operatingCostLamports: '5000',
+      ...extra,
     },
   });
-  return {
-    f,
-    job: await store.attachSigned(
-      prepared.id,
-      Buffer.from(VersionedTransaction.deserialize(f.tx.serialize()).serialize()).toString('base64')
-    ),
-  };
+  const wire = Buffer.from(VersionedTransaction.deserialize(f.tx.serialize()).serialize()).toString(
+    'base64'
+  );
+  return { f, wire, job: attach ? await store.attachSigned(prepared.id, wire) : prepared };
 }
 function effect(job: WalletJob, extra: Partial<WalletEffectFacts> = {}): WalletEffectFacts {
   const value = {
-    networkGenesis: fixtureGenesis,
+    networkGenesis: job.network_genesis,
     mint: job.mint,
     kind: job.kind,
     signature: job.signature!,
@@ -351,8 +462,8 @@ async function signGeneric(job: WalletJob, extra: Record<string, unknown> = {}) 
     collector
   );
   const prepared = await store.prepareJob(job.id, {
-    networkGenesis: fixtureGenesis,
-    mint,
+    networkGenesis: job.network_genesis,
+    mint: job.mint,
     kind: job.kind,
     transactionBase64: unsignedTransaction(f.tx),
     messageDigest: messageDigest(f.tx.serializeMessage()),
@@ -489,6 +600,23 @@ describe('actual collected income only', () => {
 });
 import { snapshotFixture } from './holderSnapshotFixture';
 import { collectHolderSnapshot } from './holderSnapshot';
+async function fundHolderCollection(
+  mint: string,
+  pool: string,
+  slot: number,
+  value: number,
+  network = fixtureGenesis
+) {
+  const id = randomUUID();
+  await db.query(
+    `INSERT INTO wallet_jobs(id,network_genesis,mint,kind,intent_key,status,transaction_base64,message_digest,prepared_slot,last_valid_block_height,signature,finalized_slot,received_lamports)VALUES($1::uuid,$2,$3,'collect',$1::text,'finalized','fixture',repeat('a',64),900,1100,$1::text,$4,$5)`,
+    [id, network, mint, slot, value]
+  );
+  await db.query(
+    `INSERT INTO wallet_collections(job_id,network_genesis,mint,pool,signature,finalized_slot,transaction_index,received,raw_observed,rinse_net,post_net,rinse_buyback,creator,community,platform)VALUES($1::uuid,$2,$3,$4,$1::text,$5,0,$6,$6,0,$6,0,0,$6,0)`,
+    [id, network, mint, pool, slot, value]
+  );
+}
 it('Community snapshots allocate funded same-bank income once, carry dust and keep later receipts out', async () => {
   const f = snapshotFixture(),
     cm = f.mint.toBase58(),
@@ -511,15 +639,7 @@ it('Community snapshots allocate funded same-bank income once, carry dust and ke
     [999, 11],
     [1500, 20],
   ]) {
-    const id = randomUUID();
-    await db.query(
-      `INSERT INTO wallet_jobs(id,network_genesis,mint,kind,intent_key,status,transaction_base64,message_digest,prepared_slot,last_valid_block_height,signature,finalized_slot,received_lamports)VALUES($1::uuid,$2,$3,'collect',$1::text,'finalized','fixture',repeat('a',64),900,1100,$1::text,$4,$5)`,
-      [id, fixtureGenesis, cm, slot, value]
-    );
-    await db.query(
-      `INSERT INTO wallet_collections(job_id,network_genesis,mint,pool,signature,finalized_slot,transaction_index,received,raw_observed,rinse_net,post_net,rinse_buyback,creator,community,platform)VALUES($1::uuid,$2,$3,$4,$1::text,$5,0,$6,$6,0,$6,0,0,$6,0)`,
-      [id, fixtureGenesis, cm, cp, slot, value]
-    );
+    await fundHolderCollection(cm, cp, slot!, value!);
   }
   await db.query(
     `INSERT INTO wallet_balances(network_genesis,mint,bucket,funded)VALUES($1,$2,'community',31)`,
@@ -563,6 +683,271 @@ it('Community snapshots allocate funded same-bank income once, carry dust and ke
     store.createEpoch({ networkGenesis: fixtureGenesis, mint: cm, epoch: 0, snapshot })
   ).rejects.toThrow('current processing hour');
 });
+
+async function registerHolderFixture(
+  fixture: ReturnType<typeof snapshotFixture>,
+  mode: 'cashback' | 'cashback-hsol' | 'mskd' | 'mskd-hsol'
+) {
+  for (const name of [
+    '024-bond-it-policy.sql',
+    '025-mskd-modes.sql',
+    '026-mskd-sol-pair.sql',
+    '027-holder-payout-allocations.sql',
+    '028-mskd-payout-conversions.sql',
+    '033-hsol-launch-pair.sql',
+    '034-hsol-holder-modes.sql',
+  ])
+    await db.exec(migration(name));
+  const hsol = mode.endsWith('-hsol');
+  const network = hsol ? owner.networkGenesis : fixtureGenesis;
+  const quoteMint = hsol ? HSOL_REWARD_MINT : SOL_REWARD_MINT;
+  fixture.rpc.getGenesisHash = async () => network;
+  const mint = fixture.mint.toBase58();
+  const pool = fixtureWallet().publicKey.toBase58();
+  const config = fixtureWallet().publicKey.toBase58();
+  const company = [collector.publicKey.toBase58(), treasury.publicKey.toBase58()];
+  if (hsol) {
+    companyFixture.collector = company[0]!;
+    companyFixture.treasury = company[1]!;
+  }
+  await db.query(
+    `INSERT INTO launch_configs(network_genesis,config_key,policy_version,expected_fee_claimer,expected_leftover_receiver,config_digest,verified_slot,quote_mint)VALUES($1,$2,$3,$4,$5,repeat('a',64),1,$6)`,
+    [network, config, `${mode}-v1`, ...company, quoteMint]
+  );
+  await db.query(
+    `INSERT INTO launch_coins(network_genesis,mint,dbc_pool,config_key,original_deployer,mode,recipient,policy_version,activation_point,activation_time,creation_signature,finalized_slot,quote_mint)VALUES($1,$2,$3,$4,$5,$6,$7,$8,1,1,'holder-creation',1,$9)`,
+    [
+      network,
+      mint,
+      pool,
+      config,
+      creator.publicKey.toBase58(),
+      mode,
+      company[0],
+      `${mode}-v1`,
+      quoteMint,
+    ]
+  );
+  return { mint, pool, company, network, quoteMint, hsol };
+}
+
+it.each(['cashback', 'cashback-hsol'] as const)(
+  'batches %s once through ambiguous relay and failed finalization writes',
+  async (mode) => {
+    const fixture = snapshotFixture();
+    const { mint, pool, company, network, quoteMint } = await registerHolderFixture(fixture, mode);
+    await db.query(
+      `INSERT INTO wallet_balances(network_genesis,mint,bucket,funded)VALUES($1,$2,'community',1600000)`,
+      [network, mint]
+    );
+    const advance = async (epoch: number, deadlineOffset: number, excluded = company) => {
+      fixture.rpc.getBlockTime = async () => (epoch + 1) * 3600 + deadlineOffset;
+      const snapshot = await collectHolderSnapshot(fixture.rpc, {
+        networkGenesis: network,
+        mint,
+        excludedOwners: new Set(excluded),
+      });
+      return store.createEpoch({ networkGenesis: network, mint, epoch, snapshot });
+    };
+    const holder = {
+      networkGenesis: network,
+      mint,
+      wallet: fixture.owners[0]!.publicKey.toBase58(),
+    };
+    const view = () => store.rewardsView({ ...holder, limit: 1 });
+    await fundHolderCollection(mint, pool, 999, 800_000, network);
+    await expect(advance(1, 60)).rejects.toThrow('hourly snapshot');
+    await expect(advance(1, 5, [])).rejects.toThrow('company wallet exclusions');
+    const first = await advance(1, 5);
+    expect(await advance(1, 5)).toEqual(first);
+    expect(await view()).toMatchObject({ availableLamports: '600000', holderClaim: null });
+    await fundHolderCollection(mint, pool, 1000, 800_000, network);
+    await advance(2, 5);
+    expect(await view()).toMatchObject({
+      availableLamports: '1200000',
+      holderClaim: { amount: '1200000', throughEpoch: '2', assetMint: quoteMint },
+    });
+    const claim = {
+      ...holder,
+      epoch: 2,
+      amount: 1_200_000n,
+      assetMint: quoteMint,
+      authorizationDigest: 'a'.repeat(64),
+      requestId: randomUUID(),
+    };
+    await expect(store.requestClaim({ ...claim, amount: 1_200_001n })).rejects.toThrow(
+      'exact funded'
+    );
+    const [queued, replay] = await Promise.all([
+      store.requestClaim(claim),
+      store.requestClaim(claim),
+    ]);
+    expect(replay.id).toBe(queued.id);
+    const failed = await prepare(queued, { quoteMint });
+    failed.f.rpc.getGenesisHash = async () => network;
+    await store.markSubmitted(failed.job.id);
+    await store.markUncertain(failed.job.id);
+    expect((await view()).availableLamports).toBe('0');
+    failed.f.response.meta!.err = { InstructionError: [0, { Custom: 1 }] };
+    const failure = await new FinalizedVerifier(failed.f.rpc, network).failure(
+      failed.job.signature!,
+      failed.job.message_digest!
+    );
+    await store.recordFailure(failed.job.id, failure);
+    expect((await view()).availableLamports).toBe('1200000');
+    const { job } = await prepare(await store.requestClaim({ ...claim, requestId: randomUUID() }), {
+      quoteMint,
+    });
+    await store.markSubmitted(job.id);
+    const receipt = effect(job, { operatingCostLamports: 5000n });
+    await db.exec(
+      'ALTER TABLE wallet_settlements ADD CONSTRAINT force_fixture_rollback CHECK(false)'
+    );
+    await expect(store.settle(job.id, receipt)).rejects.toThrow('force_fixture_rollback');
+    expect(await store.job(job.id)).toMatchObject({
+      status: 'submitted',
+      signature: job.signature,
+    });
+    expect((await view()).availableLamports).toBe('0');
+    await db.exec('ALTER TABLE wallet_settlements DROP CONSTRAINT force_fixture_rollback');
+    await store.settle(job.id, receipt);
+    await store.settle(job.id, receipt);
+    const final = await store.rewardsView(holder);
+    expect(final.paidLamports).toBe('1200000');
+    expect(final.epochs).toHaveLength(2);
+    expect(
+      final.epochs.every((entry) => entry.status === 'paid' && entry.signature === job.signature)
+    ).toBe(true);
+    await expect(store.requestClaim({ ...claim, requestId: randomUUID() })).rejects.toThrow();
+  }
+);
+
+it.each(['mskd', 'mskd-hsol'] as const)(
+  'reserves %s once, preserves interrupted receipts and pays only actual converted wXMR',
+  async (mode) => {
+    const fixture = snapshotFixture();
+    const { mint, pool, company, network, quoteMint, hsol } = await registerHolderFixture(
+      fixture,
+      mode
+    );
+    const assetMint = hsol
+      ? 'WXMRyRZhsa19ety5erZhHg4N3xj3EVN92u94422teJp'
+      : fixtureWallet().publicKey.toBase58();
+    const market = fixtureWallet().publicKey.toBase58();
+    vi.stubEnv('MSKD_DEVNET_PAYOUT_MINT', assetMint);
+    vi.stubEnv('MSKD_PAYOUT_POOL', market);
+    try {
+      await db.query(
+        `INSERT INTO wallet_balances(network_genesis,mint,bucket,funded)VALUES($1,$2,'community',2000000)`,
+        [network, mint]
+      );
+      await fundHolderCollection(mint, pool, 999, 2_000_000, network);
+      fixture.rpc.getBlockTime = async () => 7205;
+      const snapshot = await collectHolderSnapshot(fixture.rpc, {
+        networkGenesis: network,
+        mint,
+        excludedOwners: new Set(company),
+      });
+      await db.exec(
+        'ALTER TABLE wallet_mskd_snapshots ADD CONSTRAINT force_queue_rollback CHECK(false)'
+      );
+      await expect(store.queueMskdConversion(snapshot)).rejects.toThrow('force_queue_rollback');
+      expect(await store.pendingJobs(network, mint)).toEqual([]);
+      expect((await store.balances(network, mint))[0]!.reserved).toBe('0');
+      await db.exec('ALTER TABLE wallet_mskd_snapshots DROP CONSTRAINT force_queue_rollback');
+      const [first, replay] = await Promise.all([
+        store.queueMskdConversion(snapshot),
+        store.queueMskdConversion(snapshot),
+      ]);
+      expect(first).toMatchObject({ kind: 'holder_conversion', lamports: '2000000' });
+      expect(replay).toBeNull();
+      const view = () =>
+        store.rewardsView({
+          networkGenesis: network,
+          mint,
+          wallet: fixture.owners[0]!.publicKey.toBase58(),
+        });
+      expect((await view()).availableLamports).toBe('0');
+      expect((await store.custodyRequirement(network, company[0]!)).liability).toBe(
+        hsol ? 0n : 2_000_000n
+      );
+      if (hsol)
+        expect(
+          (await store.tokenCustodyRequirement(network, company[0]!, quoteMint)).liability
+        ).toBe(2_000_000n);
+      const job = await signGeneric(first!, {
+        quoteMint,
+        maximumSpendLamports: '2000000',
+        pool: market,
+        payoutMint: assetMint,
+      });
+      await store.markSubmitted(job.id);
+      await store.markUncertain(job.id);
+      const converted = effect(job, {
+        collectorDebitLamports: hsol ? 1_995_000n : 2_000_000n,
+        receivedPayoutUnits: 101n,
+        operatingCostLamports: 5000n,
+      });
+      await db.exec(
+        'ALTER TABLE wallet_mskd_conversions ADD CONSTRAINT force_fixture_rollback CHECK(false)'
+      );
+      await expect(store.settle(job.id, converted)).rejects.toThrow('force_fixture_rollback');
+      expect(await store.job(job.id)).toMatchObject({
+        status: 'manual_review',
+        signature: job.signature,
+      });
+      expect((await view()).availableLamports).toBe('0');
+      expect(await store.queueMskdConversion(snapshot)).toBeNull();
+      await db.exec('ALTER TABLE wallet_mskd_conversions DROP CONSTRAINT force_fixture_rollback');
+      await store.settle(job.id, converted);
+      await store.settle(job.id, converted);
+      expect((await store.custodyRequirement(network, company[0]!)).liability).toBe(0n);
+      expect(await store.tokenCustodyRequirement(network, company[0]!, assetMint)).toMatchObject({
+        liability: 101n,
+        minimumSlot: 1000,
+      });
+      if (hsol)
+        expect((await store.balances(network, mint))[0]).toMatchObject({
+          reserved: '0',
+          spent: '1995000',
+          available: '5000',
+        });
+      expect(await store.epoch(network, mint, 1)).toMatchObject({
+        budget: '101',
+        allocated: '100',
+        carry: '1',
+        asset_mint: assetMint,
+      });
+      expect((await view()).holderClaim).toEqual({ amount: '75', throughEpoch: '1', assetMint });
+      const claim = {
+        networkGenesis: network,
+        mint,
+        wallet: fixture.owners[0]!.publicKey.toBase58(),
+        epoch: 1,
+        assetMint,
+        amount: 75n,
+        requestId: randomUUID(),
+        authorizationDigest: 'a'.repeat(64),
+      };
+      await expect(store.requestClaim({ ...claim, assetMint: SOL_REWARD_MINT })).rejects.toThrow(
+        'asset'
+      );
+      const { job: payout } = await prepare(await store.requestClaim(claim), {
+        quoteMint,
+        payoutMint: assetMint,
+      });
+      const payment = effect(payout, { operatingCostLamports: 5000n });
+      await store.settle(payout.id, payment);
+      await store.settle(payout.id, payment);
+      expect(await store.tokenCustodyRequirement(network, company[0]!, assetMint)).toMatchObject({
+        liability: 26n,
+      });
+      expect((await view()).paidLamports).toBe('75');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  }
+);
 import { verifyWalletRecovery } from './walletRecovery';
 import type { Connection } from '@solana/web3.js';
 it('signed expired payout renewal archives exact bytes, retains reservation, and cannot renew twice', async () => {

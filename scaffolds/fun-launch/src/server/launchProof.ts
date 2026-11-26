@@ -7,6 +7,7 @@ import {
 import { registerCoinInstruction } from '@/lib/vault/client';
 
 import { isWalletPolicy, type LaunchPolicyVersion } from '@/lib/launchModes';
+import { assertMskdCreationIdentity } from './officialMskd';
 
 const coder = new BorshCoder(DynamicBondingCurveIdl as unknown as Idl);
 const initialize = DynamicBondingCurveIdl.instructions.find(
@@ -51,10 +52,7 @@ export function proveLaunchCreation(
   )
     throw new Error('Creation occurred outside the signed launch intent');
   const message = tx.transaction.message;
-  if (
-    isWalletPolicy(expected.policyVersion ?? '') &&
-    (!expected.mode || expected.vaultProgram)
-  )
+  if (isWalletPolicy(expected.policyVersion ?? '') && (!expected.mode || expected.vaultProgram))
     throw new Error('Wallet policy requires the immutable signed mode without native registration');
   const keys = message.getAccountKeys({ accountKeysFromLookups: tx.meta.loadedAddresses });
   for (const instruction of message.compiledInstructions) {
@@ -81,6 +79,7 @@ export function proveLaunchCreation(
       !message.isAccountSigner(account('base_mint').index)
     )
       throw new Error('Creator and mint must sign the creation transaction');
+    assertMskdCreationIdentity(decoded.data, expected.mint, expected.deployer);
     if (expected.vaultProgram) {
       if (expected.mode !== 'creator' && expected.mode !== 'community')
         throw new Error('A legacy signed launch mode is required for native custody');

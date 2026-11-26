@@ -12,7 +12,7 @@ type ShareButtonProps = {
 /** Copy the coin link or open a pre-filled post on X. The link unfurls into the coin's share card. */
 export const ShareButton = ({ mint, symbol, className }: ShareButtonProps) => {
   const url = () => `${window.location.origin}/token/${mint}`;
-  const text = `$${symbol} on ${BRAND.xHandle}.\n\nExplore the token and its launch details. 🧼`;
+  const text = `$${symbol} on ${BRAND.xHandle}.\n\nExplore the token and its launch details.`;
 
   return (
     <DropdownMenu.Root>

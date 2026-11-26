@@ -1,7 +1,6 @@
 const legacyPolicy = require('../scaffolds/fun-launch/src/constants/launchPolicy.json');
 const bondPolicy = require('../scaffolds/fun-launch/src/constants/bondPolicy.json');
 const modePolicy = require('../scaffolds/fun-launch/src/constants/modePolicy.json');
-const SOL_MINT = 'So11111111111111111111111111111111111111112';
 /** MSKD launch modes share one flat schedule; each pins its own quote mint and threshold. */
 const modeForPolicy = (version) =>
   Object.values(modePolicy.modes).find((mode) => mode.policyVersion === version) ?? null;
@@ -9,14 +8,16 @@ exports.modeForPolicy = modeForPolicy;
 exports.verifyQuoteMint = async function verifyQuoteMint(connection, mint) {
   const { getMint, TOKEN_PROGRAM_ID } = require('@solana/spl-token');
   const state = await getMint(connection, new PublicKey(mint), 'finalized', TOKEN_PROGRAM_ID);
-  if (!state.isInitialized || state.decimals !== 9)
-    throw new Error('The reviewed quote mint must use nine decimals and the standard SPL token program');
+  if (!state.isInitialized || state.decimals !== 9 || state.freezeAuthority !== null)
+    throw new Error(
+      'The reviewed quote mint must use nine decimals and the standard SPL token program'
+    );
 };
-// Every reviewed launch policy pairs to SOL with the 80 SOL bonding target. MSKD pays holders
-// in wXMR, but its curve, config and fee claims are SOL.
-exports.reviewedQuote = function reviewedQuote() {
-  return { quoteMint: SOL_MINT, migrationQuoteThreshold: '80000000000' };
-};
+function reviewedQuote(policyVersion) {
+  const quote = modePolicy.quotes[modeForPolicy(policyVersion)?.quote ?? 'sol'];
+  return { quoteMint: quote.mint, migrationQuoteThreshold: quote.migrationQuoteThreshold };
+}
+exports.reviewedQuote = reviewedQuote;
 const { PublicKey } = require('@solana/web3.js');
 const { BorshCoder } = require('@coral-xyz/anchor');
 const { convertIdlToCamelCase } = require('@coral-xyz/anchor/dist/cjs/idl.js');
@@ -61,18 +62,9 @@ exports.inspectLaunchConfig = function inspectLaunchConfig(config, expected = {}
   check('dynamicFeeEnabled', Number(config.poolFees?.dynamicFee?.initialized ?? 0), 0);
   check('collectFeeMode', config.collectFeeMode, 0);
   check('activationType', config.activationType, bond ? scheduled.activationType : 1);
-  if (mode && mode.quote !== 'sol') {
-    // A non-SOL pair (none today) must be pinned by the caller.
-    if (!expected.quoteMint || expected.quoteMint === SOL_MINT)
-      issues.push({ field: 'quoteMint', expected: 'An independently pinned quote mint', actual: null });
-    else check('quoteMint', config.quoteMint, expected.quoteMint);
-    if (!/^[1-9][0-9]*$/.test(String(expected.migrationQuoteThreshold ?? '')))
-      issues.push({ field: 'migrationQuoteThreshold', expected: 'A reviewed raw quote threshold', actual: null });
-    else check('migrationQuoteThreshold', config.migrationQuoteThreshold, expected.migrationQuoteThreshold);
-  } else {
-    check('quoteMint', config.quoteMint, SOL_MINT);
-    check('migrationQuoteThreshold', config.migrationQuoteThreshold, '80000000000');
-  }
+  const quote = reviewedQuote(expected.policyVersion);
+  check('quoteMint', config.quoteMint, quote.quoteMint);
+  check('migrationQuoteThreshold', config.migrationQuoteThreshold, quote.migrationQuoteThreshold);
   check('tokenDecimal', config.tokenDecimal, 6);
   check('tokenType', config.tokenType, 0);
   check('tokenUpdateAuthority', config.tokenUpdateAuthority, 1);

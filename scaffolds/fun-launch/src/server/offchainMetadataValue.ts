@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto';
 import { imageSources } from '@/lib/ipfs';
-import { parseSourcePost } from '@/lib/antivamp/rules';
 import { remoteUrl } from './remote';
-import { normalizeSocial, SOCIAL_KINDS, type Socials } from '@/lib/socials';
+import { isSourcePostUrl, normalizeSocial, SOCIAL_KINDS, type Socials } from '@/lib/socials';
 
 export type OffchainMetadata = {
   image: string | null;
@@ -50,7 +49,7 @@ export function sanitizeMetadata(input: unknown): OffchainMetadata {
   const source =
     typeof fields.source === 'string' &&
     Buffer.byteLength(fields.source) <= METADATA_LIMITS.valueBytes &&
-    parseSourcePost(fields.source)
+    isSourcePostUrl(fields.source)
       ? fields.source
       : null;
   const description =

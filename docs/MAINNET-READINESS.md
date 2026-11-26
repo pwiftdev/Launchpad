@@ -19,13 +19,8 @@ private `.local/heroku-state.json` to avoid a source/build identifier cycle.
 
 ## Available now
 
-The visual identity uses the supplied bubble mark and gradient wordmark from
-`scaffolds/fun-launch/rebrandedimages`. Originals stay unchanged. Run
-`node scripts/prepare-brand-assets.mjs` locally after replacing source artwork to produce the
-optimized WebP UI assets, PNG wallet/share-card icons, favicon and Apple touch icon. The shared
-brand components and `BRAND.assets` choose these files throughout the site. The legacy logo URL also
-serves the new bubble mark. Public access permits only the explicitly listed brand assets; the
-launchpad remains behind the admin gate.
+This release used the Rinsed bubble mark and gradient wordmark. The current launchpad's brand assets
+live in `scaffolds/fun-launch/public/brand` and are configured through `BRAND.assets`.
 
 The updated cyan, magenta and violet palette covers both themes, wallet UI, chart accents,
 background particles, loading states and share images. Trading gains/losses retain their semantic

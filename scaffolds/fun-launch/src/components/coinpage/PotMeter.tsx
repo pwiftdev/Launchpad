@@ -8,6 +8,7 @@ import { NETWORK_LABEL } from '@/constants/network';
 import { formatReadableNumber } from '@/lib/format/number';
 import { cn } from '@/lib/utils';
 import { PanelSection } from './PanelSection';
+import { quoteAsset } from '@/lib/feeModes';
 
 const MILESTONES = [25, 50, 75];
 
@@ -32,6 +33,8 @@ export const PotMeter = ({
   const pct = coin.isMigrated ? 100 : Math.min(Math.max(coin.progress * 100, 0), 100);
   const hot = !coin.isMigrated && pct >= HOT_BOND_PROGRESS * 100;
   const remainingSol = Math.max(coin.thresholdSol - coin.quoteReserveSol, 0);
+  const { symbol } = quoteAsset(coin.quoteMint);
+  const quoteToSol = coin.quoteToSol ?? 1;
 
   return (
     <PanelSection
@@ -101,9 +104,11 @@ export const PotMeter = ({
               </p>
               <p
                 className="font-mono text-[13px] font-semibold tabular-nums"
-                title={`${coin.quoteReserveSol.toFixed(2)} SOL in the curve`}
+                title={`${(coin.quoteReserveSol / quoteToSol).toFixed(2)} ${symbol} in the curve`}
               >
-                {usd(coin.quoteReserveSol)}
+                {symbol === 'SOL'
+                  ? usd(coin.quoteReserveSol)
+                  : `${formatReadableNumber(coin.quoteReserveSol / quoteToSol)} ${symbol}`}
               </p>
             </div>
             <div className="rounded-lg bg-neutral-900/60 px-2.5 py-2">
@@ -115,9 +120,9 @@ export const PotMeter = ({
                   'font-mono text-[13px] font-semibold tabular-nums',
                   hot && 'text-acid'
                 )}
-                title={`${coin.thresholdSol} SOL graduation target`}
+                title={`${formatReadableNumber(coin.thresholdSol / quoteToSol)} ${symbol} graduation target`}
               >
-                {formatReadableNumber(remainingSol)} SOL
+                {formatReadableNumber(remainingSol / quoteToSol)} {symbol}
               </p>
             </div>
           </div>

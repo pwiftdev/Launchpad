@@ -26,11 +26,15 @@ import {
   verifyConfigAccount,
   verifyLaunchConfig,
 } from './launchConfig';
-import { isFeeModeId } from '@/lib/feeModes';
+import { isFeeModeId, isHsolMode, QUOTES, quoteAsset } from '@/lib/feeModes';
+import { NETWORK_GENESIS } from '../../../../scripts/network-policy.cjs';
+import { createHsolRateReader } from './hsolRate';
 import { registeredConfigKeys, registeredCoin, type LaunchMode } from './launchRegistry';
 import { loadMigratedPool, migratedPrice } from './damm';
 import { hasSocials, SOCIAL_KINDS, type Socials } from '@/lib/socials';
 import { readDisplayClock } from './displayClock';
+import { allowsMskdIdentity } from './officialMskd';
+import { readBorshString } from './mintMetadata';
 
 const RPC_URL = process.env.RPC_URL as string;
 const POOL_CONFIG_KEY = process.env.POOL_CONFIG_KEY as string;
@@ -42,6 +46,7 @@ export const connection = new Connection(RPC_URL || 'http://127.0.0.1:8899', {
 });
 export const dbc = new DynamicBondingCurveClient(connection, 'confirmed');
 export const configKey = () => new PublicKey(POOL_CONFIG_KEY);
+const hsolRate = createHsolRateReader(connection);
 
 const LAMPORTS = 1e9;
 const COINS_TTL_MS = 10_000;
@@ -63,8 +68,13 @@ export async function getConfig(key: PublicKey = configKey(), fresh = false): Pr
   if (!fresh && cached && Date.now() - cached.at < 60_000) return cached.value;
   const digest = await verifyConfigAccount(connection, key);
   const value = await dbc.state.getPoolConfig(key);
-  // Every launch mode pairs to SOL (MSKD pays holders in wXMR, but its curve is SOL)
-  if (!value || !value.quoteMint.equals(NATIVE_MINT)) throw new Error('Unsupported pool quote mint');
+  if (
+    !value ||
+    (!value.quoteMint.equals(NATIVE_MINT) &&
+      (genesis !== NETWORK_GENESIS['mainnet-beta'] ||
+        value.quoteMint.toBase58() !== QUOTES.hsol.mint))
+  )
+    throw new Error('Unsupported pool quote mint');
   if (configCache.size >= 128) configCache.delete(configCache.keys().next().value!);
   configCache.set(id, { at: Date.now(), value, digest });
   return value;
@@ -74,7 +84,8 @@ export async function getLaunchConfig(mode: LaunchMode = 'bond') {
   let key: PublicKey;
   if (isFeeModeId(mode)) {
     const keys = await registeredConfigKeys(genesis, `${mode}-v1`, true);
-    if (keys.length !== 1) throw new Error('A single enabled reviewed config is required for this mode');
+    if (keys.length !== 1)
+      throw new Error('A single enabled reviewed config is required for this mode');
     key = new PublicKey(keys[0]!);
   } else key = configKey();
   const config = await getConfig(key, true);
@@ -110,18 +121,6 @@ const metaUris = new Map<string, string>();
 const offchainMetadata = new OffchainMetadataCache({ store: metadataStoreFromEnvironment() });
 export const cacheUploadedMetadata = (uri: string, metadata: unknown) =>
   offchainMetadata.seed(uri, metadata);
-
-function readBorshString(data: Buffer, offset: number): [string, number] {
-  if (offset < 0 || offset + 4 > data.length) throw new Error('Invalid metadata');
-  const len = data.readUInt32LE(offset);
-  if (len > 2048 || offset + 4 + len > data.length) throw new Error('Invalid metadata length');
-  const value = data
-    .subarray(offset + 4, offset + 4 + len)
-    .toString('utf8')
-    .replace(/\0/g, '')
-    .trim();
-  return [value, offset + 4 + len];
-}
 
 async function getMetas(mints: PublicKey[]): Promise<Map<string, TokenMeta>> {
   const missing = mints.filter((m) => !metaCache.has(m.toBase58()));
@@ -176,19 +175,33 @@ async function getMetas(mints: PublicKey[]): Promise<Map<string, TokenMeta>> {
   return metaCache;
 }
 
-export async function toCoin(
+async function toCoin(
   address: PublicKey,
   account: VirtualPool,
   config: PoolConfig,
   mintData: Mint,
   meta?: TokenMeta
-): Promise<Coin> {
+): Promise<Coin | null> {
   const s = account.poolState;
-  // Every pool is SOL-quoted, so quote amounts are already SOL
-  const quoteToSol = 1;
-  const quoteReserveSol = Number(s.quoteReserve.toString()) / LAMPORTS;
-  const thresholdSol = Number(config.migrationQuoteThreshold.toString()) / LAMPORTS;
-  let priceSol = Number(getPriceFromSqrtPrice(s.sqrtPrice as BN, mintData.decimals, 9).toString());
+  const mint = s.baseMint.toBase58();
+  const registry = await registeredCoin(await networkGenesis(), mint);
+  const name = meta?.name || 'Unnamed coin';
+  const symbol = meta?.symbol || mint.slice(0, 4);
+  if (!allowsMskdIdentity({ name, symbol, mint, deployer: registry?.original_deployer }))
+    return null;
+  const asset = quoteAsset(config.quoteMint.toBase58());
+  if (
+    asset.symbol === 'hSOL' &&
+    (!registry || !isHsolMode(registry.mode) || registry.quote_mint !== asset.mint)
+  )
+    return null;
+  const quoteToSol = asset.symbol === 'hSOL' ? await hsolRate().catch((): null => null) : 1;
+  if (quoteToSol === null) return null;
+  const quoteReserveSol = (Number(s.quoteReserve.toString()) * quoteToSol) / LAMPORTS;
+  const thresholdSol = (Number(config.migrationQuoteThreshold.toString()) * quoteToSol) / LAMPORTS;
+  let priceSol = Number(
+    getPriceFromSqrtPrice(s.sqrtPrice as BN, mintData.decimals, asset.decimals).toString()
+  );
   const isMigrated = Number(s.isMigrated) === 1;
   let migratedPool: string | undefined;
   let migratedBaseIsA: boolean | undefined;
@@ -199,8 +212,6 @@ export async function toCoin(
     migratedBaseIsA = migrated.state.tokenAMint.equals(s.baseMint);
   }
   priceSol *= quoteToSol;
-  const mint = s.baseMint.toBase58();
-  const registry = await registeredCoin(await networkGenesis(), mint);
   const supply = Number(mintData.supply) / 10 ** mintData.decimals;
   return {
     mint,
@@ -217,8 +228,8 @@ export async function toCoin(
     migratedPool,
     migratedBaseIsA,
     dbcCollectFeeMode: config.collectFeeMode,
-    name: meta?.name || 'Unnamed coin',
-    symbol: meta?.symbol || mint.slice(0, 4),
+    name,
+    symbol,
     image: meta?.image ?? null,
     description: meta?.description,
     socials: meta ? socialsOf(meta) : undefined,
@@ -258,8 +269,8 @@ export function invalidateCoinDisplay(mint: string) {
 }
 
 /** All pools on our config, newest first. */
-export async function listCoins({ fresh = false } = {}): Promise<Coin[]> {
-  if (!fresh && coinsCache && Date.now() - coinsCache.at < COINS_TTL_MS) return coinsCache.coins;
+export async function listCoins(): Promise<Coin[]> {
+  if (coinsCache && Date.now() - coinsCache.at < COINS_TTL_MS) return coinsCache.coins;
   if (coinsPending) return coinsPending;
   coinsPending = loadCoins();
   try {
@@ -296,9 +307,14 @@ async function loadCoins(): Promise<Coin[]> {
         )
           return;
         const data = unpackMint(mint, info, info.owner);
-        coins.push(
-          await toCoin(p.publicKey, p.account, p.config, data, metas.get(mint.toBase58()))
+        const coin = await toCoin(
+          p.publicKey,
+          p.account,
+          p.config,
+          data,
+          metas.get(mint.toBase58())
         );
+        if (coin) coins.push(coin);
       })
     );
   }
@@ -353,15 +369,9 @@ async function loadCoin(mint: string): Promise<CoinLookup | null> {
   if (!info || (!info.owner.equals(TOKEN_PROGRAM_ID) && !info.owner.equals(TOKEN_2022_PROGRAM_ID)))
     return null;
   const mintData = unpackMint(s.baseMint, info, info.owner);
-  return {
-    coin: await toCoin(found.publicKey, found.account, config, mintData, metas.get(mint)),
-    account: found.account,
-    config,
-  };
+  const coin = await toCoin(found.publicKey, found.account, config, mintData, metas.get(mint));
+  return coin ? { coin, account: found.account, config } : null;
 }
-
-/** Cached metadata for a coin already returned by listCoins/getCoin. */
-export const cachedMeta = (mint: string): TokenMeta | undefined => metaCache.get(mint);
 
 /** Parses a base58 address from user input, or null if it is not one. */
 export function parseKey(value: unknown): PublicKey | null {

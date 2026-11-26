@@ -39,7 +39,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('profile and discussion access boundaries', () => {
-  it('allows a public profile read while keeping token callouts private during the whitelist', async () => {
+  it('allows a public profile read while keeping token callouts private while the launchpad is private', async () => {
     const wallet = Keypair.generate().publicKey.toBase58();
     const publicRes = response();
     await socialApi('profile')(

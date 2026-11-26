@@ -3,13 +3,18 @@ import { expectedNetworkGenesis } from '../../../../../scripts/network-policy.cj
 import { configuredCompanyWallets } from '../launchConfig';
 import { database } from '../database';
 import { WalletStore } from './walletStore';
-import { WalletWorker, WalletMessageExpired } from './walletWorker';
+import { WalletWorker } from './walletWorker';
 import { WalletSchedulerStore } from './walletSchedulerStore';
 import { MeteoraWalletAdapter } from './walletAdapter';
 import { WalletExternalSigner } from './walletSigner';
 import { loadExternalSignerCommand } from './externalSigner';
 import { assertWalletExecutionGate } from './walletGate';
 import type { SchedulerLease } from './scheduler';
+import {
+  drainWalletExecutionQueue,
+  walletExecutionIssue,
+  walletQueueAlerts,
+} from './walletExecutionQueue';
 const commands = new Set([
   'status',
   'index',
@@ -133,7 +138,8 @@ export async function runWalletCli(argv = process.argv.slice(2)) {
   if (mutating) await assertWalletExecutionGate(rpc, genesis, { worker: true });
   const store = new WalletStore(),
     saved = new WalletSchedulerStore(genesis, wallets.collector.toBase58());
-  const signing = options['--automatic'] === 'true' || command === 'sign';
+  const automatic = options['--automatic'] === 'true';
+  const signing = automatic || command === 'sign';
   const signer = signing
     ? new WalletExternalSigner(
         rpc,
@@ -146,9 +152,13 @@ export async function runWalletCli(argv = process.argv.slice(2)) {
     : undefined;
   let activeLease: SchedulerLease | null = null;
   const runtimeGate = async () => {
-    if (controller.signal.aborted || !activeLease?.alive())
+    const lease = activeLease;
+    if (controller.signal.aborted || !lease?.alive())
       throw new Error('Private worker lease lost or shutdown requested');
-    return assertWalletExecutionGate(rpc, genesis, { worker: true });
+    const wallets = await assertWalletExecutionGate(rpc, genesis, { worker: true });
+    if (controller.signal.aborted || activeLease !== lease || !lease.alive())
+      throw new Error('Private worker lease lost or shutdown requested');
+    return wallets;
   };
   const worker = new WalletWorker(
     rpc,
@@ -181,6 +191,8 @@ export async function runWalletCli(argv = process.argv.slice(2)) {
         failed = 0,
         signed = 0,
         sent = 0;
+      const alerts = new Set<string>();
+      const healthy = () => !controller.signal.aborted && lease.alive();
       const rows: Array<{ mint: string; status: string }> = [];
       try {
         const mints = options['--mint']
@@ -188,8 +200,23 @@ export async function runWalletCli(argv = process.argv.slice(2)) {
           : options['--id']
             ? [(await worker.required(options['--id'])).mint]
             : await saved.discover(maximumCoins);
+        const collector = wallets.collector.toBase58();
+        const dispatch = async () => {
+          const candidates = await store.executionCandidates(
+            genesis,
+            collector,
+            maximumJobs,
+            options['--mint'] ?? (options['--id'] ? mints[0] : undefined)
+          );
+          const execution = await drainWalletExecutionQueue(worker, candidates, healthy);
+          signed += execution.signed;
+          sent += execution.sent;
+          for (const alert of execution.alerts) alerts.add(alert);
+          return candidates.length > 0;
+        };
+        const hadCandidates = automatic && healthy() && (await dispatch());
         for (const mint of mints) {
-          if (controller.signal.aborted || !lease.alive()) break;
+          if (!healthy()) break;
           try {
             if (command === 'index') await worker.index(mint);
             else if (command === 'prepare-platform') {
@@ -213,45 +240,29 @@ export async function runWalletCli(argv = process.argv.slice(2)) {
               if (!options['--id']) throw new Error('Job id required');
               await worker.recover(options['--id']);
             } else {
-              const pending = await store.pendingJobs(genesis, mint, maximumJobs);
-              for (const job of pending) {
-                if (controller.signal.aborted || !lease.alive()) break;
-                if (job.signature) await worker.reconcile(job.id);
-              }
+              if (!automatic)
+                for (const job of await store.pendingJobs(genesis, mint, maximumJobs)) {
+                  if (!healthy()) break;
+                  if (job.signature) await worker.reconcile(job.id);
+                }
               if (command !== 'reconcile') {
-                await worker.plan(mint, maxSpend, maximumJobs, options['--automatic'] === 'true');
-                if (options['--automatic'] === 'true')
-                  for (const job of await store.pendingJobs(genesis, mint, maximumJobs)) {
-                    if (controller.signal.aborted || !lease.alive()) break;
-                    try {
-                      const current = await worker.required(job.id);
-                      if (current.status === 'prepared') {
-                        await worker.sign(job.id);
-                        signed++;
-                      }
-                      if (
-                        ['prepared', 'signed', 'submitted', 'manual_review'].includes(
-                          current.status
-                        )
-                      ) {
-                        await worker.relay(job.id);
-                        sent++;
-                      }
-                    } catch (error) {
-                      if (!(error instanceof WalletMessageExpired)) throw error;
-                      const renewed = await worker.recover(job.id);
-                      if (renewed.status === 'queued') await worker.prepare(job.id);
-                    }
-                  }
+                await worker.plan(mint, maxSpend, maximumJobs, automatic);
               }
             }
             rows.push({ mint, status: 'completed' });
-          } catch {
+          } catch (error) {
+            alerts.add(walletExecutionIssue(error));
             failed++;
             rows.push({ mint, status: 'failed' });
           }
           processed++;
           await lease.progress(mint, processed, failed);
+        }
+        if (automatic && healthy()) {
+          if (!hadCandidates) await dispatch();
+          if (healthy())
+            for (const alert of await walletQueueAlerts(store, rpc, genesis, wallets.collector))
+              alerts.add(alert);
         }
         await lease.finish(controller.signal.aborted ? 'stopped' : 'completed', processed, failed);
       } catch (error) {
@@ -269,7 +280,8 @@ export async function runWalletCli(argv = process.argv.slice(2)) {
           coins: rows,
           transactionsSigned: signed,
           transactionsSent: sent,
-          unsignedOnly: options['--automatic'] !== 'true' && !['sign', 'relay'].includes(command),
+          alerts: [...alerts],
+          unsignedOnly: !automatic && !['sign', 'relay'].includes(command),
         })
       );
       if (cycle + 1 < cycles && !controller.signal.aborted)

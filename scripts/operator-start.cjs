@@ -70,6 +70,8 @@ function validateOperatorConfig(value) {
     'files',
     'exportsDirectory',
     'scheduler',
+    ...(value && Object.hasOwn(value, 'poolPolicyVersion') ? ['poolPolicyVersion'] : []),
+    ...(value && Object.hasOwn(value, 'mskdPayout') ? ['mskdPayout'] : []),
   ]);
   if (
     value.version !== 2 ||
@@ -87,6 +89,26 @@ function validateOperatorConfig(value) {
     fail('OPERATOR_MAINNET_CLOSED');
   if (value.network !== 'mainnet-beta' && value.mainnetTradingEnabled)
     fail('OPERATOR_MAINNET_FLAG_NETWORK');
+  if (
+    value.poolPolicyVersion !== undefined &&
+    ![
+      'wallet-v1',
+      'bond-v1',
+      'mskd-v1',
+      'dev-v1',
+      'cashback-v1',
+      'hsol-v1',
+      'cashback-hsol-v1',
+      'mskd-hsol-v1',
+    ].includes(value.poolPolicyVersion)
+  )
+    fail('OPERATOR_REVIEWED_CONFIG');
+  if (value.mskdPayout !== undefined) {
+    exact(value.mskdPayout, ['pool', 'devnetMint']);
+    publicKey(value.mskdPayout.pool);
+    if (value.network === 'devnet') publicKey(value.mskdPayout.devnetMint);
+    else if (value.mskdPayout.devnetMint !== null) fail('OPERATOR_MAINNET_FLAG_NETWORK');
+  }
   for (const field of ['poolConfigKey', 'collectorPublicKey', 'treasuryPublicKey'])
     publicKey(value[field]);
   try {
@@ -94,6 +116,7 @@ function validateOperatorConfig(value) {
       {
         FEE_COLLECTOR_PUBLIC_KEY: value.collectorPublicKey,
         TREASURY_PUBLIC_KEY: value.treasuryPublicKey,
+        LAUNCH_POLICY_VERSION: value.poolPolicyVersion,
       },
       value.genesis,
       { allowLegacy: true }
@@ -381,6 +404,15 @@ function loadOperatorEnvironment(
     TREASURY_PUBLIC_KEY: config.treasuryPublicKey,
     WALLET_WORKER_ENABLED: 'true',
     MAINNET_TRADING_ENABLED: config.mainnetTradingEnabled ? 'true' : 'false',
+    ...(config.poolPolicyVersion ? { LAUNCH_POLICY_VERSION: config.poolPolicyVersion } : {}),
+    ...(config.mskdPayout
+      ? {
+          MSKD_PAYOUT_POOL: config.mskdPayout.pool,
+          ...(config.mskdPayout.devnetMint
+            ? { MSKD_DEVNET_PAYOUT_MINT: config.mskdPayout.devnetMint }
+            : {}),
+        }
+      : {}),
   };
 }
 async function probeOperatorDeployment(
@@ -409,7 +441,8 @@ async function probeOperatorDeployment(
   let economicPolicy;
   try {
     const decoded = decodeLaunchConfig(account.data);
-    economicPolicy = decoded.activationType === 0 ? 'bond-v1' : 'wallet-v1';
+    economicPolicy =
+      config.poolPolicyVersion ?? (decoded.activationType === 0 ? 'bond-v1' : 'wallet-v1');
     if (economicPolicy === 'bond-v1')
       companyWallets(
         {

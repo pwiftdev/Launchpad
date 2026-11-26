@@ -3,7 +3,7 @@ import { parseEnv } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { validateEnv } from './validate-env.mjs';
 import { companyWallets } from './company-wallets.cjs';
-import { NETWORK_GENESIS } from './network-policy.cjs';
+import { mainnetLaunchPolicy, NETWORK_GENESIS } from './network-policy.cjs';
 
 /** Offline configuration checks only. Values and provider errors never enter the report. */
 export function deploymentReadiness(env) {
@@ -26,12 +26,12 @@ export function deploymentReadiness(env) {
   }
   check('activeCollectorMatchesOwnerRecord', currentWallets);
   check('mainnetNetwork', env.NEXT_PUBLIC_NETWORK === 'mainnet-beta');
-  check('bondPolicy', env.LAUNCH_POLICY_VERSION === 'bond-v1');
+  const policy = mainnetLaunchPolicy(env);
+  check('mainnetLaunchPolicy', env.LAUNCH_POLICY_VERSION === policy);
   check(
     'canonicalDeploymentOrigin',
-    ['https://plzzz.bond', 'https://rinsed-launchpad-1675f6b9bebf.herokuapp.com'].includes(
-      env.NEXT_PUBLIC_SITE_URL
-    )
+    env.NEXT_PUBLIC_SITE_URL === 'https://rinsed-launchpad-1675f6b9bebf.herokuapp.com' ||
+      (policy === 'bond-v1' && env.NEXT_PUBLIC_SITE_URL === 'https://plzzz.bond')
   );
   check('databaseConfigured', /^postgres(?:ql)?:\/\//.test(env.DATABASE_URL ?? ''));
   check('collectorConfigured', Boolean(env.FEE_COLLECTOR_PUBLIC_KEY));
@@ -46,18 +46,13 @@ export function deploymentReadiness(env) {
     env.WALLET_WORKER_ENABLED !== 'true' && env.FINANCIAL_WORKER_ENABLED !== 'true'
   );
   check(
-    'registrationFlagsMatch',
-    ['true', 'false'].includes(env.WHITELIST_ENABLED) &&
-      env.WHITELIST_ENABLED === env.NEXT_PUBLIC_WHITELIST_ENABLED
-  );
-  check(
     'releaseFlagsExplicit',
     ['true', 'false'].includes(env.LAUNCHPAD_PUBLIC) &&
       ['true', 'false'].includes(env.MAINNET_TRADING_ENABLED)
   );
   return {
     version: 1,
-    policy: 'bond-v1',
+    policy,
     offline: true,
     configurationChecksPassed: checks.every((item) => item.passed),
     activationEnabled: env.LAUNCHPAD_PUBLIC === 'true' && env.MAINNET_TRADING_ENABLED === 'true',

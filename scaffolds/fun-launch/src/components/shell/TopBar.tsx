@@ -29,7 +29,11 @@ export const TopBar = () => {
       >
         <Wordmark className="text-[19px]" />
       </Link>
-      <Link href="/" aria-label={`${BRAND.name} home`} className="flex items-center gap-1.5 md:hidden">
+      <Link
+        href="/"
+        aria-label={`${BRAND.name} home`}
+        className="flex items-center gap-1.5 md:hidden"
+      >
         <LogoMark small className="h-8 w-7" />
         <Wordmark className="hidden text-[16px] xs:inline-flex" />
       </Link>
@@ -40,7 +44,8 @@ export const TopBar = () => {
         className="group flex h-9 min-w-9 max-w-md flex-1 items-center gap-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 text-sm text-neutral-500 transition-colors hover:border-neutral-700 hover:text-neutral-300 sm:px-3"
         aria-label="Search coins"
       >
-        <span className="iconify h-4 w-4 ph--magnifying-glass" />
+        <span className="iconify h-4 w-4 shrink-0 ph--magnifying-glass" />
+        <span className="min-w-0 flex-1 truncate text-left text-[13px] sm:hidden">Search</span>
         <span className="hidden min-w-0 flex-1 truncate text-left text-[13px] sm:inline">
           Search coins, tickers, mints
         </span>
@@ -53,14 +58,6 @@ export const TopBar = () => {
       </button>
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
-        {process.env.NEXT_PUBLIC_WHITELIST_ENABLED === 'true' && (
-          <Link
-            href="/whitelist"
-            className="hidden h-9 shrink-0 items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 text-xs font-medium text-primary sm:flex"
-          >
-            $MSKD airdrop <span className="iconify h-3.5 w-3.5 ph--arrow-up-right" />
-          </Link>
-        )}
         <span
           className="hidden items-center gap-1.5 rounded-md px-2 py-1 font-term text-[10px] uppercase tracking-[0.12em] text-neutral-500 lg:flex"
           title="No KYC, no account, no email. Your wallet is your only login."

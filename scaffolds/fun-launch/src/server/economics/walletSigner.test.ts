@@ -17,6 +17,7 @@ import { validateWalletSignJob, WalletExternalSigner, WALLET_SIGN_PROTOCOL } fro
 import { walletSignerConfig } from './walletSignerConfig';
 import type { WalletJob } from './walletTypes';
 import type { WalletStore } from './walletStore';
+import devCompany from '../../../../../docs/mskd-mainnet-dev-wallets.public.json';
 const stubs = vi.hoisted(() => ({
   gate: vi.fn(),
   coin: vi.fn(),
@@ -206,18 +207,29 @@ describe('company-wallet signer policy', () => {
       'reconstructed Meteora'
     );
   });
-  it('protects funded liabilities and enforces private amount caps', async () => {
+  it('protects funded liabilities even when a user claim exceeds the treasury limit', async () => {
     const f = fixture();
     vi.mocked(f.rpc.getBalanceAndContext).mockResolvedValue({
       context: { slot: 1000 },
       value: 805000,
     });
-    await expect(validateWalletSignJob(f.job, f.rpc, f.store, limits)).rejects.toThrow(
-      'all reward liabilities'
-    );
     await expect(
       validateWalletSignJob(f.job, f.rpc, f.store, { ...limits, maximumPayoutLamports: '700000' })
-    ).rejects.toThrow('payout limit');
+    ).rejects.toThrow('all reward liabilities');
+    vi.mocked(f.rpc.getBalanceAndContext).mockResolvedValue({
+      context: { slot: 1000 },
+      value: 2000000,
+    });
+    await expect(
+      validateWalletSignJob(f.job, f.rpc, f.store, { ...limits, maximumPayoutLamports: '700000' })
+    ).resolves.toHaveProperty('transaction');
+  });
+  it('retains the private cap for treasury withdrawals', async () => {
+    const f = fixture();
+    f.job.kind = f.saved.kind = 'platform_claim';
+    await expect(
+      validateWalletSignJob(f.job, f.rpc, f.store, { ...limits, maximumPayoutLamports: '700000' })
+    ).rejects.toThrow('treasury payout limit');
   });
 });
 describe('private wallet signer configuration', () => {
@@ -239,6 +251,21 @@ describe('private wallet signer configuration', () => {
   });
   it('accepts explicit ordinary owner wallets without a native program setting', () => {
     expect(walletSignerConfig(policy()).purpose).toBe('rinsed-wallet-signer');
+  });
+  it('requires the Dev collector, treasury and pool config pin for mainnet Dev', () => {
+    const p = policy();
+    const environment = {
+      ...p.environment,
+      LAUNCH_POLICY_VERSION: 'dev-v1',
+      FEE_COLLECTOR_PUBLIC_KEY: devCompany.collector,
+      TREASURY_PUBLIC_KEY: devCompany.treasury,
+    };
+    expect(() => walletSignerConfig({ ...p, environment })).toThrow('pool config pin');
+    const POOL_CONFIG_KEY = fixtureWallet().publicKey.toBase58();
+    expect(
+      walletSignerConfig({ ...p, environment: { ...environment, POOL_CONFIG_KEY } }).environment
+        .POOL_CONFIG_KEY
+    ).toBe(POOL_CONFIG_KEY);
   });
   it('rejects disabled or missing explicit gates, inherited settings and swapped wallets', () => {
     const p = policy();

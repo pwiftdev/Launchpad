@@ -19,6 +19,7 @@ import {
   type PoolConfig,
 } from '@meteora-ag/dynamic-bonding-curve-sdk';
 import BN from 'bn.js';
+import { assertReviewedSwap, type ReviewedSwap } from './reviewedSwap';
 
 export function migratedPoolAddress(config: PoolConfig, mint: PublicKey) {
   if (config.migrationOption !== 1 || config.quoteMint.equals(mint))
@@ -39,7 +40,12 @@ export function assertMigratedPair(
     throw new Error('Graduated pool mint pair does not match the launch');
 }
 /** Graduated new-policy fees are at their final floor; mode accounting starts immediately. */
-export function assertReleasedMigrationPolicy(state: PoolState, mint: PublicKey, feeBps = 125, quote = NATIVE_MINT) {
+export function assertReleasedMigrationPolicy(
+  state: PoolState,
+  mint: PublicKey,
+  feeBps = 125,
+  quote = NATIVE_MINT
+) {
   assertMigratedPair(state, mint, quote);
   const base = decodePodAlignedFeeTimeScheduler(
     Buffer.from(state.poolFees.baseFee.baseFeeInfo.data)
@@ -100,7 +106,8 @@ export async function migratedSwap(
   units: BN,
   slippageBps: number,
   owner?: PublicKey,
-  commitment: 'confirmed' | 'finalized' = 'confirmed'
+  commitment: 'confirmed' | 'finalized' = 'confirmed',
+  reviewed?: ReviewedSwap
 ) {
   const { address, state, client } = await loadMigratedPool(connection, config, mint, commitment);
   const accounts = await connection.getMultipleAccountsInfo(
@@ -151,6 +158,8 @@ export async function migratedSwap(
   const feeSol = feeMint.equals(config.quoteMint)
     ? feeAmount
     : feeAmount * migratedPrice(state, mint, baseDecimals, config.quoteMint);
+  if (reviewed) assertReviewedSwap(reviewed, address.toBase58(), quote.swapOutAmount);
+  const minimumAmountOut = reviewed?.minimumAmountOut ?? quote.minSwapOutAmount;
   const transaction = owner
     ? await client.swap({
         payer: owner,
@@ -158,7 +167,7 @@ export async function migratedSwap(
         inputTokenMint: inputMint,
         outputTokenMint: outputMint,
         amountIn: units,
-        minimumAmountOut: quote.minSwapOutAmount,
+        minimumAmountOut,
         tokenAVault: state.tokenAVault,
         tokenBVault: state.tokenBVault,
         tokenAMint: state.tokenAMint,
@@ -171,7 +180,7 @@ export async function migratedSwap(
     : undefined;
   return {
     amountOut: quote.swapOutAmount,
-    minimumAmountOut: quote.minSwapOutAmount,
+    minimumAmountOut,
     feeMint: feeMint.toBase58(),
     feeAmount,
     feeSol,

@@ -401,7 +401,8 @@ it('refuses treasury/operator role substitution and non-mainnet or unbounded pol
 });
 
 it('runs the bundled reference signer in a separate process with fixture-only keys and no network sends', async () => {
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rinsed-reference-signer-'));
+  const tempRoot = fs.realpathSync(os.tmpdir());
+  const folder = fs.mkdtempSync(path.join(tempRoot, 'rinsed-reference-signer-'));
   try {
     const f = fixture(),
       entry = path.join(folder, 'signer.cjs'),
@@ -515,7 +516,7 @@ it('runs the bundled reference signer in a separate process with fixture-only ke
     expect(throughTransport.requestId).toBe(f.request().requestId);
   } finally {
     if (
-      path.dirname(folder) !== path.resolve(os.tmpdir()) ||
+      path.dirname(folder) !== tempRoot ||
       !path.basename(folder).startsWith('rinsed-reference-signer-')
     )
       throw Error('Unsafe fixture cleanup path');

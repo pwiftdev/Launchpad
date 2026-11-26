@@ -25,7 +25,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const common = {
       network,
       genesis,
-
     };
 
     if (!bond && isFeeModeId(requested)) {
@@ -48,8 +47,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           creatorBundledBuyExempt: true,
         },
         split: SPLIT,
-        mainnetTradingEnabled: false,
-        ...(approved ? {} : { notice: `${mode.label} requires a reviewed, enabled launch configuration.` }),
+        mainnetTradingEnabled: approved?.genesis === genesis && network === 'mainnet-beta',
+        ...(approved
+          ? {}
+          : { notice: `${mode.label} requires a reviewed, enabled launch configuration.` }),
       });
     }
 

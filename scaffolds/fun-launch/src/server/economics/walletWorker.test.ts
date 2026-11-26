@@ -10,6 +10,8 @@ import {
 import { messageDigest } from './chainEvidence';
 import type { WalletStore } from './walletStore';
 import type { WalletJob, WalletChainAdapter } from './walletTypes';
+import { MSKD_QUOTE_LIFETIME_MS } from './walletMskdPolicy';
+import { WalletRecipientUnavailable } from './walletRecipient';
 function fixture() {
   const collector = fixtureWallet(),
     recipient = fixtureWallet(),
@@ -172,6 +174,49 @@ describe('central wallet signing and relay recovery', () => {
     expect(f.getJob().transaction_base64).toBeTruthy();
   });
 });
+
+describe('MSKD conversion uses the durable wallet attempt', () => {
+  function conversion() {
+    const f = fixture();
+    const job = f.getJob();
+    Object.assign(job, { kind: 'holder_conversion', bucket: 'community', recipient: null });
+    job.expectations.quoteCreatedAt = Date.now();
+    vi.spyOn(f.worker, 'coin').mockResolvedValue({
+      mode: 'mskd',
+      policy_version: 'mskd-v1',
+    } as never);
+    return f;
+  }
+  it('keeps exact signed bytes if the worker loses its lease and after an ambiguous send', async () => {
+    const f = conversion();
+    f.gate.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('lease lost'));
+    await expect(f.worker.sign('1')).rejects.toThrow('lease lost');
+    expect(f.getJob().status).toBe('signed');
+    expect(f.rpc.sendRawTransaction).not.toHaveBeenCalled();
+    const signed = f.getJob().transaction_base64;
+    vi.mocked(f.rpc.sendRawTransaction).mockRejectedValueOnce(
+      new Error('ambiguous remote outcome')
+    );
+    await expect(f.worker.relay('1')).rejects.toThrow('ambiguous');
+    expect(f.getJob().status).toBe('manual_review');
+    await f.worker.relay('1');
+    expect(f.getJob().transaction_base64).toBe(signed);
+    expect(f.signer.sign).toHaveBeenCalledOnce();
+    expect(f.rpc.sendRawTransaction).toHaveBeenNthCalledWith(2, Buffer.from(signed!, 'base64'), {
+      skipPreflight: false,
+      maxRetries: 0,
+    });
+  });
+
+  it('keeps a signed conversion pending when its quote expires before relay', async () => {
+    const f = conversion();
+    await f.worker.sign('1');
+    f.getJob().expectations.quoteCreatedAt = Date.now() - MSKD_QUOTE_LIFETIME_MS - 1;
+    await expect(f.worker.relay('1')).rejects.toThrow('quote has expired');
+    expect(f.getJob().status).toBe('signed');
+    expect(f.rpc.sendRawTransaction).not.toHaveBeenCalled();
+  });
+});
 it('another unsettled signed collector job cannot be mistaken for free operating income', async () => {
   const f = fixture();
   vi.mocked(f.store.assertNoUnsettledSigned).mockRejectedValue(
@@ -279,4 +324,24 @@ it('a zero-output buyback stays queued while the same coin payout is prepared', 
   expect(prepare.mock.calls.map((c) => c[0])).toEqual(['dust', '1']);
   expect(result.jobs.map((j) => j.status)).toEqual(['queued', 'prepared']);
   expect(f.signer.sign).not.toHaveBeenCalled();
+});
+it('prepares collection even when a queued payout cannot meet recipient rent', async () => {
+  const f = fixture();
+  const blocked = {
+    ...f.getJob(),
+    id: 'treasury',
+    kind: 'platform_claim',
+    status: 'queued',
+  } as const;
+  const collection = { ...f.getJob(), kind: 'collect' } as const;
+  vi.spyOn(f.worker, 'coin').mockResolvedValue({ mode: 'dev' } as never);
+  vi.spyOn(f.worker, 'index').mockResolvedValue({ complete: true, dbc: {} as never, damm: null });
+  Object.assign(f.store, { pendingJobs: async () => [blocked, collection] });
+  const prepare = vi
+    .spyOn(f.worker, 'prepare')
+    .mockRejectedValueOnce(new WalletRecipientUnavailable())
+    .mockResolvedValueOnce(collection);
+  const result = await f.worker.plan(collection.mint);
+  expect(prepare.mock.calls).toEqual([[blocked.id], [collection.id]]);
+  expect(result.jobs).toEqual([blocked, collection]);
 });

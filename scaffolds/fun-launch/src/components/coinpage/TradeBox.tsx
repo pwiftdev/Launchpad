@@ -6,7 +6,7 @@ import { useUnifiedWalletContext, useWallet } from '@jup-ag/wallet-adapter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { BalanceResponse, Coin, QuoteResponse } from '@/lib/coin';
-import { BASE_FEE_PERCENT } from '@/constants/launch';
+import { BASE_FEE_PERCENT, TOKEN_DECIMALS } from '@/constants/launch';
 import { explorerUrl, NETWORK, NETWORK_LABEL } from '@/constants/network';
 import { formatReadableNumber } from '@/lib/format/number';
 import { useUsd } from '@/hooks/useUsd';
@@ -16,6 +16,9 @@ import { Button } from '../ui/button';
 import { CoinAvatar } from '../coin/CoinAvatar';
 import { confirmTransaction } from '@/lib/confirmTransaction';
 import { readTradeReceipt, tradeReceiptKey, type TradeReceipt } from '@/lib/tradeReceipt';
+import { formatTokenUnits } from '@/lib/tokenUnits';
+import { TRADE_SLIPPAGE_BPS } from '@/lib/tradeQuote';
+import { quoteAsset } from '@/lib/feeModes';
 import {
   migrationReceiptKey,
   readMigrationReceipt,
@@ -28,8 +31,6 @@ const BUY_PRESETS = [0.1, 0.5, 1, 2];
 const SELL_PRESETS = [25, 50, 75, 100];
 /** Left in the wallet on a max buy, for network fees and account rent. */
 const BUY_SOL_RESERVE = 0.01;
-/** The swap route's default slippage bound (see swapSchema). */
-const DEFAULT_SLIPPAGE_PERCENT = 3;
 
 export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }) => {
   const amountId = useId();
@@ -89,7 +90,7 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
       /* Receipt remains in memory when browser storage is unavailable. */
     }
   };
-  const { quote, error, loading } = useQuote(coin.mint, side, Number(amount));
+  const { quote, error, loading, refetch } = useQuote(coin.mint, side, Number(amount));
   const balance = useBalance(coin.mint, publicKey?.toBase58(), !coin.isDemo);
   const { usd, price } = useUsd();
 
@@ -108,6 +109,7 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
         await recoverTrade(saved, false);
         return;
       }
+      if (!quote || quote.minimumAmountOut === '0') return;
       const res = await fetch('/api/swap-tx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -116,9 +118,12 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
           side,
           amount: Number(amount),
           wallet: publicKey.toBase58(),
+          quotePool: quote.pool,
+          minimumAmountOut: quote.minimumAmountOut,
         }),
       });
       const body = await res.json();
+      if (res.status === 409) void refetch();
       if (!res.ok) throw new Error(body.error);
       const prepared = Transaction.from(Buffer.from(body.tx, 'base64'));
       const message = Buffer.from(prepared.serializeMessage());
@@ -395,7 +400,8 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
   }
 
   const numericAmount = Number(amount);
-  const quoteUnit = 'SOL';
+  const { symbol: quoteUnit } = quoteAsset(coin.quoteMint);
+  const quoteToSol = coin.quoteToSol ?? 1;
   const quoteBalance = balance?.quoteBalance ?? (quoteUnit === 'SOL' ? balance?.sol : undefined);
   const available = side === 'buy' ? quoteBalance : balance?.tokens;
   const unit = side === 'buy' ? quoteUnit : coin.symbol;
@@ -404,7 +410,11 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
     if (!balance) return;
     const value =
       side === 'buy'
-        ? Math.max(0, (quoteBalance ?? 0) * fraction - (fraction === 1 && quoteUnit === 'SOL' ? BUY_SOL_RESERVE : 0))
+        ? Math.max(
+            0,
+            (quoteBalance ?? 0) * fraction -
+              (fraction === 1 && quoteUnit === 'SOL' ? BUY_SOL_RESERVE : 0)
+          )
         : balance.tokens * fraction;
     const rounded = Math.floor(value * 1e6) / 1e6;
     setAmount(rounded > 0 ? String(rounded) : '');
@@ -608,7 +618,7 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
                 {formatReadableNumber(quote.amountOut)} {side === 'buy' ? coin.symbol : quoteUnit}
               </span>
               {side === 'sell' && price && (
-                <span className="ml-1.5 text-neutral-500">{usd(quote.amountOut)}</span>
+                <span className="ml-1.5 text-neutral-500">{usd(quote.amountOut * quoteToSol)}</span>
               )}
             </Row>
             <Row
@@ -617,16 +627,28 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
               title={
                 quote.feeMint && quote.feeMint !== (coin.quoteMint ?? NATIVE_MINT.toBase58())
                   ? `${formatReadableNumber(quote.feeAmount ?? 0)} ${coin.symbol} · SOL equivalent estimated`
-                  : `${quote.feeSol.toFixed(quote.feeSol < 0.01 ? 5 : 3)} SOL`
+                  : `${formatReadableNumber(quote.feeAmount ?? quote.feeSol / quoteToSol)} ${quoteUnit}`
               }
             >
               <span className={taxed ? 'font-semibold text-rose' : 'text-neutral-200'}>
                 {quote.feeSolIsEstimate ? '≈ ' : ''}
-                {usd(quote.feeSol)} · {quote.feePercent.toFixed(2)}%
+                {quoteUnit === 'SOL'
+                  ? usd(quote.feeSol)
+                  : `${formatReadableNumber(quote.feeSol / quoteToSol)} ${quoteUnit}`}{' '}
+                · {quote.feePercent.toFixed(2)}%
               </span>
             </Row>
             <Row label="Max slippage">
-              <span className="text-neutral-400">{DEFAULT_SLIPPAGE_PERCENT}%</span>
+              <span className="text-neutral-400">{TRADE_SLIPPAGE_BPS / 100}%</span>
+            </Row>
+            <Row label="Minimum received">
+              <span className="text-neutral-400">
+                {formatTokenUnits(
+                  quote.minimumAmountOut,
+                  side === 'buy' ? (coin.tokenDecimals ?? TOKEN_DECIMALS) : 9
+                )}{' '}
+                {side === 'buy' ? coin.symbol : quoteUnit}
+              </span>
             </Row>
             {taxed && (
               <p className="pt-0.5 text-[11px] leading-relaxed text-rose/90">
@@ -653,7 +675,10 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
             ? 'bg-emerald text-ink hover:bg-emerald/90'
             : 'bg-rose text-white hover:bg-rose/90'
         )}
-        disabled={!!publicKey && (!quote || sending || !!pendingTrade || short)}
+        disabled={
+          !!publicKey &&
+          (!quote || quote.minimumAmountOut === '0' || sending || !!pendingTrade || short)
+        }
         onClick={trade}
       >
         {!publicKey
@@ -732,12 +757,18 @@ function useQuote(mint: string, side: Side, amount: number) {
   });
   // A failed refresh must remove the previous quote and disable signing.
   const quote =
-    enabled && !query.isError && Date.now() - query.dataUpdatedAt <= 5000
-      ? (query.data ?? null)
+    enabled &&
+    !query.isError &&
+    query.data?.side === side &&
+    query.data.amountIn === amount &&
+    typeof query.data.minimumAmountOut === 'string' &&
+    Date.now() - query.dataUpdatedAt <= 5000
+      ? query.data
       : null;
   return {
     quote,
     error: query.error instanceof Error ? query.error.message : null,
     loading: enabled && query.isFetching && !quote,
+    refetch: query.refetch,
   };
 }

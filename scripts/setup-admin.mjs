@@ -80,7 +80,7 @@ try {
   };
   const current = await api('GET');
   if (!current.DATABASE_URL || (current.WHITELIST_SECRET?.length ?? 0) < 32)
-    throw new Error('Registration storage must be configured before admin sign-in.');
+    throw new Error('Configure Postgres and the rate-limit secret before admin sign-in.');
   console.log(`Set the private admin key for ${app}. Existing admin sessions will be signed out.`);
   console.log(
     'Use a unique key from your password manager, at least 16 characters. Input stays hidden.'

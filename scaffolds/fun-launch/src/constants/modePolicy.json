@@ -22,6 +22,12 @@
       "decimals": 9,
       "mint": "So11111111111111111111111111111111111111112",
       "migrationQuoteThreshold": "80000000000"
+    },
+    "hsol": {
+      "symbol": "hSOL",
+      "decimals": 9,
+      "mint": "he1iusmfkpAdwvxLNGV8Y1iSbj4rUy6yMhEA3fotn9A",
+      "migrationQuoteThreshold": "80000000000"
     }
   },
   "payouts": {
@@ -37,7 +43,7 @@
     "mskd": {
       "policyVersion": "mskd-v1",
       "label": "MSKD",
-      "tagline": "Paired to SOL. Holders earn in Monero.",
+      "tagline": "Holders earn wXMR from collected trade fees.",
       "quote": "sol",
       "payout": "wxmr",
       "beneficiary": "holders"
@@ -45,15 +51,37 @@
     "dev": {
       "policyVersion": "dev-v1",
       "label": "Regular · Dev",
-      "tagline": "Paired to SOL. The creator earns.",
+      "tagline": "The creator earns a share of collected trade fees.",
       "quote": "sol",
       "beneficiary": "creator"
     },
     "cashback": {
       "policyVersion": "cashback-v1",
       "label": "Regular · Cashback",
-      "tagline": "Paired to SOL. Holders earn.",
+      "tagline": "Holders earn a share of collected trade fees in the paired asset.",
       "quote": "sol",
+      "beneficiary": "holders"
+    },
+    "hsol": {
+      "policyVersion": "hsol-v1",
+      "label": "hSOL · Dev",
+      "tagline": "Buy and sell in hSOL. The creator earns hSOL.",
+      "quote": "hsol",
+      "beneficiary": "creator"
+    },
+    "cashback-hsol": {
+      "policyVersion": "cashback-hsol-v1",
+      "label": "Regular · Cashback",
+      "tagline": "Buy and sell in hSOL. Holders earn hSOL.",
+      "quote": "hsol",
+      "beneficiary": "holders"
+    },
+    "mskd-hsol": {
+      "policyVersion": "mskd-hsol-v1",
+      "label": "MSKD",
+      "tagline": "Buy and sell in hSOL. Holders earn wXMR.",
+      "quote": "hsol",
+      "payout": "wxmr",
       "beneficiary": "holders"
     }
   }

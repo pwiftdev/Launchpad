@@ -66,7 +66,17 @@ function parse(raw: string | null, wallet: string): PendingLaunch | null {
       row.signature.length < 64 ||
       row.signature.length > 88 ||
       bs58.decode(row.signature).length !== 64 ||
-      !['bond', 'creator', 'community', 'mskd', 'dev', 'cashback'].includes(String(row.mode)) ||
+      ![
+        'bond',
+        'creator',
+        'community',
+        'mskd',
+        'dev',
+        'cashback',
+        'hsol',
+        'cashback-hsol',
+        'mskd-hsol',
+      ].includes(String(row.mode)) ||
       typeof row.name !== 'string' ||
       row.name.length > 64 ||
       typeof row.symbol !== 'string' ||

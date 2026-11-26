@@ -35,6 +35,63 @@ const valid = {
 test('accepts a complete deployment configuration', () => {
   assert.doesNotThrow(() => validateEnv(valid));
 });
+test('private launch previews accept only an optional lowercase hex server secret', () => {
+  const secret = 'a3'.repeat(32);
+  assert.doesNotThrow(() => validateEnv({ ...valid, LAUNCH_PREVIEW_SECRET: secret }));
+  assert.throws(
+    () => validateEnv({ ...valid, LAUNCH_PREVIEW_SECRET: 'invalid-preview-secret' }),
+    /LAUNCH_PREVIEW_SECRET must be a 32-byte lowercase hex secret/
+  );
+  assert.doesNotMatch(
+    JSON.stringify(publicBuildEnvironment({ ...valid, LAUNCH_PREVIEW_SECRET: secret })),
+    /LAUNCH_PREVIEW_SECRET/
+  );
+});
+test('mainnet OTC offer opt-in requires a server-only secret and Postgres', () => {
+  const options = {
+    OTC_MAINNET_OFFERS_ENABLED: 'true',
+    OTC_PREVIEW_SECRET: 'ab'.repeat(32),
+    DATABASE_URL: 'postgresql://db.example/app',
+  };
+  const mainnet = { ...valid, ...options, NEXT_PUBLIC_NETWORK: 'mainnet-beta' };
+  assert.doesNotThrow(() => validateEnv(mainnet));
+  assert.throws(() => validateEnv({ ...valid, ...options }), /requires mainnet-beta/);
+  assert.throws(
+    () => validateEnv({ ...mainnet, OTC_PREVIEW_SECRET: '' }),
+    /require OTC_PREVIEW_SECRET/
+  );
+  assert.throws(() => validateEnv({ ...mainnet, DATABASE_URL: 'invalid' }), /Postgres/);
+  assert.throws(
+    () => validateEnv({ ...mainnet, OTC_MAINNET_OFFERS_ENABLED: 'yes' }),
+    /Invalid OTC/
+  );
+  assert.doesNotMatch(JSON.stringify(publicBuildEnvironment(mainnet)), /OTC_/);
+});
+test('Rings settlement uses a keyed Helius endpoint on the selected network', () => {
+  const mainnet = {
+    ...valid,
+    NEXT_PUBLIC_NETWORK: 'mainnet-beta',
+    DATABASE_URL: 'postgresql://db.example/app',
+    OTC_PREVIEW_SECRET: 'ab'.repeat(32),
+    OTC_MAINNET_OFFERS_ENABLED: 'true',
+    OTC_RINGS_SETTLEMENT_ENABLED: 'true',
+    OTC_RINGS_RPC_URL: 'https://mainnet.helius-rpc.com/?api-key=fixture',
+  };
+  assert.doesNotThrow(() => validateEnv(mainnet));
+  assert.throws(
+    () => validateEnv({ ...mainnet, OTC_MAINNET_OFFERS_ENABLED: 'false' }),
+    /requires the OTC desk/
+  );
+  assert.throws(
+    () =>
+      validateEnv({
+        ...mainnet,
+        OTC_RINGS_RPC_URL: 'https://devnet.helius-rpc.com/?api-key=fixture',
+      }),
+    /keyed Helius RPC/
+  );
+  assert.doesNotMatch(JSON.stringify(publicBuildEnvironment(mainnet)), /OTC_RINGS|fixture/);
+});
 test('permits known historical collector pins only for a closed web transition, never live admission', () => {
   const roles = createRequire(import.meta.url)('../docs/mainnet-authorities.public.json');
   const env = {
@@ -140,27 +197,6 @@ test('validates additional domains separately from the single canonical origin',
     assert.throws(() => validateEnv({ ...valid, SITE_ALLOWED_ORIGINS }));
   assert.throws(() =>
     validateEnv({ ...valid, NEXT_PUBLIC_SITE_URL: 'https://launch.example,https://rinsed.fun' })
-  );
-});
-
-test('requires durable storage and an authentication key for whitelist registration', () => {
-  assert.throws(() => validateEnv({ ...valid, WHITELIST_ENABLED: 'true' }), /database/);
-  assert.throws(
-    () =>
-      validateEnv({
-        ...valid,
-        WHITELIST_ENABLED: 'true',
-        DATABASE_URL: 'postgres://db.example/app',
-      }),
-    /WHITELIST_SECRET/
-  );
-  assert.doesNotThrow(() =>
-    validateEnv({
-      ...valid,
-      WHITELIST_ENABLED: 'true',
-      DATABASE_URL: 'postgres://db.example/app',
-      WHITELIST_SECRET: 'x'.repeat(48),
-    })
   );
 });
 

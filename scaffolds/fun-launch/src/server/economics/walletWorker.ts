@@ -13,9 +13,14 @@ import { migratedPoolAddress } from '../damm';
 import { FinalizedVerifier, validateSignedTransaction } from './chainEvidence';
 import { FinalizedFeeIndexer } from './finalizedIndexer';
 import { collectHolderSnapshot } from './holderSnapshot';
+import { configuredCompanyWallets } from '../launchConfig';
+import { mskdConversionPool, mskdPayoutMint, requireFreshMskdQuote } from './walletMskdPolicy';
+import { hasBatchedHolderRewards, isCashbackMode, isMskdMode } from '@/lib/launchModes';
+import { assertPayoutTokenBacking } from './walletTokenCustody';
 import { WalletStore } from './walletStore';
 import { verifyWalletRecovery } from './walletRecovery';
 import { WalletCollectionUnavailable, WalletBuybackUnavailable } from './walletAdapter';
+import { WalletRecipientUnavailable } from './walletRecipient';
 import {
   MINIMUM_BUYBACK_LAMPORTS,
   MAXIMUM_AUTOMATIC_TREASURY_LAMPORTS,
@@ -146,6 +151,10 @@ export class WalletWorker {
         coin,
         maximumSpendLamports: BigInt(job.lamports),
       });
+    } else if (job.kind === 'holder_conversion') {
+      if (!this.adapter.prepareHolderConversion)
+        throw new Error('MSKD conversion adapter is unavailable');
+      prepared = await this.adapter.prepareHolderConversion(job);
     } else if (job.kind === 'setup') prepared = await this.adapter.prepareSetup({ coin });
     else prepared = await this.adapter.preparePayout(job);
     await this.gate();
@@ -217,35 +226,15 @@ export class WalletWorker {
         intentKey: treasuryIntent(clock.blockTime),
       });
     }
-    const community =
-      coin.mode === 'community'
-        ? (await this.store.balances(this.genesis, mint)).find((row) => row.bucket === 'community')
-        : undefined;
-    if (coin.mode === 'community' && community && BigInt(community.available) > 0n) {
-      const clock = await new FinalizedVerifier(this.rpc, this.genesis).clock(),
-        epoch = Math.floor(clock.blockTime / 3600) - 1;
-      if (epoch >= 0 && !(await this.store.epoch(this.genesis, mint, epoch))) {
-        const snapshot = await collectHolderSnapshot(this.rpc, {
-          networkGenesis: this.genesis,
-          mint,
-          excludedOwners: new Set([
-            PublicKey.default.toBase58(),
-            deriveDbcPoolAuthority().toBase58(),
-            deriveDammV2PoolAuthority().toBase58(),
-          ]),
-          excludedTokenAccounts: new Set([
-            getAssociatedTokenAddressSync(new PublicKey(mint), this.collector).toBase58(),
-          ]),
-        });
-        await this.gate();
-        await this.store.createEpoch({
-          networkGenesis: this.genesis,
-          mint,
-          epoch: Math.floor(snapshot.blockTime / 3600) - 1,
-          snapshot,
-        });
-      }
-    }
+    if (
+      coin.mode === 'community' ||
+      isCashbackMode(coin.mode) ||
+      (isMskdMode(coin.mode) &&
+        mskdPayoutMint(this.genesis) &&
+        mskdConversionPool() &&
+        !pending.some((job) => job.kind === 'holder_conversion'))
+    )
+      await this.allocateHolderIncome(coin);
     pending = await this.store.pendingJobs(this.genesis, mint, maximumJobs);
     const jobs: WalletJob[] = [];
     for (const job of pending) {
@@ -255,6 +244,7 @@ export class WalletWorker {
         if (
           !(error instanceof WalletCollectionUnavailable) &&
           !(error instanceof WalletBuybackUnavailable) &&
+          !(error instanceof WalletRecipientUnavailable) &&
           !(error instanceof WalletOperatingUnavailable)
         )
           throw error;
@@ -263,9 +253,63 @@ export class WalletWorker {
     }
     return { status: 'planned', jobs };
   }
+  private async allocateHolderIncome(coin: RegisteredCoin) {
+    const community = (await this.store.balances(this.genesis, coin.mint)).find(
+      (balance) => balance.bucket === 'community'
+    );
+    if (!community || BigInt(community.available) <= 0n) return;
+    const clock = await new FinalizedVerifier(this.rpc, this.genesis).clock();
+    const epoch = Math.floor(clock.blockTime / 3600) - 1;
+    const hourly = hasBatchedHolderRewards(coin.mode);
+    if (
+      epoch < 0 ||
+      (hourly && clock.blockTime % 3600 >= 60) ||
+      (await this.store.epoch(this.genesis, coin.mint, epoch))
+    )
+      return;
+    const excludedOwners = new Set([
+      PublicKey.default.toBase58(),
+      deriveDbcPoolAuthority().toBase58(),
+      deriveDammV2PoolAuthority().toBase58(),
+    ]);
+    if (hourly) {
+      const { collector, treasury } = configuredCompanyWallets(this.genesis);
+      for (const owner of [
+        collector.toBase58(),
+        treasury.toBase58(),
+        '1nc1nerator11111111111111111111111111111111',
+      ])
+        excludedOwners.add(owner);
+    }
+    const snapshot = await collectHolderSnapshot(this.rpc, {
+      networkGenesis: this.genesis,
+      mint: coin.mint,
+      excludedOwners,
+      excludedTokenAccounts: new Set([
+        getAssociatedTokenAddressSync(new PublicKey(coin.mint), this.collector).toBase58(),
+      ]),
+    });
+    if (
+      hourly &&
+      (Math.floor(snapshot.blockTime / 3600) - 1 !== epoch || snapshot.blockTime % 3600 >= 60)
+    )
+      return;
+    await this.gate();
+    if (isMskdMode(coin.mode)) {
+      await this.store.queueMskdConversion(snapshot);
+      return;
+    }
+    await this.store.createEpoch({
+      networkGenesis: this.genesis,
+      mint: coin.mint,
+      epoch: Math.floor(snapshot.blockTime / 3600) - 1,
+      snapshot,
+    });
+  }
   private async solvent(job: WalletJob) {
-    if ((await this.coin(job.mint)).policy_version === 'bond-v1')
-      await this.store.assertOperatingFunding(job);
+    const coin = await this.coin(job.mint);
+    if (coin.policy_version === 'bond-v1') await this.store.assertOperatingFunding(job);
+    await assertPayoutTokenBacking(this.rpc, this.store, this.collector, job, coin);
     const requirement = await this.store.custodyRequirement(
         this.genesis,
         this.collector.toBase58()
@@ -316,6 +360,7 @@ export class WalletWorker {
     await this.store.assertNoUnsettledSigned(this.genesis, this.collector.toBase58(), id);
     await this.unexpired(job);
     await this.solvent(job);
+    if (job.kind === 'holder_conversion') requireFreshMskdQuote(job.expectations.quoteCreatedAt);
     const signed = await this.signer.sign(job),
       checked = validateSignedTransaction(signed.signedTransactionBase64, job.message_digest!);
     if (checked.signature !== signed.signature)
@@ -334,10 +379,13 @@ export class WalletWorker {
     await this.gate();
     await this.unexpired(job);
     await this.solvent(job);
+    if (job.kind === 'holder_conversion') requireFreshMskdQuote(job.expectations.quoteCreatedAt);
     job = await this.store.markSubmitted(id);
     try {
       await this.gate();
       await this.solvent(job);
+      await this.gate();
+      if (job.kind === 'holder_conversion') requireFreshMskdQuote(job.expectations.quoteCreatedAt);
       const signature = await this.rpc.sendRawTransaction(
         Buffer.from(job.transaction_base64!, 'base64'),
         { skipPreflight: false, maxRetries: 0 }

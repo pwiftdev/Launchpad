@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { PublicKey } from '@solana/web3.js';
 import { DynamicBondingCurveClient } from '@meteora-ag/dynamic-bonding-curve-sdk';
-import { usesLaunchSlot } from '@/lib/launchModes';
+import { hasBatchedHolderRewards, usesLaunchSlot } from '@/lib/launchModes';
 import { z } from 'zod';
 import { apiGuard } from '@/server/apiGuard';
 import { connection, networkGenesis, getConfig } from '@/server/dbc';
@@ -84,10 +84,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     if (!proof.signature || proof.signature !== parsed.data.signature)
       throw new Error('Creation signature mismatch');
-    if (
-      usesLaunchSlot(intent.mode) &&
-      (!Number.isSafeInteger(tx.blockTime) || tx.blockTime! <= 0)
-    )
+    if (usesLaunchSlot(intent.mode) && (!Number.isSafeInteger(tx.blockTime) || tx.blockTime! <= 0))
       throw new Error('The finalized launch timestamp is required');
     if (reviewed.policy_version === 'rinse-v1') {
       const program = configuredVaultProgram();
@@ -120,7 +117,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       config_key: intent.config_key,
       original_deployer: intent.deployer,
       mode: intent.mode,
-      recipient: intent.mode === 'community' ? reviewed.expected_fee_claimer : intent.deployer,
+      recipient:
+        intent.mode === 'community' || hasBatchedHolderRewards(intent.mode)
+          ? reviewed.expected_fee_claimer
+          : intent.deployer,
       policy_version: reviewed.policy_version,
       quote_mint: config.quoteMint.toBase58(),
       activation_point: state.activationPoint.toString(),

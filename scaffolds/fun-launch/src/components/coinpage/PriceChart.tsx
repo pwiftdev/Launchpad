@@ -12,6 +12,7 @@ import {
   type ChartPreferences,
 } from '@/lib/chartPreferences';
 import { useSolPrice } from '@/hooks/useUsd';
+import { quoteAsset } from '@/lib/feeModes';
 import { cn } from '@/lib/utils';
 
 const UP = '#2EE6A6';
@@ -133,12 +134,19 @@ const TokenChart = ({ coin, trades, isLoading, error, onRetry, className }: Pric
     () => buildTradeBars(trades?.trades ?? [], preferences.interval),
     [trades?.trades, preferences.interval]
   );
-  const multiplier = chartValueMultiplier(
+  const quoteUnit = quoteAsset(coin.quoteMint).symbol;
+  const quoteToSol = trades?.quoteToSol ?? coin.quoteToSol ?? 1;
+  const chartCurrency = preferences.currency === 'USD' ? 'USD' : quoteUnit;
+  const baseMultiplier = chartValueMultiplier(
     preferences.metric,
     preferences.currency,
     coin.tokenSupply,
     solPrice
   );
+  const multiplier =
+    baseMultiplier === null || preferences.currency === 'USD'
+      ? baseMultiplier
+      : baseMultiplier / quoteToSol;
   const candles = useMemo(
     () =>
       multiplier === null
@@ -311,7 +319,7 @@ const TokenChart = ({ coin, trades, isLoading, error, onRetry, className }: Pric
           ? []
           : bars.map((bar) => ({
               time: bar.time as UTCTimestamp,
-              value: bar.volumeSol,
+              value: bar.volumeSol / quoteToSol,
               color: bar.close >= bar.open ? 'rgba(46,230,166,0.32)' : 'rgba(255,77,120,0.32)',
             }))
       );
@@ -321,7 +329,7 @@ const TokenChart = ({ coin, trades, isLoading, error, onRetry, className }: Pric
     } finally {
       changingData.current = false;
     }
-  }, [candles, bars, multiplier, preferences.interval, ready]);
+  }, [candles, bars, multiplier, preferences.interval, quoteToSol, ready]);
 
   const activeIndex =
     hoverTime === null
@@ -363,7 +371,7 @@ const TokenChart = ({ coin, trades, isLoading, error, onRetry, className }: Pric
     preferences.currency === 'USD'
       ? 'USD uses the current SOL rate, not historical exchange rates.'
       : '',
-    preferences.volume ? 'Volume is recorded wallet SOL flow, including swap fees.' : '',
+    preferences.volume ? `Volume is recorded wallet ${quoteUnit} flow, including swap fees.` : '',
     trades && !trades.complete ? 'History is partial.' : '',
     storageUnavailable ? 'Chart settings apply to this visit; browser storage is unavailable.' : '',
   ]
@@ -414,7 +422,7 @@ const TokenChart = ({ coin, trades, isLoading, error, onRetry, className }: Pric
             value={preferences.currency}
             onChange={(value) => update('currency', value)}
             options={[
-              ['SOL', 'SOL'],
+              ['SOL', quoteUnit],
               ['USD', 'USD'],
             ]}
           />
@@ -468,7 +476,7 @@ const TokenChart = ({ coin, trades, isLoading, error, onRetry, className }: Pric
             <span className="font-normal text-neutral-500">
               {' '}
               · {preferences.metric === 'marketCap' ? 'MCap' : 'Price'} ·{' '}
-              {intervalLabel(preferences.interval)} · {preferences.currency}
+              {intervalLabel(preferences.interval)} · {chartCurrency}
             </span>
           </span>
           {coin.isDemo && (
@@ -501,7 +509,10 @@ const TokenChart = ({ coin, trades, isLoading, error, onRetry, className }: Pric
               )}
               {preferences.volume && activeBar && (
                 <span>
-                  Vol <span className="text-neutral-200">{formatValue(activeBar.volumeSol)}</span>
+                  Vol{' '}
+                  <span className="text-neutral-200">
+                    {formatValue(activeBar.volumeSol / quoteToSol)}
+                  </span>
                 </span>
               )}
             </span>
@@ -545,7 +556,7 @@ const TokenChart = ({ coin, trades, isLoading, error, onRetry, className }: Pric
                   ? 'Market history could not load.'
                   : noValues
                     ? preferences.currency === 'USD' && (!solPrice || usdError)
-                      ? 'USD conversion unavailable. Select SOL to view recorded prices.'
+                      ? `USD conversion unavailable. Select ${quoteUnit} to view recorded prices.`
                       : 'Verified token supply is unavailable. Select token price to view this market.'
                     : loading
                       ? 'Loading recorded trades...'

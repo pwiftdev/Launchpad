@@ -74,7 +74,7 @@ test('web3 and the trading SDKs use the JSON RPC client without stream-json serv
 test('the patched Metro consumer reads image buffers through the fixed image-size API', () => {
   const { getAssetSize } = requireApp('metro/private/Assets');
   const png = readFileSync(
-    new URL('../scaffolds/fun-launch/public/brand/favicon-32.png', import.meta.url)
+    new URL('../scaffolds/fun-launch/public/brand/mskd-favicon-32.png', import.meta.url)
   );
   assert.deepEqual(getAssetSize('png', png, 'favicon.png'), { width: 32, height: 32 });
   assert.throws(() => getAssetSize('png', Buffer.alloc(0), 'empty.png'));

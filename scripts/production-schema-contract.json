@@ -105,10 +105,43 @@
     {
       "file": "026-mskd-sol-pair.sql",
       "sha256": "3a2e255ecfcb2d13fb8e32ddf364049f756728ffb3ce7d70d6a5668249853b3a"
+    },
+    {
+      "file": "027-holder-payout-allocations.sql",
+      "sha256": "7eee699b2100bd0f462c6b05f9c3bdda3b06afbf61910d38d275937f3d46be16"
+    },
+    {
+      "file": "028-mskd-payout-conversions.sql",
+      "sha256": "1036f6ade73afe99083338e4ae577d8e1bb88b9913560fe76d188c6e2f30e5af"
+    },
+    {
+      "file": "029-token-chat.sql",
+      "sha256": "971f281f370fff2465247089349069dc253c64827e4bbb5b16dfc14d47164ba4"
+    },
+    {
+      "file": "030-private-launch-previews.sql",
+      "sha256": "ee1c8fd4319c68ed7f26bff1723499b8016c2ba0625e957b7a2fe82c5d6ae8f6"
+    },
+    {
+      "file": "031-confidential-otc-offers.sql",
+      "sha256": "7e2d9c4c6f7593a1a3c8d2cf3f6dd64a34b7768c5a1ab6bc43d9b10d76db1afc"
+    },
+    {
+      "file": "032-otc-rings-deals.sql",
+      "sha256": "b528e857aca1b8b9ea44025037f4acd51df211ede6d31f32e44de34e172c271a"
+    },
+    {
+      "file": "033-hsol-launch-pair.sql",
+      "sha256": "04e5d34e35872b6261272c8e532f65edd367c08eee35989e82fad7934dac9303"
+    },
+    {
+      "file": "034-hsol-holder-modes.sql",
+      "sha256": "5733cf32f387624259cc443c150f208a1169b4edcd9b50564a0efc9733b4b985"
     }
   ],
   "catalog": {
     "tables": [
+      "confidential_otc_offers",
       "financial_balances",
       "financial_claim_attempts",
       "financial_collected_reserves",
@@ -136,15 +169,20 @@
       "launch_configs",
       "launch_migration_proofs",
       "launch_migrations",
+      "launch_preview_drafts",
+      "launch_preview_invites",
       "launch_schema_migrations",
       "launch_upload_authorizations",
       "launch_upload_budgets",
       "offchain_metadata_cache",
+      "otc_rings_deals",
       "pending_launch_intents",
       "token_callouts",
+      "token_chat_messages",
       "token_image_cache",
       "wallet_allocations",
       "wallet_balances",
+      "wallet_claim_allocations",
       "wallet_claim_requests",
       "wallet_collected_events",
       "wallet_collection_cursors",
@@ -156,6 +194,8 @@
       "wallet_job_attempts",
       "wallet_jobs",
       "wallet_mode_sol_expenses",
+      "wallet_mskd_conversions",
+      "wallet_mskd_snapshots",
       "wallet_operating_costs",
       "wallet_operating_sources",
       "wallet_phase_totals",
@@ -169,6 +209,76 @@
       "whitelist_limits"
     ],
     "columns": [
+      {
+        "table_name": "confidential_otc_offers",
+        "column_name": "id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "confidential_otc_offers",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "confidential_otc_offers",
+        "column_name": "owner",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "confidential_otc_offers",
+        "column_name": "viewer_wallet",
+        "udt_name": "varchar",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "confidential_otc_offers",
+        "column_name": "token_hash",
+        "udt_name": "bpchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 64,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "confidential_otc_offers",
+        "column_name": "expires_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "confidential_otc_offers",
+        "column_name": "ciphertext",
+        "udt_name": "bytea",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
       {
         "table_name": "financial_balances",
         "column_name": "network_genesis",
@@ -2930,6 +3040,116 @@
         "numeric_scale": null
       },
       {
+        "table_name": "launch_preview_drafts",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "launch_preview_drafts",
+        "column_name": "owner",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "launch_preview_drafts",
+        "column_name": "revision",
+        "udt_name": "int4",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "launch_preview_drafts",
+        "column_name": "ciphertext",
+        "udt_name": "bytea",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "launch_preview_invites",
+        "column_name": "id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "launch_preview_invites",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "launch_preview_invites",
+        "column_name": "owner",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "launch_preview_invites",
+        "column_name": "revision",
+        "udt_name": "int4",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "launch_preview_invites",
+        "column_name": "token_hash",
+        "udt_name": "bpchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 64,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "launch_preview_invites",
+        "column_name": "viewer_wallet",
+        "udt_name": "varchar",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "launch_preview_invites",
+        "column_name": "expires_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
         "table_name": "launch_schema_migrations",
         "column_name": "filename",
         "udt_name": "text",
@@ -3110,6 +3330,76 @@
         "numeric_scale": null
       },
       {
+        "table_name": "otc_rings_deals",
+        "column_name": "offer_id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "otc_rings_deals",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "otc_rings_deals",
+        "column_name": "maker",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "otc_rings_deals",
+        "column_name": "taker",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "otc_rings_deals",
+        "column_name": "revision",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": "0",
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "otc_rings_deals",
+        "column_name": "ciphertext",
+        "udt_name": "bytea",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "otc_rings_deals",
+        "column_name": "created_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": "now()",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
         "table_name": "pending_launch_intents",
         "column_name": "network_genesis",
         "udt_name": "varchar",
@@ -3270,6 +3560,76 @@
         "numeric_scale": null
       },
       {
+        "table_name": "token_chat_messages",
+        "column_name": "id",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "token_chat_messages",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "token_chat_messages",
+        "column_name": "mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "token_chat_messages",
+        "column_name": "author",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 16,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "token_chat_messages",
+        "column_name": "client_id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "token_chat_messages",
+        "column_name": "ciphertext",
+        "udt_name": "bytea",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "token_chat_messages",
+        "column_name": "created_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": "now()",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
         "table_name": "token_image_cache",
         "column_name": "uri_digest",
         "udt_name": "bpchar",
@@ -3360,6 +3720,16 @@
         "numeric_scale": 0
       },
       {
+        "table_name": "wallet_allocations",
+        "column_name": "source_lamports",
+        "udt_name": "numeric",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 78,
+        "numeric_scale": 0
+      },
+      {
         "table_name": "wallet_balances",
         "column_name": "network_genesis",
         "udt_name": "text",
@@ -3418,6 +3788,56 @@
         "character_maximum_length": null,
         "numeric_precision": 78,
         "numeric_scale": 0
+      },
+      {
+        "table_name": "wallet_claim_allocations",
+        "column_name": "job_id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "wallet_claim_allocations",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "wallet_claim_allocations",
+        "column_name": "mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "wallet_claim_allocations",
+        "column_name": "epoch",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "wallet_claim_allocations",
+        "column_name": "wallet",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
       },
       {
         "table_name": "wallet_claim_requests",
@@ -3865,6 +4285,36 @@
         "udt_name": "numeric",
         "is_nullable": "NO",
         "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 78,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "wallet_epochs",
+        "column_name": "snapshot_exclusions",
+        "udt_name": "jsonb",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "wallet_epochs",
+        "column_name": "asset_mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": "'So11111111111111111111111111111111111111112'::character varying",
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "wallet_epochs",
+        "column_name": "source_carry_lamports",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": "0",
         "character_maximum_length": null,
         "numeric_precision": 78,
         "numeric_scale": 0
@@ -4518,6 +4968,156 @@
         "character_maximum_length": null,
         "numeric_precision": 78,
         "numeric_scale": 0
+      },
+      {
+        "table_name": "wallet_mskd_conversions",
+        "column_name": "job_id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "wallet_mskd_conversions",
+        "column_name": "signature",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 88,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "wallet_mskd_conversions",
+        "column_name": "finalized_slot",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "wallet_mskd_conversions",
+        "column_name": "spent_lamports",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 78,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "wallet_mskd_conversions",
+        "column_name": "received_units",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 78,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "column_name": "job_id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "column_name": "mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "column_name": "epoch",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "column_name": "snapshot_slot",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "column_name": "snapshot_time",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "column_name": "snapshot_digest",
+        "udt_name": "bpchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 64,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "column_name": "payout_mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "column_name": "excluded_owners",
+        "udt_name": "jsonb",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "column_name": "owner_weights",
+        "udt_name": "jsonb",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
       },
       {
         "table_name": "wallet_operating_costs",
@@ -5231,6 +5831,34 @@
       }
     ],
     "constraints": [
+      {
+        "table_name": "confidential_otc_offers",
+        "name": "check:2ffeeba5041c484a237a35d9e860c9f314e24dc13fc6edc14282be8328d84a7c",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((token_hash ~ '^[a-f0-9]{64}$'::text))"
+      },
+      {
+        "table_name": "confidential_otc_offers",
+        "name": "check:86d735bce19779c94ed697f782a75d61c8602a19defd2b2d45126d9c87a11130",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((octet_length(ciphertext) >= 30) AND (octet_length(ciphertext) <= 512)))"
+      },
+      {
+        "table_name": "confidential_otc_offers",
+        "name": "confidential_otc_offers_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "confidential_otc_offers",
+        "name": "confidential_otc_offers_token_hash_key",
+        "type": "u",
+        "validated": true,
+        "definition": "UNIQUE (token_hash)"
+      },
       {
         "table_name": "financial_balances",
         "name": "check:0e02fbd4ca9785908d8edb975a41e9d2ab888a7a9113ac7232e4102904a7a0c8",
@@ -6206,31 +6834,17 @@
       },
       {
         "table_name": "launch_coins",
-        "name": "check:3c0a7626adb7f05086f57fb49d292944c4a129c39e67ac8f9963440a3f9ff0a2",
+        "name": "check:319d15f302ae0893e5a9e956688a2f64beb77806c30e3f678b37b5a5e56a7603",
         "type": "c",
         "validated": true,
-        "definition": "CHECK ((policy_version = ANY (ARRAY['rinse-v1'::text, 'legacy-devnet'::text, 'wallet-v1'::text, 'bond-v1'::text, 'mskd-v1'::text, 'dev-v1'::text, 'cashback-v1'::text])))"
+        "definition": "CHECK (((mode = ANY (ARRAY['community'::text, 'cashback'::text, 'mskd'::text, 'cashback-hsol'::text, 'mskd-hsol'::text])) OR ((recipient)::text = (original_deployer)::text)))"
       },
       {
         "table_name": "launch_coins",
-        "name": "check:4015b2f459d65c0b8acecd4a597bd6fc4c9811666dbd0e6c83a2b2675e120be9",
+        "name": "check:4d838e9aa62fd25f2368a13f1b5b65ffbb05affe1e5f19ce4b1ba13e25b843eb",
         "type": "c",
         "validated": true,
-        "definition": "CHECK (((mode = 'community'::text) OR ((recipient)::text = (original_deployer)::text)))"
-      },
-      {
-        "table_name": "launch_coins",
-        "name": "check:7645b4ad4598b516ecbab94b09d5b73d0684c0ce69ccc9cdd6bc74492284ce01",
-        "type": "c",
-        "validated": true,
-        "definition": "CHECK ((mode = ANY (ARRAY['creator'::text, 'community'::text, 'bond'::text, 'mskd'::text, 'dev'::text, 'cashback'::text])))"
-      },
-      {
-        "table_name": "launch_coins",
-        "name": "check:a60b01031a6323cf03a4d6eb00cef1590230970e3e83410f9b0b9a579d59d8db",
-        "type": "c",
-        "validated": true,
-        "definition": "CHECK (((policy_version <> ALL (ARRAY['bond-v1'::text, 'mskd-v1'::text, 'dev-v1'::text, 'cashback-v1'::text])) OR (activation_time IS NOT NULL)))"
+        "definition": "CHECK (((policy_version <> ALL (ARRAY['bond-v1'::text, 'mskd-v1'::text, 'dev-v1'::text, 'cashback-v1'::text, 'hsol-v1'::text, 'cashback-hsol-v1'::text, 'mskd-hsol-v1'::text])) OR (activation_time IS NOT NULL)))"
       },
       {
         "table_name": "launch_coins",
@@ -6238,6 +6852,20 @@
         "type": "c",
         "validated": true,
         "definition": "CHECK ((finalized_slot >= 0))"
+      },
+      {
+        "table_name": "launch_coins",
+        "name": "check:b13ef81b2e989f00ec5568c1ef70ab72ef880de59174e665560f9176c28d6454",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((mode = ANY (ARRAY['creator'::text, 'community'::text, 'bond'::text, 'mskd'::text, 'dev'::text, 'cashback'::text, 'hsol'::text, 'cashback-hsol'::text, 'mskd-hsol'::text])))"
+      },
+      {
+        "table_name": "launch_coins",
+        "name": "check:c18f34bf9041663c1befee7de36807b5248f9e5b424ca73ff005753c4571ad79",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((policy_version = ANY (ARRAY['rinse-v1'::text, 'legacy-devnet'::text, 'wallet-v1'::text, 'bond-v1'::text, 'mskd-v1'::text, 'dev-v1'::text, 'cashback-v1'::text, 'hsol-v1'::text, 'cashback-hsol-v1'::text, 'mskd-hsol-v1'::text])))"
       },
       {
         "table_name": "launch_coins",
@@ -6283,13 +6911,6 @@
       },
       {
         "table_name": "launch_configs",
-        "name": "check:3c0a7626adb7f05086f57fb49d292944c4a129c39e67ac8f9963440a3f9ff0a2",
-        "type": "c",
-        "validated": true,
-        "definition": "CHECK ((policy_version = ANY (ARRAY['rinse-v1'::text, 'legacy-devnet'::text, 'wallet-v1'::text, 'bond-v1'::text, 'mskd-v1'::text, 'dev-v1'::text, 'cashback-v1'::text])))"
-      },
-      {
-        "table_name": "launch_configs",
         "name": "check:5462dbb4a5a6e2e4bfe952f7ec4aeba1dcdee16fd1436af53fc80489e6a094c6",
         "type": "c",
         "validated": true,
@@ -6304,10 +6925,17 @@
       },
       {
         "table_name": "launch_configs",
-        "name": "check:cfb66deb31ce6f705f016bc332b94be29c7c735e9797d740a6cc62a6d792c179",
+        "name": "check:6fae00ccec9e61926f70fb237a409852abd99acfbd3130e597680b56d20eb0f0",
         "type": "c",
         "validated": true,
-        "definition": "CHECK (((quote_mint)::text = 'So11111111111111111111111111111111111111112'::text))"
+        "definition": "CHECK ((((policy_version <> ALL (ARRAY['hsol-v1'::text, 'cashback-hsol-v1'::text, 'mskd-hsol-v1'::text])) AND ((quote_mint)::text = 'So11111111111111111111111111111111111111112'::text)) OR ((policy_version = ANY (ARRAY['hsol-v1'::text, 'cashback-hsol-v1'::text, 'mskd-hsol-v1'::text])) AND ((network_genesis)::text = '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d'::text) AND ((quote_mint)::text = 'he1iusmfkpAdwvxLNGV8Y1iSbj4rUy6yMhEA3fotn9A'::text))))"
+      },
+      {
+        "table_name": "launch_configs",
+        "name": "check:c18f34bf9041663c1befee7de36807b5248f9e5b424ca73ff005753c4571ad79",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((policy_version = ANY (ARRAY['rinse-v1'::text, 'legacy-devnet'::text, 'wallet-v1'::text, 'bond-v1'::text, 'mskd-v1'::text, 'dev-v1'::text, 'cashback-v1'::text, 'hsol-v1'::text, 'cashback-hsol-v1'::text, 'mskd-hsol-v1'::text])))"
       },
       {
         "table_name": "launch_configs",
@@ -6378,6 +7006,62 @@
         "type": "p",
         "validated": true,
         "definition": "PRIMARY KEY (network_genesis, mint)"
+      },
+      {
+        "table_name": "launch_preview_drafts",
+        "name": "check:0fd71e4b3684be599f03971f19ce43a7a7e14f59376215b38e8db19d0deaa25d",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((octet_length(ciphertext) >= 30) AND (octet_length(ciphertext) <= 2810000)))"
+      },
+      {
+        "table_name": "launch_preview_drafts",
+        "name": "check:7c0ddfd91f9bdc7bd607f558b7220a0d09efdbea0973a07402460329265b9c9f",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((revision > 0))"
+      },
+      {
+        "table_name": "launch_preview_drafts",
+        "name": "launch_preview_drafts_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (network_genesis, owner)"
+      },
+      {
+        "table_name": "launch_preview_invites",
+        "name": "check:2ffeeba5041c484a237a35d9e860c9f314e24dc13fc6edc14282be8328d84a7c",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((token_hash ~ '^[a-f0-9]{64}$'::text))"
+      },
+      {
+        "table_name": "launch_preview_invites",
+        "name": "check:7c0ddfd91f9bdc7bd607f558b7220a0d09efdbea0973a07402460329265b9c9f",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((revision > 0))"
+      },
+      {
+        "table_name": "launch_preview_invites",
+        "name": "launch_preview_invites_network_genesis_owner_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (network_genesis, owner) REFERENCES launch_preview_drafts(network_genesis, owner) ON DELETE CASCADE"
+      },
+      {
+        "table_name": "launch_preview_invites",
+        "name": "launch_preview_invites_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "launch_preview_invites",
+        "name": "launch_preview_invites_token_hash_key",
+        "type": "u",
+        "validated": true,
+        "definition": "UNIQUE (token_hash)"
       },
       {
         "table_name": "launch_schema_migrations",
@@ -6471,11 +7155,39 @@
         "definition": "PRIMARY KEY (uri_digest)"
       },
       {
-        "table_name": "pending_launch_intents",
-        "name": "check:7645b4ad4598b516ecbab94b09d5b73d0684c0ce69ccc9cdd6bc74492284ce01",
+        "table_name": "otc_rings_deals",
+        "name": "check:2918db0881e93e4e6a67d66da3d43e523799d69282983a72b1f504ba3680736d",
         "type": "c",
         "validated": true,
-        "definition": "CHECK ((mode = ANY (ARRAY['creator'::text, 'community'::text, 'bond'::text, 'mskd'::text, 'dev'::text, 'cashback'::text])))"
+        "definition": "CHECK (((maker)::text <> (taker)::text))"
+      },
+      {
+        "table_name": "otc_rings_deals",
+        "name": "check:9fc8e8059adec7b39a5f15467d81b855d63246276c8a0d1f8b69d7a221c43acf",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((octet_length(ciphertext) >= 30) AND (octet_length(ciphertext) <= 65536)))"
+      },
+      {
+        "table_name": "otc_rings_deals",
+        "name": "check:f12714e31c277e7a306f2dbf8d987bafbd6ef0991d0bc2110ac6c20a1ab84e9c",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((revision >= 0))"
+      },
+      {
+        "table_name": "otc_rings_deals",
+        "name": "otc_rings_deals_offer_id_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (offer_id) REFERENCES confidential_otc_offers(id) ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "otc_rings_deals",
+        "name": "otc_rings_deals_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (offer_id)"
       },
       {
         "table_name": "pending_launch_intents",
@@ -6483,6 +7195,13 @@
         "type": "c",
         "validated": true,
         "definition": "CHECK ((payload_digest ~ '^[a-f0-9]{64}$'::text))"
+      },
+      {
+        "table_name": "pending_launch_intents",
+        "name": "check:b13ef81b2e989f00ec5568c1ef70ab72ef880de59174e665560f9176c28d6454",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((mode = ANY (ARRAY['creator'::text, 'community'::text, 'bond'::text, 'mskd'::text, 'dev'::text, 'cashback'::text, 'hsol'::text, 'cashback-hsol'::text, 'mskd-hsol'::text])))"
       },
       {
         "table_name": "pending_launch_intents",
@@ -6541,6 +7260,41 @@
         "definition": "PRIMARY KEY (id)"
       },
       {
+        "table_name": "token_chat_messages",
+        "name": "check:7ab9a79feb13118aa7c592856dceed708b3ee317edf7f6109bc0766834c35a6f",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((author)::text ~ '^[a-f0-9]{16}$'::text))"
+      },
+      {
+        "table_name": "token_chat_messages",
+        "name": "check:db302fd3400b570acabe1a3479db497b2315457377fab1a1c7936c8abaa69365",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((octet_length(ciphertext) >= 30) AND (octet_length(ciphertext) <= 2029)))"
+      },
+      {
+        "table_name": "token_chat_messages",
+        "name": "token_chat_messages_network_genesis_mint_author_client_id_key",
+        "type": "u",
+        "validated": true,
+        "definition": "UNIQUE (network_genesis, mint, author, client_id)"
+      },
+      {
+        "table_name": "token_chat_messages",
+        "name": "token_chat_messages_network_genesis_mint_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (network_genesis, mint) REFERENCES launch_coins(network_genesis, mint)"
+      },
+      {
+        "table_name": "token_chat_messages",
+        "name": "token_chat_messages_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
         "table_name": "token_image_cache",
         "name": "check:30e44e20bd467fc0512f9b3e7a250d63023df8a31437c39c8f2986ec4e076911",
         "type": "c",
@@ -6574,6 +7328,13 @@
         "type": "c",
         "validated": true,
         "definition": "CHECK ((lamports > (0)::numeric))"
+      },
+      {
+        "table_name": "wallet_allocations",
+        "name": "check:d0756b93c30d42f3bc176d79f7f1de8b0da53b7e5deded6e04c52b3d5eef5805",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((source_lamports >= (0)::numeric))"
       },
       {
         "table_name": "wallet_allocations",
@@ -6616,6 +7377,27 @@
         "type": "p",
         "validated": true,
         "definition": "PRIMARY KEY (network_genesis, mint, bucket)"
+      },
+      {
+        "table_name": "wallet_claim_allocations",
+        "name": "wallet_claim_allocations_job_id_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (job_id) REFERENCES wallet_jobs(id)"
+      },
+      {
+        "table_name": "wallet_claim_allocations",
+        "name": "wallet_claim_allocations_network_genesis_mint_epoch_wallet_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (network_genesis, mint, epoch, wallet) REFERENCES wallet_allocations(network_genesis, mint, epoch, wallet)"
+      },
+      {
+        "table_name": "wallet_claim_allocations",
+        "name": "wallet_claim_allocations_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (job_id, epoch)"
       },
       {
         "table_name": "wallet_claim_requests",
@@ -6822,6 +7604,13 @@
       },
       {
         "table_name": "wallet_epochs",
+        "name": "check:75aaf7f4a6007ef0c34b69e61359e76f3369cbc377a1efcdb4459a3d057d9dab",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((source_carry_lamports >= (0)::numeric))"
+      },
+      {
+        "table_name": "wallet_epochs",
         "name": "check:9a1e46cf8cb79d642ae0507a166b4c0f56a6f5fd5963dde1fad9598631b1bef4",
         "type": "c",
         "validated": true,
@@ -6861,6 +7650,13 @@
         "type": "c",
         "validated": true,
         "definition": "CHECK ((carry >= (0)::numeric))"
+      },
+      {
+        "table_name": "wallet_epochs",
+        "name": "check:ee4e0f7b37a40b18b8da42da81b25bc9c4b0abb07b39f952ae287ea0c6117636",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((jsonb_typeof(snapshot_exclusions) = 'array'::text))"
       },
       {
         "table_name": "wallet_epochs",
@@ -7053,6 +7849,13 @@
       },
       {
         "table_name": "wallet_jobs",
+        "name": "check:485e5f0858e2c78743b769a95f89fbceca0fcc4f74fac2a5a204c9c40610c241",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((kind <> 'holder_conversion'::text) OR (NOT (bucket IS DISTINCT FROM 'community'::text))))"
+      },
+      {
+        "table_name": "wallet_jobs",
         "name": "check:71f8ebf8c12b12cdab67127ea30de760babcb2b8d760becedb88387af5d41176",
         "type": "c",
         "validated": true,
@@ -7067,17 +7870,17 @@
       },
       {
         "table_name": "wallet_jobs",
+        "name": "check:8aff86d1882b6522eeef10ac0cbe5c44e2a810686058ca6cbb13cbf8a3fd8d1b",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((kind = ANY (ARRAY['collect'::text, 'buyback'::text, 'creator_claim'::text, 'community_claim'::text, 'platform_claim'::text, 'setup'::text, 'holder_conversion'::text])))"
+      },
+      {
+        "table_name": "wallet_jobs",
         "name": "check:8f2380747748100ca3eb4c3ae3c1cdd3223badf2c939ae4a2368b035bec1aaf0",
         "type": "c",
         "validated": true,
         "definition": "CHECK ((burned_tokens >= (0)::numeric))"
-      },
-      {
-        "table_name": "wallet_jobs",
-        "name": "check:ad29358f708e11f0b2fb7ed7d2693c60f8eb8a794af2f4269f75f4fd74482e77",
-        "type": "c",
-        "validated": true,
-        "definition": "CHECK ((kind = ANY (ARRAY['collect'::text, 'buyback'::text, 'creator_claim'::text, 'community_claim'::text, 'platform_claim'::text, 'setup'::text])))"
       },
       {
         "table_name": "wallet_jobs",
@@ -7190,6 +7993,125 @@
         "type": "u",
         "validated": true,
         "definition": "UNIQUE (signature)"
+      },
+      {
+        "table_name": "wallet_mskd_conversions",
+        "name": "check:093746d1bffb21bd3b40fd4ce8c444133b362c23c617031dfe1b699c8c0187bc",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((spent_lamports > (0)::numeric))"
+      },
+      {
+        "table_name": "wallet_mskd_conversions",
+        "name": "check:369d32d4a774b545233dd2144f8ad8ab241826724c11f5738a8263ac69f8e14c",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((received_units > (0)::numeric))"
+      },
+      {
+        "table_name": "wallet_mskd_conversions",
+        "name": "check:af5ac4c30edd3a0b0a440c658eaab3322b777a9d3d7c1c138ffdcd12da9d76ac",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((finalized_slot >= 0))"
+      },
+      {
+        "table_name": "wallet_mskd_conversions",
+        "name": "wallet_mskd_conversions_job_id_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (job_id) REFERENCES wallet_mskd_snapshots(job_id)"
+      },
+      {
+        "table_name": "wallet_mskd_conversions",
+        "name": "wallet_mskd_conversions_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (job_id)"
+      },
+      {
+        "table_name": "wallet_mskd_conversions",
+        "name": "wallet_mskd_conversions_signature_key",
+        "type": "u",
+        "validated": true,
+        "definition": "UNIQUE (signature)"
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "name": "check:63daa09e374b4084ebeab8534712b8a000c8f8148194b500c6d449f04c43059f",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((((snapshot_time / 3600) - 1) = epoch) AND ((snapshot_time % (3600)::bigint) < 60)))"
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "name": "check:6c4b5b8774758574b7c3317b29c39e7187430cf61e25bbf90a9a0604bb40f8dc",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((jsonb_typeof(owner_weights) = 'array'::text))"
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "name": "check:7e6be7b7302fd3587d0a8698cc5d8db0571c12bff1d29f45cb54b9ac527893d2",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((jsonb_typeof(excluded_owners) = 'array'::text))"
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "name": "check:aa8335c68b0bb1fb834b327952ac858643d339a2cb4a3eb3a58c751517bf75b3",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((payout_mint)::text <> 'So11111111111111111111111111111111111111112'::text))"
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "name": "check:cbd42b6b7bfd1a33a72d5c85fb6b266e5269d1ede93cbc0907f143685e3ac86a",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((snapshot_digest ~ '^[a-f0-9]{64}$'::text))"
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "name": "check:d3452e8c38e3f213c3e54075de1aba521320d7f01e35e0dd0629c330ecd88ab3",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((snapshot_slot >= 0))"
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "name": "check:e130b87b93a840313dba7b2a250cf0cd46e62544e81e3a6d66155897698440cf",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((epoch >= 0))"
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "name": "wallet_mskd_snapshots_job_id_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (job_id) REFERENCES wallet_jobs(id)"
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "name": "wallet_mskd_snapshots_network_genesis_mint_epoch_key",
+        "type": "u",
+        "validated": true,
+        "definition": "UNIQUE (network_genesis, mint, epoch)"
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "name": "wallet_mskd_snapshots_network_genesis_mint_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (network_genesis, mint) REFERENCES launch_coins(network_genesis, mint)"
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "name": "wallet_mskd_snapshots_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (job_id)"
       },
       {
         "table_name": "wallet_operating_costs",
@@ -7424,17 +8346,17 @@
       },
       {
         "table_name": "wallet_social_challenges",
-        "name": "check:854df276d5e950389fdf8df05d575784b43f1050fb11503e5aa2d339fbdfba8f",
-        "type": "c",
-        "validated": true,
-        "definition": "CHECK ((purpose = ANY (ARRAY['profile'::text, 'callout'::text])))"
-      },
-      {
-        "table_name": "wallet_social_challenges",
         "name": "check:9f33d65fea423fde094135d7017bd92b2c4ca770196410625b43a2965dbb3e18",
         "type": "c",
         "validated": true,
         "definition": "CHECK ((length(message) <= 2400))"
+      },
+      {
+        "table_name": "wallet_social_challenges",
+        "name": "check:b7805255e3b680071d7ae2bdbf5cd857e5291aa25d681be1c89fba752d250925",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((purpose = ANY (ARRAY['profile'::text, 'callout'::text, 'chat'::text, 'launch-preview'::text, 'otc'::text])))"
       },
       {
         "table_name": "wallet_social_challenges",
@@ -7529,6 +8451,26 @@
       }
     ],
     "indexes": [
+      {
+        "table_name": "confidential_otc_offers",
+        "name": "confidential_otc_offers_expiry",
+        "definition": "CREATE INDEX confidential_otc_offers_expiry ON public.confidential_otc_offers USING btree (expires_at)"
+      },
+      {
+        "table_name": "confidential_otc_offers",
+        "name": "confidential_otc_offers_owner",
+        "definition": "CREATE INDEX confidential_otc_offers_owner ON public.confidential_otc_offers USING btree (network_genesis, owner, expires_at)"
+      },
+      {
+        "table_name": "confidential_otc_offers",
+        "name": "confidential_otc_offers_pkey",
+        "definition": "CREATE UNIQUE INDEX confidential_otc_offers_pkey ON public.confidential_otc_offers USING btree (id)"
+      },
+      {
+        "table_name": "confidential_otc_offers",
+        "name": "confidential_otc_offers_token_hash_key",
+        "definition": "CREATE UNIQUE INDEX confidential_otc_offers_token_hash_key ON public.confidential_otc_offers USING btree (token_hash)"
+      },
       {
         "table_name": "financial_balances",
         "name": "financial_balances_pkey",
@@ -7765,6 +8707,31 @@
         "definition": "CREATE UNIQUE INDEX launch_migrations_pkey ON public.launch_migrations USING btree (network_genesis, mint)"
       },
       {
+        "table_name": "launch_preview_drafts",
+        "name": "launch_preview_drafts_pkey",
+        "definition": "CREATE UNIQUE INDEX launch_preview_drafts_pkey ON public.launch_preview_drafts USING btree (network_genesis, owner)"
+      },
+      {
+        "table_name": "launch_preview_invites",
+        "name": "launch_preview_invites_expiry",
+        "definition": "CREATE INDEX launch_preview_invites_expiry ON public.launch_preview_invites USING btree (expires_at)"
+      },
+      {
+        "table_name": "launch_preview_invites",
+        "name": "launch_preview_invites_owner",
+        "definition": "CREATE INDEX launch_preview_invites_owner ON public.launch_preview_invites USING btree (network_genesis, owner, revision, expires_at)"
+      },
+      {
+        "table_name": "launch_preview_invites",
+        "name": "launch_preview_invites_pkey",
+        "definition": "CREATE UNIQUE INDEX launch_preview_invites_pkey ON public.launch_preview_invites USING btree (id)"
+      },
+      {
+        "table_name": "launch_preview_invites",
+        "name": "launch_preview_invites_token_hash_key",
+        "definition": "CREATE UNIQUE INDEX launch_preview_invites_token_hash_key ON public.launch_preview_invites USING btree (token_hash)"
+      },
+      {
         "table_name": "launch_schema_migrations",
         "name": "launch_schema_migrations_pkey",
         "definition": "CREATE UNIQUE INDEX launch_schema_migrations_pkey ON public.launch_schema_migrations USING btree (filename)"
@@ -7800,6 +8767,21 @@
         "definition": "CREATE UNIQUE INDEX offchain_metadata_cache_pkey ON public.offchain_metadata_cache USING btree (uri_digest)"
       },
       {
+        "table_name": "otc_rings_deals",
+        "name": "otc_rings_deals_maker",
+        "definition": "CREATE INDEX otc_rings_deals_maker ON public.otc_rings_deals USING btree (network_genesis, maker, created_at DESC)"
+      },
+      {
+        "table_name": "otc_rings_deals",
+        "name": "otc_rings_deals_pkey",
+        "definition": "CREATE UNIQUE INDEX otc_rings_deals_pkey ON public.otc_rings_deals USING btree (offer_id)"
+      },
+      {
+        "table_name": "otc_rings_deals",
+        "name": "otc_rings_deals_taker",
+        "definition": "CREATE INDEX otc_rings_deals_taker ON public.otc_rings_deals USING btree (network_genesis, taker, created_at DESC)"
+      },
+      {
         "table_name": "pending_launch_intents",
         "name": "pending_launch_intents_pkey",
         "definition": "CREATE UNIQUE INDEX pending_launch_intents_pkey ON public.pending_launch_intents USING btree (network_genesis, mint)"
@@ -7825,6 +8807,21 @@
         "definition": "CREATE INDEX token_callouts_wallet_rate ON public.token_callouts USING btree (wallet, created_at DESC)"
       },
       {
+        "table_name": "token_chat_messages",
+        "name": "token_chat_messages_feed",
+        "definition": "CREATE INDEX token_chat_messages_feed ON public.token_chat_messages USING btree (network_genesis, mint, id DESC)"
+      },
+      {
+        "table_name": "token_chat_messages",
+        "name": "token_chat_messages_network_genesis_mint_author_client_id_key",
+        "definition": "CREATE UNIQUE INDEX token_chat_messages_network_genesis_mint_author_client_id_key ON public.token_chat_messages USING btree (network_genesis, mint, author, client_id)"
+      },
+      {
+        "table_name": "token_chat_messages",
+        "name": "token_chat_messages_pkey",
+        "definition": "CREATE UNIQUE INDEX token_chat_messages_pkey ON public.token_chat_messages USING btree (id)"
+      },
+      {
         "table_name": "token_image_cache",
         "name": "token_image_cache_accessed",
         "definition": "CREATE INDEX token_image_cache_accessed ON public.token_image_cache USING btree (accessed_at, uri_digest)"
@@ -7836,6 +8833,11 @@
       },
       {
         "table_name": "wallet_allocations",
+        "name": "wallet_allocations_by_wallet",
+        "definition": "CREATE INDEX wallet_allocations_by_wallet ON public.wallet_allocations USING btree (network_genesis, mint, wallet, epoch DESC)"
+      },
+      {
+        "table_name": "wallet_allocations",
         "name": "wallet_allocations_pkey",
         "definition": "CREATE UNIQUE INDEX wallet_allocations_pkey ON public.wallet_allocations USING btree (network_genesis, mint, epoch, wallet)"
       },
@@ -7843,6 +8845,16 @@
         "table_name": "wallet_balances",
         "name": "wallet_balances_pkey",
         "definition": "CREATE UNIQUE INDEX wallet_balances_pkey ON public.wallet_balances USING btree (network_genesis, mint, bucket)"
+      },
+      {
+        "table_name": "wallet_claim_allocations",
+        "name": "wallet_claim_allocations_entitlement",
+        "definition": "CREATE INDEX wallet_claim_allocations_entitlement ON public.wallet_claim_allocations USING btree (network_genesis, mint, wallet, epoch)"
+      },
+      {
+        "table_name": "wallet_claim_allocations",
+        "name": "wallet_claim_allocations_pkey",
+        "definition": "CREATE UNIQUE INDEX wallet_claim_allocations_pkey ON public.wallet_claim_allocations USING btree (job_id, epoch)"
       },
       {
         "table_name": "wallet_claim_requests",
@@ -7916,6 +8928,11 @@
       },
       {
         "table_name": "wallet_jobs",
+        "name": "wallet_active_conversion",
+        "definition": "CREATE UNIQUE INDEX wallet_active_conversion ON public.wallet_jobs USING btree (network_genesis, mint) WHERE ((kind = 'holder_conversion'::text) AND (status = ANY (ARRAY['queued'::text, 'prepared'::text, 'signed'::text, 'submitted'::text, 'manual_review'::text])))"
+      },
+      {
+        "table_name": "wallet_jobs",
         "name": "wallet_active_platform",
         "definition": "CREATE UNIQUE INDEX wallet_active_platform ON public.wallet_jobs USING btree (network_genesis, mint) WHERE ((kind = 'platform_claim'::text) AND (status = ANY (ARRAY['queued'::text, 'prepared'::text, 'signed'::text, 'submitted'::text, 'manual_review'::text])))"
       },
@@ -7928,6 +8945,11 @@
         "table_name": "wallet_jobs",
         "name": "wallet_epoch_once",
         "definition": "CREATE UNIQUE INDEX wallet_epoch_once ON public.wallet_jobs USING btree (network_genesis, mint, recipient, epoch) WHERE ((kind = 'community_claim'::text) AND (status <> 'failed'::text))"
+      },
+      {
+        "table_name": "wallet_jobs",
+        "name": "wallet_finalized_token_claims",
+        "definition": "CREATE INDEX wallet_finalized_token_claims ON public.wallet_jobs USING btree (network_genesis, ((details ->> 'collector'::text)), ((details ->> 'assetMint'::text))) WHERE ((kind = 'community_claim'::text) AND (status = 'finalized'::text) AND (details ? 'assetMint'::text))"
       },
       {
         "table_name": "wallet_jobs",
@@ -7958,6 +8980,26 @@
         "table_name": "wallet_mode_sol_expenses",
         "name": "wallet_mode_sol_expenses_signature_key",
         "definition": "CREATE UNIQUE INDEX wallet_mode_sol_expenses_signature_key ON public.wallet_mode_sol_expenses USING btree (signature)"
+      },
+      {
+        "table_name": "wallet_mskd_conversions",
+        "name": "wallet_mskd_conversions_pkey",
+        "definition": "CREATE UNIQUE INDEX wallet_mskd_conversions_pkey ON public.wallet_mskd_conversions USING btree (job_id)"
+      },
+      {
+        "table_name": "wallet_mskd_conversions",
+        "name": "wallet_mskd_conversions_signature_key",
+        "definition": "CREATE UNIQUE INDEX wallet_mskd_conversions_signature_key ON public.wallet_mskd_conversions USING btree (signature)"
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "name": "wallet_mskd_snapshots_network_genesis_mint_epoch_key",
+        "definition": "CREATE UNIQUE INDEX wallet_mskd_snapshots_network_genesis_mint_epoch_key ON public.wallet_mskd_snapshots USING btree (network_genesis, mint, epoch)"
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "name": "wallet_mskd_snapshots_pkey",
+        "definition": "CREATE UNIQUE INDEX wallet_mskd_snapshots_pkey ON public.wallet_mskd_snapshots USING btree (job_id)"
       },
       {
         "table_name": "wallet_operating_costs",
@@ -8212,6 +9254,13 @@
         "definition": "CREATE TRIGGER wallet_allocations_immutable BEFORE DELETE OR UPDATE ON public.wallet_allocations FOR EACH ROW EXECUTE FUNCTION rinsed_wallet_immutable()"
       },
       {
+        "table_name": "wallet_claim_allocations",
+        "name": "wallet_claim_allocations_immutable",
+        "enabled": "O",
+        "function_name": "rinsed_wallet_immutable",
+        "definition": "CREATE TRIGGER wallet_claim_allocations_immutable BEFORE DELETE OR UPDATE ON public.wallet_claim_allocations FOR EACH ROW EXECUTE FUNCTION rinsed_wallet_immutable()"
+      },
+      {
         "table_name": "wallet_claim_requests",
         "name": "wallet_claim_requests_immutable",
         "enabled": "O",
@@ -8268,6 +9317,20 @@
         "definition": "CREATE TRIGGER wallet_mode_sol_expenses_immutable BEFORE DELETE OR UPDATE ON public.wallet_mode_sol_expenses FOR EACH ROW EXECUTE FUNCTION rinsed_wallet_immutable()"
       },
       {
+        "table_name": "wallet_mskd_conversions",
+        "name": "wallet_mskd_conversions_immutable",
+        "enabled": "O",
+        "function_name": "rinsed_wallet_immutable",
+        "definition": "CREATE TRIGGER wallet_mskd_conversions_immutable BEFORE DELETE OR UPDATE ON public.wallet_mskd_conversions FOR EACH ROW EXECUTE FUNCTION rinsed_wallet_immutable()"
+      },
+      {
+        "table_name": "wallet_mskd_snapshots",
+        "name": "wallet_mskd_snapshots_immutable",
+        "enabled": "O",
+        "function_name": "rinsed_wallet_immutable",
+        "definition": "CREATE TRIGGER wallet_mskd_snapshots_immutable BEFORE DELETE OR UPDATE ON public.wallet_mskd_snapshots FOR EACH ROW EXECUTE FUNCTION rinsed_wallet_immutable()"
+      },
+      {
         "table_name": "wallet_operating_costs",
         "name": "wallet_operating_costs_immutable",
         "enabled": "O",
@@ -8297,7 +9360,7 @@
         "security_definer": false,
         "volatility": "v",
         "config": null,
-        "body_sha256": "13587091ce84e7dbe89350a176f5ca8fa75cded6fc3a0eaf7dc5b0f702c58fee"
+        "body_sha256": "6200e9060bfd0de2863f1a461e605b84dbf034a691bb3188115251d74c69fa6c"
       },
       {
         "name": "rinsed_epoch_immutable",

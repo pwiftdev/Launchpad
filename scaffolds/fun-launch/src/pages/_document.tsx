@@ -27,7 +27,7 @@ export default class Document extends NextDocument<DocumentInitialProps & { nonc
           <link rel="apple-touch-icon" href={BRAND.assets.appleTouch} sizes="180x180" />
           <link rel="manifest" href="/site.webmanifest" />
           {/* The mark and wordmark paint above the fold on the splash and top bar */}
-          <link rel="preload" as="image" href={BRAND.assets.portal} type="image/png" />
+          <link rel="preload" as="image" href={BRAND.assets.markSmall} type="image/webp" />
           <link rel="preload" as="image" href={BRAND.logo} type="image/webp" />
           <link rel="preload" as="image" href={BRAND.wordmarkImage} type="image/webp" />
           <meta name="theme-color" content={BRAND.themeColor} />

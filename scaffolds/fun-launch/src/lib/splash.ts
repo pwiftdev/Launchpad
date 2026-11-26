@@ -1,9 +1,9 @@
-export const SPLASH_SEEN_KEY = 'mskd.splash.v1';
+export const SPLASH_SEEN_KEY = 'mskd.splash.v2';
 export const SPLASH_MAX_MS = 3000;
-/** The balaclava holds this long so the intro reads, even when data is already cached. */
+/** Briefly hold the lockup even when data is already cached. */
 export const SPLASH_MIN_MS = 900;
-/** Zoom through the eyes; must match .splash-leave in globals.css */
-export const SPLASH_EXIT_MS = 1100;
+/** Keep the veil mounted until its CSS fade finishes. */
+export const SPLASH_EXIT_MS = 820;
 /** _document runs this before paint; storage failure simply leaves the first-visit veil in place. */
 export const SPLASH_BOOT_SCRIPT = `try{if(sessionStorage.getItem(${JSON.stringify(SPLASH_SEEN_KEY)})==='1')document.documentElement.classList.add('no-splash')}catch(e){}`;
 

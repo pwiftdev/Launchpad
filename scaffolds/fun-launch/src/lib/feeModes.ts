@@ -8,12 +8,25 @@ export type PayoutId = keyof typeof modePolicy.payouts;
 export type Beneficiary = 'creator' | 'holders';
 
 export const FEE_MODE_IDS = Object.keys(modePolicy.modes) as FeeModeId[];
+export const REWARD_MODES = ['mskd', 'dev', 'cashback'] as const;
+export type RewardMode = (typeof REWARD_MODES)[number];
+const HSOL_PAIRING = { mskd: 'mskd-hsol', dev: 'hsol', cashback: 'cashback-hsol' } as const;
+export const HSOL_MODES = Object.values(HSOL_PAIRING);
+export const pairingMode = (reward: RewardMode, quote: QuoteId): FeeModeId =>
+  quote === 'sol' ? reward : HSOL_PAIRING[reward];
+export const rewardMode = (mode: FeeModeId): RewardMode =>
+  isHsolMode(mode) ? REWARD_MODES.find((reward) => HSOL_PAIRING[reward] === mode)! : mode;
+export const isHsolMode = (mode: unknown): mode is (typeof HSOL_MODES)[number] =>
+  HSOL_MODES.some((value) => value === mode);
 export const DEFAULT_FEE_MODE: FeeModeId = 'mskd';
 export const MODE_POLICY_VERSIONS = FEE_MODE_IDS.map((id) => modePolicy.modes[id].policyVersion);
 export type ModePolicyVersion = `${FeeModeId}-v1`;
 
 export const SCHEDULE = modePolicy.schedule;
 export const SPLIT = modePolicy.split;
+export const QUOTES = modePolicy.quotes;
+
+export const quoteAsset = (mint?: string) => (mint === QUOTES.hsol.mint ? QUOTES.hsol : QUOTES.sol);
 
 /** Percent strings: 125 -> "1.25%", 60 -> "0.60%", 9900 -> "99%" */
 export const pct = (bps: number) =>
@@ -33,9 +46,11 @@ export function feeMode(id: FeeModeId) {
   return {
     id,
     ...mode,
+    quote: mode.quote as QuoteId,
     beneficiary: mode.beneficiary as Beneficiary,
     quoteSymbol: quote.symbol,
     quoteDecimals: quote.decimals,
+    bondingTarget: Number(quote.migrationQuoteThreshold) / 10 ** quote.decimals,
     /** Who receives the 0.60% */
     beneficiaryLabel: mode.beneficiary === 'creator' ? 'Creator' : 'Holders',
     /** What that share is paid in */
@@ -66,7 +81,6 @@ export const BENEFICIARY_NET_BPS = Math.round(
   (SPLIT.beneficiaryBps / (SPLIT.beneficiaryBps + SPLIT.houseBps)) * 10_000
 );
 
-/** The quote mint a mode pairs against. Every mode pairs to SOL. */
 export function quoteMintFor(id: FeeModeId): string {
   return modePolicy.quotes[modePolicy.modes[id].quote as QuoteId].mint;
 }

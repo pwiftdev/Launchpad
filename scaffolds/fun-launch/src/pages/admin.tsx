@@ -5,11 +5,13 @@ import type { GetServerSideProps } from 'next';
 import { LogoMark, Wordmark } from '@/components/brand/Logo';
 import { ADMIN_COOKIE, adminConfigured, readAdminSession } from '@/server/adminSession';
 import { AdminLockButton } from '@/components/shell/AdminLockButton';
+import { launchpadIsPublic } from '@/lib/accessRoutes';
 
 export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Vary', 'Cookie');
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  if (launchpadIsPublic()) return { redirect: { destination: '/', permanent: false } };
   return {
     props: {
       authenticated: readAdminSession(req.cookies[ADMIN_COOKIE]),

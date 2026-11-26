@@ -1,12 +1,8 @@
-# plzzz.bond · Meteora Invent
+# MSKD.fun · Meteora Invent
 
-The [Heroku restoration record](docs/HEROKU-RESTORED-2026-10-31.md) has the current live URL,
-database recovery, deployment status and remaining activation work.
-
-For the launchpad, start with the [current live deployment guide](docs/LIVE-DEPLOYMENT.md) and
-[Bond it. policy](docs/BOND-IT-IMPLEMENTATION-2026-10-31.md). New launches use one mode: Bond it.
-Earlier Rinsed deployment and native-vault documents are historical records. Live readiness still
-requires the new on-chain config, working database/operator, domain and funded acceptance.
+[MASKED](https://mskd.fun) is the Meteora-powered launchpad in this repository. See the
+[launchpad README](scaffolds/fun-launch/README.md) for development and deployment. Earlier Rinsed
+and Bond it. deployment records are kept in `docs/`.
 
 A toolkit consisting of everything you need to invent innovative token launches on Meteora.
 

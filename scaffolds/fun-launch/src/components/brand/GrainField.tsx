@@ -72,13 +72,23 @@ const VERT = `attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}`;
 const SCALE = 0.5;
 const FRAME_MS = 1000 / 30;
 
-/** Full-viewport animated background, fixed behind every page. CSS fallback without WebGL. */
-export const GrainField = () => {
+// One clock for every instance, so the splash draws the exact frame the page background
+// draws beneath it and the hand-off when the splash fades is invisible.
+let sharedT0: number | null = null;
+
+/** Grainy mist for the page background, also drawn identically behind the first-visit splash. */
+export const GrainField = ({ splash = false }: { splash?: boolean }) => {
   const canvas = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const el = canvas.current;
-    const gl = el?.getContext('webgl', { antialias: false, alpha: false, depth: false });
+    const stillFrame = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const gl = el?.getContext('webgl', {
+      antialias: false,
+      alpha: false,
+      depth: false,
+      preserveDrawingBuffer: stillFrame,
+    });
     if (!el || !gl) {
       el?.setAttribute('data-fallback', '');
       return;
@@ -123,9 +133,8 @@ export const GrainField = () => {
         gl.viewport(0, 0, w, h);
       }
       gl.uniform2f(uRes, w, h);
+      if (stillFrame) draw(performance.now());
     };
-    resize();
-    window.addEventListener('resize', resize);
 
     const target = { x: 0.5, y: 0.5 },
       mouse = { x: 0.5, y: 0.5 };
@@ -133,10 +142,8 @@ export const GrainField = () => {
       target.x = e.clientX / window.innerWidth;
       target.y = 1 - e.clientY / window.innerHeight;
     };
-    window.addEventListener('pointermove', onMove, { passive: true });
-
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const t0 = performance.now() - 40_000 * Math.random();
+    sharedT0 ??= performance.now() - 40_000 * Math.random();
+    const t0 = sharedT0;
     let raf = 0,
       last = 0;
     const draw = (now: number) => {
@@ -152,8 +159,12 @@ export const GrainField = () => {
       last = now;
       draw(now);
     };
-    if (reduced) draw(performance.now());
-    else raf = requestAnimationFrame(loop);
+    resize();
+    window.addEventListener('resize', resize);
+    if (!stillFrame) {
+      window.addEventListener('pointermove', onMove, { passive: true });
+      raf = requestAnimationFrame(loop);
+    }
     el.setAttribute('data-ready', '');
 
     return () => {
@@ -162,10 +173,10 @@ export const GrainField = () => {
       window.removeEventListener('pointermove', onMove);
       gl.getExtension('WEBGL_lose_context')?.loseContext();
     };
-  }, []);
+  }, [splash]);
 
   return (
-    <div className="grain-field" aria-hidden>
+    <div className={splash ? 'grain-field splash-mist' : 'grain-field'} aria-hidden>
       <canvas ref={canvas} />
     </div>
   );

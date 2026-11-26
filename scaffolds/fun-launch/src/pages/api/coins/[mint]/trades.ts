@@ -22,6 +22,7 @@ export default async function handler(
     res.status(200).json({
       trades: activity.history.trades.slice(0, RETURNED_TRADES),
       launchPriceSol: activity.launchPriceSol,
+      quoteToSol: activity.coin.quoteToSol,
       pot: activity.pot,
       complete: activity.history.complete && activity.history.trades.length <= RETURNED_TRADES,
       stale: activity.history.stale,

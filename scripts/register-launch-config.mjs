@@ -1,8 +1,18 @@
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { inspectLaunchConfig, decodeLaunchConfig, reviewedQuote, modeForPolicy } from './launch-policy.cjs';
+import {
+  inspectLaunchConfig,
+  decodeLaunchConfig,
+  reviewedQuote,
+  modeForPolicy,
+} from './launch-policy.cjs';
 import { companyWallets } from './company-wallets.cjs';
-import { expectedNetworkGenesis, NETWORK_GENESIS } from './network-policy.cjs';
+import {
+  expectedNetworkGenesis,
+  mainnetConfigPin,
+  mainnetLaunchPolicy,
+  NETWORK_GENESIS,
+} from './network-policy.cjs';
 import { databaseConfig } from './postgres-config.cjs';
 const app = createRequire(new URL('../scaffolds/fun-launch/package.json', import.meta.url)),
   args = process.argv.slice(2);
@@ -33,9 +43,17 @@ try {
     });
   const genesis = await connection.getGenesisHash();
   if (genesis !== expectedNetworkGenesis(process.env)) throw Error('Wrong RPC genesis');
-  const policyVersion = process.env.LAUNCH_POLICY_VERSION || 'bond-v1';
-  if (policyVersion !== 'bond-v1' && !modeForPolicy(policyVersion)) throw Error('Unsupported policy');
-  if (policyVersion !== 'bond-v1' && genesis === NETWORK_GENESIS['mainnet-beta'] && args.includes('--write')) throw Error('Devnet rehearsal required');
+  const policyVersion =
+    process.env.REGISTRATION_POLICY_VERSION || process.env.LAUNCH_POLICY_VERSION || 'bond-v1';
+  if (policyVersion !== 'bond-v1' && !modeForPolicy(policyVersion))
+    throw Error('Unsupported policy');
+  if (
+    genesis === NETWORK_GENESIS['mainnet-beta'] &&
+    (policyVersion !== mainnetLaunchPolicy() || process.env.REGISTRATION_POLICY_VERSION) &&
+    mainnetConfigPin(policyVersion) !== key.toBase58() &&
+    args.includes('--write')
+  )
+    throw Error('Mainnet policy is not enabled for registration');
   const quote = reviewedQuote(policyVersion, genesis);
   const { collector, treasury } = companyWallets(process.env, genesis),
     { context, value } = await connection.getAccountInfoAndContext(key, 'finalized');
@@ -83,7 +101,8 @@ try {
         ).rows[0];
         if (
           !row ||
-          row.policy_version !== policyVersion || row.quote_mint !== quote.quoteMint ||
+          row.policy_version !== policyVersion ||
+          row.quote_mint !== quote.quoteMint ||
           row.config_digest !== digest ||
           row.expected_fee_claimer !== collector.toBase58() ||
           row.expected_leftover_receiver !== treasury.toBase58()

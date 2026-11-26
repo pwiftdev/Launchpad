@@ -65,9 +65,31 @@ function expectedNetworkGenesis(env = process.env) {
   if (!Object.hasOwn(NETWORK_GENESIS, network)) throw new Error('Unrecognized network');
   return NETWORK_GENESIS[network];
 }
+/** @returns {'dev-v1' | 'bond-v1'} */
+function mainnetLaunchPolicy(env = process.env) {
+  return env.LAUNCH_POLICY_VERSION === 'dev-v1' ? 'dev-v1' : 'bond-v1';
+}
+const MAINNET_REWARD_PINS = {
+  'cashback-v1': 'MAINNET_CASHBACK_CONFIG_KEY',
+  'mskd-v1': 'MAINNET_MSKD_CONFIG_KEY',
+  'hsol-v1': 'MAINNET_HSOL_CONFIG_KEY',
+  'cashback-hsol-v1': 'MAINNET_CASHBACK_HSOL_CONFIG_KEY',
+  'mskd-hsol-v1': 'MAINNET_MSKD_HSOL_CONFIG_KEY',
+};
+
+function mainnetConfigPin(policy, env = process.env) {
+  const base = mainnetLaunchPolicy(env);
+  if (policy === base) return env.POOL_CONFIG_KEY || null;
+  if (base !== 'dev-v1' || !Object.hasOwn(MAINNET_REWARD_PINS, policy)) return null;
+  const key = env[MAINNET_REWARD_PINS[policy]];
+  return typeof key === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(key) ? key : null;
+}
 module.exports = {
   NETWORK_GENESIS,
   isLoopbackOrigin: loopback,
   localValidatorPolicy,
   expectedNetworkGenesis,
+  mainnetLaunchPolicy,
+  mainnetConfigPin,
+  MAINNET_REWARD_PINS,
 };

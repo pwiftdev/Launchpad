@@ -20,6 +20,7 @@ import {
   deriveDbcPoolAddress,
 } from '@meteora-ag/dynamic-bonding-curve-sdk';
 import { CpAmmIdl, CP_AMM_PROGRAM_ID } from '@meteora-ag/cp-amm-sdk';
+import { QUOTES } from '@/lib/feeModes';
 import { getCoin, getLaunchConfig, networkGenesis, supportedConfig } from './dbc';
 import { configuredVaultProgram } from './launchConfig';
 import { launchIntent, registeredCoin } from './launchRegistry';
@@ -29,6 +30,7 @@ import {
   registerCoinInstruction,
 } from '@/lib/vault/client';
 import { migratedPoolAddress } from './damm';
+import { assertMskdCreationIdentity } from './officialMskd';
 
 const dbcCoder = new BorshCoder(DynamicBondingCurveIdl as unknown as Idl);
 const dammCoder = new BorshCoder(CpAmmIdl as unknown as Idl);
@@ -51,7 +53,10 @@ type Creation = {
 /** The relay is a launch/trade endpoint, never an arbitrary signed-transaction RPC proxy. */
 export async function validateRelayTransaction(
   tx: Transaction,
-  options: { claimMint?: PublicKey; onMode?: (mode: import('@/lib/launchModes').LaunchMode | undefined) => void } = {}
+  options: {
+    claimMint?: PublicKey;
+    onMode?: (mode: import('@/lib/launchModes').LaunchMode | undefined) => void;
+  } = {}
 ) {
   const payer = tx.feePayer;
   if (!payer) throw new Error('Missing fee payer');
@@ -63,7 +68,13 @@ export async function validateRelayTransaction(
   const claims = new Set<TransactionInstruction>();
   const addMint = (mint: PublicKey, program = TOKEN_PROGRAM_ID) =>
     tokens.set(mint.toBase58(), program);
-  const walletPair = (input: PublicKey, output: PublicKey, mint: PublicKey, program: PublicKey, quoteMint: PublicKey) => {
+  const walletPair = (
+    input: PublicKey,
+    output: PublicKey,
+    mint: PublicKey,
+    program: PublicKey,
+    quoteMint: PublicKey
+  ) => {
     const base = getAssociatedTokenAddressSync(mint, payer, false, program),
       quote = getAssociatedTokenAddressSync(quoteMint, payer);
     if (!(
@@ -83,11 +94,9 @@ export async function validateRelayTransaction(
         const mint = key('base_mint'),
           pool = key('pool'),
           config = key('config');
-        if (
-          !key('creator').equals(payer) ||
-          !key('payer').equals(payer)
-        )
+        if (!key('creator').equals(payer) || !key('payer').equals(payer))
           throw new Error('Invalid launch payer or quote mint');
+        assertMskdCreationIdentity(decoded.data, mint.toBase58(), payer.toBase58());
         const intent = process.env.DATABASE_URL
           ? await launchIntent(genesis, mint.toBase58())
           : null;
@@ -95,7 +104,8 @@ export async function validateRelayTransaction(
         options.onMode?.(intent?.mode);
         const quoteMint = approved.config.quoteMint;
         if (
-          !key('quote_mint').equals(quoteMint) || !config.equals(approved.key) ||
+          !key('quote_mint').equals(quoteMint) ||
+          !config.equals(approved.key) ||
           !pool.equals(deriveDbcPoolAddress(quoteMint, mint, config))
         )
           throw new Error('Launch configuration or pool differs from the prepared transaction');
@@ -122,10 +132,7 @@ export async function validateRelayTransaction(
         const mint = key('base_mint'),
           pool = key('pool'),
           config = key('config');
-        if (
-          !key('payer').equals(payer) ||
-          !(await supportedConfig(config))
-        )
+        if (!key('payer').equals(payer) || !(await supportedConfig(config)))
           throw new Error('Invalid DBC swap authority or configuration');
         const creation = creations.get(pool.toBase58());
         let tokenProgram: PublicKey;
@@ -150,7 +157,13 @@ export async function validateRelayTransaction(
         }
         if (!key('quote_mint').equals(quoteMint)) throw new Error('Invalid DBC swap quote mint');
         addMint(quoteMint);
-        walletPair(key('input_token_account'), key('output_token_account'), mint, tokenProgram, quoteMint);
+        walletPair(
+          key('input_token_account'),
+          key('output_token_account'),
+          mint,
+          tokenProgram,
+          quoteMint
+        );
         addMint(mint, tokenProgram);
         validated.add(ix);
       } else if (decoded?.name === 'migration_damm_v2' || decoded?.name === 'create_locker') {
@@ -184,18 +197,23 @@ export async function validateRelayTransaction(
       if (!key('payer').equals(payer)) throw new Error('Invalid DAMM swap payer');
       const a = key('token_a_mint'),
         b = key('token_b_mint');
-      // Reviewed non-SOL migrations store the launched token as token A.
-      const mint = a.equals(NATIVE_MINT) ? b : a;
+      const [mint, paired] =
+        a.equals(NATIVE_MINT) || a.toBase58() === QUOTES.hsol.mint ? [b, a] : [a, b];
       const found = await getCoin(mint.toBase58());
       if (!found?.coin.isMigrated || found.coin.migratedPool !== key('pool').toBase58())
         throw new Error('Unknown migrated pool');
       const tokenProgram = found.config?.tokenType === 1 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
       const quoteMint = found.config.quoteMint;
-      if (!(a.equals(mint) && b.equals(quoteMint)) && !(b.equals(mint) && a.equals(quoteMint)))
-        throw new Error('Invalid graduated quote mint');
+      if (!paired.equals(quoteMint)) throw new Error('Invalid graduated quote mint');
       options.onMode?.(found.coin.mode);
       addMint(quoteMint);
-      walletPair(key('input_token_account'), key('output_token_account'), mint, tokenProgram, quoteMint);
+      walletPair(
+        key('input_token_account'),
+        key('output_token_account'),
+        mint,
+        tokenProgram,
+        quoteMint
+      );
       addMint(mint, tokenProgram);
       validated.add(ix);
     }
@@ -301,7 +319,8 @@ export async function validateRelayTransaction(
       continue;
     }
     const candidate = [...creations.values()].find((create) => {
-      if (!create.requiresVault || (create.mode !== 'creator' && create.mode !== 'community')) return false;
+      if (!create.requiresVault || (create.mode !== 'creator' && create.mode !== 'community'))
+        return false;
       const expected = registerCoinInstruction({
         programId: configuredVaultProgram(),
         mint: create.mint,

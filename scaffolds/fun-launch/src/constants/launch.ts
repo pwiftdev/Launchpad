@@ -3,6 +3,11 @@ import launchPolicy from './launchPolicy.json';
 
 export const TOTAL_SUPPLY = 1_000_000_000;
 export const TOKEN_DECIMALS = 6;
+export const TICKER_CHARACTERS = /[\p{L}\p{N}]/u;
+export const LAUNCH_IMAGE_MAX_MB = 5;
+export const LAUNCH_IMAGE_MAX_BYTES = LAUNCH_IMAGE_MAX_MB * 1024 * 1024;
+export const LAUNCH_IMAGE_MAX_DATA_URL_LENGTH =
+  'data:image/jpeg;base64,'.length + 4 * Math.ceil(LAUNCH_IMAGE_MAX_BYTES / 3);
 
 // Optional dev first buy, paid by the dev, in the same transaction as the create.
 // Our config sets enableFirstSwapWithMinFee, so this buy pays the 1.25% floor fee.
@@ -23,12 +28,6 @@ export const BASE_FEE_PERCENT = launchPolicy.endingFeeBps / 100;
 
 // Legacy devnet history estimate only. Actual mainnet routing belongs to the server fee ledger.
 export const LEGACY_POT_ESTIMATE_SHARE = 0.8;
-
-// Anti-vamp defaults (server can override via env: ANTIVAMP_MIN_LIQUIDITY_USD, ANTIVAMP_IMAGE_DISTANCE)
-export const ANTIVAMP_RECENT_MINUTES = 60;
-export const ANTIVAMP_MIN_LIQUIDITY_USD = 10_000;
-/** Max differing bits (of 64) for two images to count as the same picture */
-export const ANTIVAMP_IMAGE_DISTANCE = 10;
 
 // Bonding target. There is no deadline-based holder settlement in the current policy.
 export const MIGRATION_THRESHOLD_SOL = 80;

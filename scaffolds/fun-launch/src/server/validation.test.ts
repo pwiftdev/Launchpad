@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PublicKey } from '@solana/web3.js';
+import { LAUNCH_IMAGE_MAX_DATA_URL_LENGTH } from '@/constants/launch';
 import { swapSchema, tradeUnits, uploadSchema } from './validation';
 
 describe('API input boundaries', () => {
@@ -37,6 +38,34 @@ describe('API input boundaries', () => {
     expect(uploadSchema.safeParse({ tokenName: {} }).success).toBe(false);
     expect(uploadSchema.shape.tokenName.safeParse('a'.repeat(33)).success).toBe(false);
     expect(uploadSchema.shape.tokenName.safeParse('😀'.repeat(9)).success).toBe(false);
-    expect(uploadSchema.shape.tokenLogo.safeParse('x'.repeat(2_800_001)).success).toBe(false);
+    const tokenLogo = uploadSchema.shape.tokenLogo;
+    expect(tokenLogo.safeParse('x'.repeat(LAUNCH_IMAGE_MAX_DATA_URL_LENGTH)).success).toBe(true);
+    expect(tokenLogo.safeParse('x'.repeat(LAUNCH_IMAGE_MAX_DATA_URL_LENGTH + 1)).success).toBe(
+      false
+    );
+  });
+  it('validates ticker characters and optional source post links', () => {
+    expect(uploadSchema.shape.tokenSymbol.safeParse('ＭＳＫＤ').success).toBe(false);
+    expect(uploadSchema.shape.tokenSymbol.safeParse('猫').success).toBe(true);
+    expect(uploadSchema.shape.tokenSymbol.safeParse('$---').success).toBe(false);
+    const source = uploadSchema.shape.sourceUrl;
+    expect(source.safeParse('https://mobile.twitter.com/mskd/status/12345?s=20').success).toBe(
+      true
+    );
+    expect(source.safeParse(undefined).success).toBe(true);
+    expect(source.safeParse('https://x.com/mskd').success).toBe(false);
+    expect(source.safeParse('https://x.com.example/mskd/status/12345').success).toBe(false);
+  });
+  it('accepts post and other X links in token metadata', () => {
+    const socials = uploadSchema.shape.socials;
+    expect(socials.safeParse({ twitter: 'https://x.com/mskdfun/status/12345?s=20' }).success).toBe(
+      true
+    );
+    expect(
+      socials.safeParse({ twitter: `https://x.com/search?q=${'a'.repeat(300)}` }).success
+    ).toBe(true);
+    expect(socials.safeParse({ twitter: 'https://x.com.example/mskd/status/12345' }).success).toBe(
+      false
+    );
   });
 });

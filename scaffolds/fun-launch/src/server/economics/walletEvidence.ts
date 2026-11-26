@@ -1,5 +1,11 @@
 import { Connection, PublicKey, SystemProgram, VersionedTransaction } from '@solana/web3.js';
-import { createTransferCheckedInstruction, createAssociatedTokenAccountIdempotentInstruction, getAssociatedTokenAddressSync, NATIVE_MINT, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import {
+  createTransferCheckedInstruction,
+  createAssociatedTokenAccountIdempotentInstruction,
+  getAssociatedTokenAddressSync,
+  NATIVE_MINT,
+  TOKEN_PROGRAM_ID,
+} from '@solana/spl-token';
 import {
   actualBurnedTokens,
   allInstructions,
@@ -12,6 +18,9 @@ import {
   type FinalizedEvidence,
 } from './chainEvidence';
 import type { WalletEffectFacts, WalletJob } from './walletTypes';
+import modePolicy from '@/constants/modePolicy.json';
+import { HSOL_REWARD_MINT } from '@/lib/rewards';
+import { HSOL_BRIDGE_POOL } from './walletMskdPolicy';
 
 export const WALLET_MEMO_PROGRAM = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
 const verified = new WeakSet<object>();
@@ -31,7 +40,12 @@ function balance(e: FinalizedEvidence, address: string, post = false): bigint {
     }
   throw new Error('Missing wallet balance account');
 }
-function quoteTransfers(e: FinalizedEvidence, source: string, destination: string, mint: string): bigint {
+function quoteTransfers(
+  e: FinalizedEvidence,
+  source: string,
+  destination: string,
+  mint: string
+): bigint {
   const tx = e.transaction,
     keys = tx.transaction.message.getAccountKeys({
       accountKeysFromLookups: tx.meta!.loadedAddresses,
@@ -40,8 +54,7 @@ function quoteTransfers(e: FinalizedEvidence, source: string, destination: strin
     ...(tx.meta!.preTokenBalances ?? []),
     ...(tx.meta!.postTokenBalances ?? []),
   ].find((b) => keys.get(b.accountIndex)?.toBase58() === source);
-  if (sourceBalance?.mint !== mint)
-    throw new Error('Fee source has an unexpected mint');
+  if (sourceBalance?.mint !== mint) throw new Error('Fee source has an unexpected mint');
   return allInstructions(e).reduce((sum, ix) => {
     if (ix.program !== TOKEN_PROGRAM_ID.toBase58()) return sum;
     if (
@@ -66,6 +79,100 @@ function requiredString(job: WalletJob, key: string) {
   const value = job.expectations[key];
   if (typeof value !== 'string' || !value) throw new Error(`Missing wallet expectation: ${key}`);
   return value;
+}
+function requireExpectedDexInstruction(
+  evidence: FinalizedEvidence,
+  job: WalletJob,
+  key = 'instruction'
+) {
+  const expected = job.expectations[key] as
+    { program?: string; accounts?: string[]; dataBase64?: string } | undefined;
+  if (!expected?.program || !Array.isArray(expected.accounts) || !expected.dataBase64)
+    throw new Error('Missing reviewed Meteora instruction');
+  if (
+    requireInstruction(evidence, {
+      program: expected.program,
+      accounts: expected.accounts,
+      data: Buffer.from(expected.dataBase64, 'base64'),
+    }).eventIndex !== 0
+  )
+    throw new Error('Meteora settlement must be a direct collector instruction');
+}
+
+function verifyMskdConversion(
+  job: WalletJob,
+  evidence: FinalizedEvidence,
+  collector: string,
+  fee: bigint,
+  delta: bigint,
+  instructionCount: number
+) {
+  const payoutMint = requiredString(job, 'payoutMint');
+  const source = getAssociatedTokenAddressSync(NATIVE_MINT, new PublicKey(collector)).toBase58();
+  const destination = getAssociatedTokenAddressSync(
+    new PublicKey(payoutMint),
+    new PublicKey(collector)
+  ).toBase58();
+  const budget = BigInt(requiredString(job, 'maximumSpendLamports'));
+  const minimum = BigInt(requiredString(job, 'minimumPayoutUnits'));
+  const rent = lamportDelta(evidence, destination);
+  const received = tokenDelta(evidence, destination, payoutMint);
+  requireExpectedDexInstruction(evidence, job);
+  const fromHsol = job.details.sourceMint === HSOL_REWARD_MINT;
+  const spent = fromHsol ? verifyHsolBridge(job, evidence, collector, source, budget) : budget;
+  if (
+    job.details.assetMint !== payoutMint ||
+    job.details.market !== job.expectations.pool ||
+    job.expectations.tokenAta !== destination ||
+    job.expectations.quoteAta !== source ||
+    BigInt(job.lamports) !== budget ||
+    spent <= 0n ||
+    minimum <= 0n ||
+    received < minimum ||
+    rent < 0n ||
+    fee + rent > BigInt(requiredString(job, 'operatingCostLamports')) ||
+    instructionCount !== (fromHsol ? 7 : 8) ||
+    balance(evidence, source) !== 0n ||
+    balance(evidence, source, true) !== 0n ||
+    delta !== -(fromHsol ? 0n : spent) - fee - rent
+  )
+    throw new Error('MSKD conversion does not match the finalized SOL and token balances');
+  return {
+    receivedPayoutUnits: received,
+    collectorDebitLamports: spent,
+    operatingCostLamports: fee + rent,
+  };
+}
+
+function verifyHsolBridge(
+  job: WalletJob,
+  evidence: FinalizedEvidence,
+  collector: string,
+  wrappedSol: string,
+  budget: bigint
+) {
+  const source = getAssociatedTokenAddressSync(
+    new PublicKey(HSOL_REWARD_MINT),
+    new PublicKey(collector)
+  ).toBase58();
+  const amount = BigInt(requiredString(job, 'bridgeAmount'));
+  const spent = -tokenDelta(evidence, source, HSOL_REWARD_MINT);
+  const hsolVault = requiredString(job, 'bridgeHsolVault');
+  const bridgeWsolVault = requiredString(job, 'bridgeWsolVault');
+  const payoutWsolVault = requiredString(job, 'payoutWsolVault');
+  requireExpectedDexInstruction(evidence, job, 'bridgeInstruction');
+  if (
+    job.expectations.quoteMint !== HSOL_REWARD_MINT ||
+    job.expectations.bridgePool !== HSOL_BRIDGE_POOL.toBase58() ||
+    spent <= 0n ||
+    spent > budget ||
+    amount <= 0n ||
+    quoteTransfers(evidence, source, hsolVault, HSOL_REWARD_MINT) !== spent ||
+    quoteTransfers(evidence, bridgeWsolVault, wrappedSol, NATIVE_MINT.toBase58()) !== amount ||
+    nativeTransfersFromClosedAccount(evidence, wrappedSol, payoutWsolVault) !== amount
+  )
+    throw new Error('MSKD conversion does not match the finalized hSOL and bridge balances');
+  return spent;
 }
 
 /** Cash, token and canonical block-order proof. A successful signature alone never funds rewards. */
@@ -118,22 +225,54 @@ export async function verifyWalletEffect(
   };
   const quoteMint = new PublicKey(String(job.expectations.quoteMint ?? NATIVE_MINT));
   const spl = !quoteMint.equals(NATIVE_MINT);
-  if (job.kind.endsWith('_claim') && spl) {
+  if (job.kind === 'holder_conversion') {
+    Object.assign(facts, verifyMskdConversion(job, evidence, collector, fee, delta, top.length));
+  } else if (job.kind.endsWith('_claim') && (job.expectations.payoutMint || spl)) {
+    const mint = new PublicKey(String(job.expectations.payoutMint ?? quoteMint));
+    const decimals = job.expectations.payoutMint ? modePolicy.payouts.wxmr.decimals : 9;
+    const requiresAsset =
+      job.expectations.payoutMint ||
+      (quoteMint.toBase58() === HSOL_REWARD_MINT && job.kind !== 'platform_claim');
+    if (requiresAsset && job.details.assetMint !== mint.toBase58())
+      throw new Error('SPL payout asset differs from the immutable job');
     const owner = new PublicKey(collector);
     const recipient = new PublicKey(requiredString(job, 'recipient'));
     const amount = BigInt(requiredString(job, 'expectedLamports'));
-    if (amount <= 0n || amount !== BigInt(job.lamports) || recipient.toBase58() !== job.recipient) throw new Error('Invalid SPL payout liability');
-    const source = getAssociatedTokenAddressSync(quoteMint, owner);
-    const destination = getAssociatedTokenAddressSync(quoteMint, recipient);
+    if (amount <= 0n || amount !== BigInt(job.lamports) || recipient.toBase58() !== job.recipient)
+      throw new Error('Invalid SPL payout liability');
+    const source = getAssociatedTokenAddressSync(mint, owner);
+    const destination = getAssociatedTokenAddressSync(mint, recipient);
     const rent = lamportDelta(evidence, destination.toBase58());
-    if (rent < 0n || fee + rent > BigInt(requiredString(job, 'operatingCostLamports')) || delta !== -fee-rent || top.length !== 3) throw new Error('Unexpected SPL payout cost');
-    for (const instruction of [createAssociatedTokenAccountIdempotentInstruction(owner, destination, recipient, quoteMint), createTransferCheckedInstruction(source, quoteMint, destination, owner, amount, 9)]) {
-      const proven = requireInstruction(evidence, { program: instruction.programId.toBase58(), accounts: instruction.keys.map(k => k.pubkey.toBase58()), data: instruction.data });
+    if (
+      rent < 0n ||
+      fee + rent > BigInt(requiredString(job, 'operatingCostLamports')) ||
+      delta !== -fee - rent ||
+      top.length !== 3
+    )
+      throw new Error('Unexpected SPL payout cost');
+    for (const instruction of [
+      createAssociatedTokenAccountIdempotentInstruction(owner, destination, recipient, mint),
+      createTransferCheckedInstruction(source, mint, destination, owner, amount, decimals),
+    ]) {
+      const proven = requireInstruction(evidence, {
+        program: instruction.programId.toBase58(),
+        accounts: instruction.keys.map((k) => k.pubkey.toBase58()),
+        data: instruction.data,
+      });
       if (proven.eventIndex !== 0) throw new Error('Expected a direct SPL payout');
     }
     const debit = owner.equals(recipient) ? 0n : amount;
-    if (tokenDelta(evidence, source.toBase58(), quoteMint.toBase58()) !== -debit || tokenDelta(evidence, destination.toBase58(), quoteMint.toBase58()) !== debit) throw new Error('SPL payout balance mismatch');
-    Object.assign(facts, { recipient: job.recipient, paidLamports: amount, collectorDebitLamports: debit, operatingCostLamports: fee + rent });
+    if (
+      tokenDelta(evidence, source.toBase58(), mint.toBase58()) !== -debit ||
+      tokenDelta(evidence, destination.toBase58(), mint.toBase58()) !== debit
+    )
+      throw new Error('SPL payout balance mismatch');
+    Object.assign(facts, {
+      recipient: job.recipient,
+      paidLamports: amount,
+      collectorDebitLamports: debit,
+      operatingCostLamports: fee + rent,
+    });
   } else if (job.kind.endsWith('_claim')) {
     const recipient = requiredString(job, 'recipient'),
       amount = BigInt(requiredString(job, 'expectedLamports'));
@@ -172,7 +311,8 @@ export async function verifyWalletEffect(
     if (tokenRent < 0n || tokenRent > BigInt(requiredString(job, 'operatingCostLamports')))
       throw new Error('Unexpected token account funding');
     if (job.kind === 'setup') {
-      if (spl && tokenDelta(evidence, quote, quoteMint.toBase58()) !== 0n) throw new Error('Unexpected quote movement during setup');
+      if (spl && tokenDelta(evidence, quote, quoteMint.toBase58()) !== 0n)
+        throw new Error('Unexpected quote movement during setup');
       const quoteRent = lamportDelta(evidence, quote);
       facts.operatingCostLamports = fee + tokenRent + quoteRent;
       if (
@@ -184,17 +324,7 @@ export async function verifyWalletEffect(
         throw new Error('Unexpected setup cash or token movement');
     } else {
       facts.operatingCostLamports = fee + tokenRent;
-      const expected = job.expectations.instruction as
-        { program?: string; accounts?: string[]; dataBase64?: string } | undefined;
-      if (!expected?.program || !Array.isArray(expected.accounts) || !expected.dataBase64)
-        throw new Error('Missing reviewed Meteora instruction');
-      const dexInstruction = requireInstruction(evidence, {
-        program: expected.program,
-        accounts: expected.accounts,
-        data: Buffer.from(expected.dataBase64, 'base64'),
-      });
-      if (dexInstruction.eventIndex !== 0)
-        throw new Error('Meteora settlement must be a direct collector instruction');
+      requireExpectedDexInstruction(evidence, job);
       if (!spl && balance(evidence, quote, true) !== 0n)
         throw new Error('Wrapped SOL was not returned to the collector');
       const closes = instructions.filter(
@@ -206,16 +336,30 @@ export async function verifyWalletEffect(
           ix.accounts[1] === collector &&
           ix.accounts[2] === collector
       );
-      if (closes.length !== (spl ? 0 : 1)) throw new Error('Expected exactly one collector wrapped SOL close');
+      if (closes.length !== (spl ? 0 : 1))
+        throw new Error('Expected exactly one collector wrapped SOL close');
       const previousQuoteBalance = balance(evidence, quote);
       if (job.kind === 'collect') {
-        const received = quoteTransfers(evidence, requiredString(job, 'sourceQuoteVault'), quote, quoteMint.toBase58());
+        const received = quoteTransfers(
+          evidence,
+          requiredString(job, 'sourceQuoteVault'),
+          quote,
+          quoteMint.toBase58()
+        );
         const quoteRent = spl ? lamportDelta(evidence, quote) : 0n;
-        if (quoteRent < 0n || (spl && fee + tokenRent + quoteRent > BigInt(requiredString(job,'operatingCostLamports')))) throw new Error('Unexpected SPL collection rent');
+        if (
+          quoteRent < 0n ||
+          (spl &&
+            fee + tokenRent + quoteRent > BigInt(requiredString(job, 'operatingCostLamports')))
+        )
+          throw new Error('Unexpected SPL collection rent');
         facts.operatingCostLamports = fee + tokenRent + quoteRent;
         if (
           received <= 0n ||
-          (spl ? delta !== -fee-tokenRent-quoteRent || tokenDelta(evidence, quote, quoteMint.toBase58()) !== received : delta + fee + tokenRent - previousQuoteBalance !== received) ||
+          (spl
+            ? delta !== -fee - tokenRent - quoteRent ||
+              tokenDelta(evidence, quote, quoteMint.toBase58()) !== received
+            : delta + fee + tokenRent - previousQuoteBalance !== received) ||
           tokenDelta(evidence, token, job.mint) !== 0n
         )
           throw new Error('Collected cash does not match finalized quote-only fee transfers');

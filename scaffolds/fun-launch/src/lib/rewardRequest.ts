@@ -1,5 +1,6 @@
 import {
   claimAuthorizationMessage,
+  HSOL_REWARD_MINT,
   type ClaimAuthorization,
   type RewardPayout,
   type RewardsView,
@@ -30,6 +31,10 @@ function valid(value: unknown, scope: Scope): value is RewardRequestReceipt {
     (receipt.jobId === undefined || uuid.test(receipt.jobId)) &&
     (receipt.epoch === null ||
       (typeof receipt.epoch === 'string' && /^(0|[1-9]\d{0,9})$/.test(receipt.epoch))) &&
+    (receipt.assetMint === undefined ||
+      ((receipt.assetMint === HSOL_REWARD_MINT || receipt.epoch !== null) &&
+        typeof receipt.assetMint === 'string' &&
+        /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(receipt.assetMint))) &&
     typeof receipt.amount === 'string' &&
     /^[1-9]\d{0,19}$/.test(receipt.amount) &&
     BigInt(receipt.amount) <= 18446744073709551615n &&
@@ -50,8 +55,18 @@ export function readRewardRequest(storage: Storage, scope: Scope): RewardRequest
 /** Persist only the public intent before requesting a payout; no signature or transaction bytes. */
 export function saveRewardRequest(storage: Storage, receipt: RewardRequestReceipt) {
   if (!valid(receipt, receipt)) throw new Error('Invalid reward request receipt');
-  const { version, networkGenesis, mint, wallet, epoch, amount, requestId, issuedAt, jobId } =
-    receipt;
+  const {
+    version,
+    networkGenesis,
+    mint,
+    wallet,
+    epoch,
+    amount,
+    requestId,
+    issuedAt,
+    jobId,
+    assetMint,
+  } = receipt;
   storage.setItem(
     key(receipt),
     JSON.stringify({
@@ -63,6 +78,7 @@ export function saveRewardRequest(storage: Storage, receipt: RewardRequestReceip
       amount,
       requestId,
       issuedAt,
+      ...(assetMint ? { assetMint } : {}),
       ...(jobId ? { jobId } : {}),
     })
   );
@@ -105,8 +121,17 @@ export async function requestRewardPayout({
   submit: (body: object) => Promise<RewardPayout>;
   onSaved?: (receipt: RewardRequestReceipt) => void;
 }) {
-  const { networkGenesis, mint, wallet, epoch, amount, requestId, issuedAt } = input;
-  const authorization = { networkGenesis, mint, wallet, epoch, amount, requestId, issuedAt };
+  const { networkGenesis, mint, wallet, epoch, amount, requestId, issuedAt, assetMint } = input;
+  const authorization = {
+    networkGenesis,
+    mint,
+    wallet,
+    epoch,
+    amount,
+    requestId,
+    issuedAt,
+    ...(assetMint ? { assetMint } : {}),
+  };
   const signature = await signMessage(
     new TextEncoder().encode(claimAuthorizationMessage(origin, authorization))
   );
@@ -120,7 +145,11 @@ export async function requestRewardPayout({
     ...authorization,
     signature: Buffer.from(signature).toString('base64'),
   });
-  if (job.requestId !== input.requestId || job.amount !== input.amount)
+  if (
+    job.requestId !== input.requestId ||
+    job.amount !== input.amount ||
+    job.assetMint !== assetMint
+  )
     throw new Error('Unexpected payout receipt. Check your saved request.');
   const receipt = { ...pending, jobId: job.id };
   saveRewardRequest(storage, receipt);

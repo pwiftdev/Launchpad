@@ -9,10 +9,9 @@ import {
 beforeEach(() => vi.stubEnv('LAUNCHPAD_PUBLIC', ''));
 afterEach(() => vi.unstubAllEnvs());
 
-describe('whitelist campaign access', () => {
-  it('allows only registration, privacy, the private login and brand assets', () => {
+describe('private preview access', () => {
+  it('allows the privacy notice, private login and brand assets', () => {
     for (const path of [
-      '/whitelist',
       '/privacy',
       '/admin',
       '/logo.svg',
@@ -20,13 +19,15 @@ describe('whitelist campaign access', () => {
       '/brand/mskd-wordmark.webp',
       '/brand/mskd-favicon-32.png',
       '/favicon.ico',
-      '/w/ABCD2345',
     ])
       expect(publicPage(path)).toBe(true);
     for (const path of [
       '/',
       '/launch',
+      '/launch-preview',
+      '/otc',
       '/rules',
+      '/roadmap',
       '/token/test',
       '/whitelist/launch',
       '/demo/coin.svg',
@@ -36,7 +37,6 @@ describe('whitelist campaign access', () => {
   });
   it('keeps all trading and market data private, including prefix lookalikes', () => {
     for (const path of [
-      '/api/whitelist?ref=ABCD2345',
       '/api/admin/session',
       '/api/health',
       '/api/og/brand',
@@ -50,10 +50,13 @@ describe('whitelist campaign access', () => {
       '/api/upload',
       '/api/swap-tx',
       '/api/send-transaction',
+      '/api/whitelist',
       '/api/whitelist/coins',
       '/api/og/token',
       '/api/profiles/admin',
       '/api/callouts',
+      '/api/launch-previews',
+      '/api/otc',
     ])
       expect(publicApi(path)).toBe(false);
   });
@@ -61,7 +64,7 @@ describe('whitelist campaign access', () => {
     expect(accessPath('/_next/data/build/index.json')).toBe('/');
     expect(publicPage('/_next/data/build/launch.json')).toBe(false);
     expect(publicPage('/_next/data/build/token/example.json')).toBe(false);
-    expect(publicPage('/_next/data/build/whitelist.json')).toBe(true);
+    expect(publicPage('/_next/data/build/admin.json')).toBe(true);
   });
 });
 
@@ -85,8 +88,11 @@ describe('public launchpad admission', () => {
     for (const path of [
       '/',
       '/launch',
+      '/launch-preview',
+      '/otc',
       '/rules',
       '/burns',
+      '/roadmap',
       '/404',
       `/token/${mint}`,
       '/coins/unknown.svg',
@@ -123,9 +129,10 @@ describe('public launchpad admission', () => {
       '/api/transaction-status',
       '/api/rewards',
       '/api/callouts',
+      '/api/launch-previews',
+      '/api/otc',
       '/api/profiles',
       '/api/upload',
-      '/api/launch-check',
       '/api/dev-buy-quote',
       '/api/launch/status',
       '/api/launch/confirm',
@@ -145,6 +152,7 @@ describe('public launchpad admission', () => {
       '/api/admin/config',
       '/api/wallet/withdraw',
       '/api/launch/admin',
+      '/api/launch-check',
       '/api/coins/admin',
       '/api/coins/' + mint + '/withdraw',
       '/api/rewards/admin',
@@ -152,12 +160,15 @@ describe('public launchpad admission', () => {
       '/api/profiles/export',
       '/api/og/test',
       '/api/unknown',
+      '/api/otc/admin',
     ])
       expect(publicApi(path)).toBe(false);
   });
   it('normalizes Next data requests with the same exact document allowlist', () => {
     vi.stubEnv('LAUNCHPAD_PUBLIC', 'true');
     expect(publicPage('/_next/data/build/index.json')).toBe(true);
+    expect(publicPage('/_next/data/build/roadmap.json')).toBe(true);
+    expect(publicPage('/_next/data/build/otc.json')).toBe(true);
     expect(publicPage(`/_next/data/build/token/${mint}.json?query=1`)).toBe(true);
     expect(publicPage('/_next/data/build/admin/wallet.json')).toBe(false);
     expect(publicPage('/_next/data/build/unknown.json')).toBe(false);

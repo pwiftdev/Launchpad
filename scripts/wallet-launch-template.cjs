@@ -3,18 +3,13 @@ const fs = require('node:fs'),
   path = require('node:path');
 const { PublicKey } = require('@solana/web3.js');
 const sdk = require('@meteora-ag/dynamic-bonding-curve-sdk');
-const { inspectLaunchConfig } = require('./launch-policy.cjs');
+const { inspectLaunchConfig, modeForPolicy, reviewedQuote } = require('./launch-policy.cjs');
 const bondPolicy = require('../scaffolds/fun-launch/src/constants/bondPolicy.json');
 const modePolicy = require('../scaffolds/fun-launch/src/constants/modePolicy.json');
-const { modeForPolicy } = require('./launch-policy.cjs');
 exports.buildWalletLaunchTemplate = function buildWalletLaunchTemplate({
   collector,
   treasury,
   policyVersion = 'bond-v1',
-  /** Non-SOL modes only: the pinned quote mint (no mode uses one today; all pair to SOL) */
-  quoteMint,
-  /** Non-SOL modes only: bonding target in whole quote tokens, for a non-SOL pair */
-  migrationQuoteThreshold,
 }) {
   const mode = modeForPolicy(policyVersion);
   if (!['bond-v1', 'wallet-v1'].includes(policyVersion) && !mode)
@@ -41,8 +36,7 @@ exports.buildWalletLaunchTemplate = function buildWalletLaunchTemplate({
     leftoverReceiver: _oldReceiver,
     ...params
   } = parsed.config.dbcConfig;
-  let pairedMint = parsed.config.quoteMint,
-    rawThreshold;
+  const quote = reviewedQuote(policyVersion);
   if (mode) {
     const schedule = modePolicy.schedule;
     params.fee = {
@@ -64,20 +58,9 @@ exports.buildWalletLaunchTemplate = function buildWalletLaunchTemplate({
       migratedPoolFee: { collectFeeMode: 0, dynamicFee: 0, poolFeeBps: schedule.migrationFeeBps },
     };
     params.activationType = schedule.activationType;
-    if (mode.quote !== 'sol') {
-      const quote = modePolicy.quotes[mode.quote];
-      if (!quoteMint) throw new Error('A pinned quote mint is required for ' + mode.label);
-      if (!/^[1-9][0-9]*(\.[0-9]+)?$/.test(String(migrationQuoteThreshold ?? '')))
-        throw new Error('A reviewed bonding target is required for ' + mode.label);
-      pairedMint = new PublicKey(quoteMint).toBase58();
-      params.token = { ...params.token, tokenQuoteDecimal: quote.decimals };
-      params.migrationQuoteThreshold = Number(migrationQuoteThreshold);
-      const [whole, fraction = ''] = String(migrationQuoteThreshold).split('.');
-      rawThreshold = (
-        BigInt(whole) * 10n ** BigInt(quote.decimals) +
-        BigInt((fraction + '0'.repeat(quote.decimals)).slice(0, quote.decimals) || '0')
-      ).toString();
-    }
+    const { decimals } = modePolicy.quotes[mode.quote];
+    params.token = { ...params.token, tokenQuoteDecimal: decimals };
+    params.migrationQuoteThreshold = Number(quote.migrationQuoteThreshold) / 10 ** decimals;
   } else if (policyVersion === 'bond-v1') {
     params.fee = {
       ...params.fee,
@@ -102,7 +85,7 @@ exports.buildWalletLaunchTemplate = function buildWalletLaunchTemplate({
   const built = sdk.buildCurve(params),
     config = {
       ...built,
-      quoteMint: new PublicKey(pairedMint),
+      quoteMint: new PublicKey(quote.quoteMint),
       feeClaimer,
       leftoverReceiver,
     };
@@ -121,8 +104,6 @@ exports.buildWalletLaunchTemplate = function buildWalletLaunchTemplate({
       feeClaimer: feeClaimer.toBase58(),
       leftoverReceiver: leftoverReceiver.toBase58(),
       policyVersion,
-      quoteMint: mode && mode.quote !== 'sol' ? pairedMint : undefined,
-      migrationQuoteThreshold: rawThreshold,
     }).length
   )
     throw new Error('Canonical template differs from wallet launch policy');

@@ -8,21 +8,28 @@ function response(path, overrides = {}) {
     'x-frame-options': 'DENY',
     'cache-control': 'private, no-store',
   };
-  if (path === '/whitelist')
+  if (path === '/admin' || path === '/')
     Object.assign(headers, {
       'content-type': 'text/html',
       'content-security-policy':
         "script-src 'nonce-abcdefghijklmnopqrstuvwx' 'strict-dynamic'; style-src 'unsafe-inline'",
     });
-  if (path === '/') headers.location = '/whitelist';
-  const status = path === '/' ? 307 : path === '/api/coins' ? 401 : 200;
-  const body =
-    path === '/whitelist'
-      ? '<!DOCTYPE html><title data-next-head="">Early access | RINSED</title>'
-      : path === '/api/health'
-        ? '{"status":"ok"}'
+  if (path === '/') headers.location = '/admin';
+  const status =
+    path === '/'
+      ? 307
+      : ['/api/coins', '/api/admin/config'].includes(path)
+        ? 401
         : path === '/api/whitelist'
-          ? '{"registration":null,"count":12}'
+          ? 410
+          : 200;
+  const body =
+    path === '/'
+      ? '<!DOCTYPE html><title data-next-head="">MASKED | Your keys. Your launches.</title>'
+      : path === '/admin'
+        ? '<!DOCTYPE html><title data-next-head="">Admin | MSKD.fun</title>'
+        : path === '/api/health'
+          ? '{"status":"ok"}'
           : '{}';
   return new Response(overrides.body ?? body, {
     status: overrides.status ?? status,
@@ -45,7 +52,7 @@ function fixture(changes = {}) {
     },
   };
 }
-test('probes campaign availability, registration and private gates without authentication or writes', async () => {
+test('probes a closed launchpad, retired registration and private gates without authentication or writes', async () => {
   const f = fixture(),
     result = await collectWebHealth({ origin, fetchImpl: f.fetchImpl });
   assert.equal(result.ok, true);
@@ -54,12 +61,12 @@ test('probes campaign availability, registration and private gates without authe
   assert.equal(result.alerts.length, 0);
   assert.ok(f.calls.includes('/api/whitelist'));
 });
-test('flags an exposed launchpad/API, absent nonce policy and failed registration as critical', async () => {
+test('flags an exposed launchpad/API, absent nonce policy and active registration as critical', async () => {
   const f = fixture({
     '/': { status: 200 },
     '/api/coins': { status: 200 },
-    '/whitelist': { headers: { 'content-security-policy': "script-src 'unsafe-inline'" } },
-    '/api/whitelist': { status: 503 },
+    '/admin': { headers: { 'content-security-policy': "script-src 'unsafe-inline'" } },
+    '/api/whitelist': { status: 200 },
   });
   const result = await collectWebHealth({ origin, fetchImpl: f.fetchImpl });
   assert.equal(result.ok, false);
@@ -67,7 +74,7 @@ test('flags an exposed launchpad/API, absent nonce policy and failed registratio
 });
 test('rejects redirects off-site, malformed/oversized bodies and redacts provider errors', async () => {
   const f = fixture({
-    '/': { headers: { location: 'https://attacker.example/whitelist' } },
+    '/': { headers: { location: 'https://attacker.example/admin' } },
     '/api/health': { body: 'x'.repeat(16385) },
     '/api/whitelist': new Error('private-provider-url?token=secret'),
   });
@@ -75,19 +82,31 @@ test('rejects redirects off-site, malformed/oversized bodies and redacts provide
   assert.equal(result.ok, false);
   assert.doesNotMatch(JSON.stringify(result), /private-provider|attacker|token=secret/);
 });
-test('latency warnings are distinct from failure and intentional registration shutdown is explicit', async () => {
+test('latency warnings are distinct from failure for the public launchpad', async () => {
   let clock = 0;
-  const f = fixture({ '/api/whitelist': { status: 503 } });
+  const f = fixture({
+    '/': { status: 200 },
+    '/admin': { status: 307, headers: { location: '/' } },
+  });
   const result = await collectWebHealth({
     origin,
-    registrationExpected: false,
+    publicExpected: true,
     fetchImpl: f.fetchImpl,
     slowMs: 1,
     now: () => (clock += 10),
   });
   assert.equal(result.ok, true);
-  assert.ok(result.alerts.some((x) => x.code === 'REGISTRATION_INTENTIONALLY_DISABLED'));
+  assert.ok(f.calls.includes('/api/admin/config'));
   assert.ok(result.alerts.some((x) => x.code === 'WEB_PROBE_SLOW'));
+});
+test('fails the public health check if the admin form is still served', async () => {
+  const f = fixture({ '/': { status: 200 } });
+  const result = await collectWebHealth({ origin, publicExpected: true, fetchImpl: f.fetchImpl });
+  assert.equal(result.ok, false);
+  assert.deepEqual(
+    result.alerts.map(({ check }) => check),
+    ['admin_document']
+  );
 });
 test('origin validation rejects credentials/paths and requires explicit local rehearsal for HTTP', () => {
   for (const value of [
@@ -157,7 +176,7 @@ test('database readiness verifies TLS/schema in a read-only transaction and alwa
     result = await collectDatabaseHealth({ pool: f.pool });
   assert.equal(result.ok, true);
   assert.deepEqual(f.statements.slice(-2), ['ROLLBACK', 'RELEASE']);
-  for (const options of [{ tls: false }, { missing: ['whitelist_entries'] }, { failure: true }]) {
+  for (const options of [{ tls: false }, { missing: ['launch_coins'] }, { failure: true }]) {
     const broken = databaseFixture(options),
       report = await collectDatabaseHealth({ pool: broken.pool });
     assert.equal(report.ok, false);

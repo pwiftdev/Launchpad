@@ -133,6 +133,7 @@ async function runRollbackDrill(input) {
           PORT: '3117',
           DATABASE_URL: request.databaseUrl,
           DATABASE_SSL_CA: '/var/lib/postgresql/rinsed-server.crt',
+          LAUNCHPAD_PUBLIC: 'false',
           WHITELIST_ENABLED: 'true',
           WHITELIST_SECRET: privateWhitelistSecret,
           ADMIN_KEY_HASH: '',
@@ -169,17 +170,27 @@ async function runRollbackDrill(input) {
         rollbackStage = version + '-build-identity';
         if (!(await fetch(origin + '/_next/static/' + buildId + '/_buildManifest.js')).ok)
           throw new Error('Running artifact build identity differs');
-        rollbackStage = version + '-whitelist-page';
-        if (!(await fetch(origin + '/whitelist')).ok) throw new Error('Whitelist page failed');
-        rollbackStage = version + '-database-api-read';
-        const stats = await fetch(origin + '/api/whitelist');
-        const body = await stats.json();
-        if (stats.status !== 200 || body.count !== expectedCount || body.registration !== null)
-          throw new Error('Candidate cannot read the restored current whitelist schema');
         rollbackStage = version + '-private-gate';
         const launch = await fetch(origin + '/launch', { redirect: 'manual' });
-        if (launch.status !== 307 || !launch.headers.get('location')?.endsWith('/whitelist'))
+        const gate = new URL(launch.headers.get('location') ?? '', origin);
+        if (
+          launch.status !== 307 ||
+          gate.origin !== configuredPublicOrigin ||
+          !['/admin', '/whitelist'].includes(gate.pathname)
+        )
           throw new Error('Public gate opened during rollback');
+        if (!(await fetch(origin + gate.pathname)).ok) throw new Error('Sign-in landing failed');
+        const registration = await fetch(origin + '/api/whitelist');
+        if (gate.pathname === '/whitelist') {
+          const body = await registration.json();
+          if (
+            registration.status !== 200 ||
+            body.count !== expectedCount ||
+            body.registration !== null
+          )
+            throw new Error('Previous artifact cannot read the restored registration schema');
+        } else if (registration.status !== 410)
+          throw new Error('Retired registration is still reachable');
         const upload = await fetch(origin + '/api/upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -202,7 +213,6 @@ async function runRollbackDrill(input) {
           const web = await collectWebHealth({
             origin: configuredPublicOrigin,
             allowLocal: true,
-            registrationExpected: true,
             slowMs: 1500,
             fetchImpl: (url, options) => {
               const target = new URL(url);
@@ -217,7 +227,7 @@ async function runRollbackDrill(input) {
           const database = await collectDatabaseHealth({ pool, slowMs: 1000 });
           if (!web.ok || !database.ok) {
             console.error(JSON.stringify({ stage: 'current-read-only-monitoring', web, database }));
-            const document = await fetch(origin + '/whitelist');
+            const document = await fetch(origin + '/admin');
             const html = await document.text();
             console.error(
               JSON.stringify({

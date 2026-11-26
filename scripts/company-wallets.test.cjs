@@ -6,7 +6,8 @@ const app = createRequire(path.resolve(__dirname, '../scaffolds/fun-launch/packa
   { Keypair, PublicKey } = app('@solana/web3.js'),
   { companyWallets } = require('./company-wallets.cjs'),
   { NETWORK_GENESIS } = require('./network-policy.cjs'),
-  owner = require('../docs/mainnet-authorities.public.json');
+  owner = require('../docs/mainnet-authorities.public.json'),
+  devCompany = require('../docs/mskd-mainnet-dev-wallets.public.json');
 test('mainnet ordinary company wallets are pinned to owner-provided public roles', () => {
   const env = {
     FEE_COLLECTOR_PUBLIC_KEY: owner.company.collector,
@@ -29,6 +30,36 @@ test('mainnet ordinary company wallets are pinned to owner-provided public roles
       companyWallets(
         { ...env, TREASURY_PUBLIC_KEY: Keypair.generate().publicKey.toBase58() },
         NETWORK_GENESIS['mainnet-beta']
+      ),
+    /owner-provided/
+  );
+});
+test('mainnet Dev requires its own recorded collector and treasury', () => {
+  const genesis = NETWORK_GENESIS['mainnet-beta'];
+  const env = {
+    LAUNCH_POLICY_VERSION: 'dev-v1',
+    FEE_COLLECTOR_PUBLIC_KEY: devCompany.collector,
+    TREASURY_PUBLIC_KEY: devCompany.treasury,
+  };
+  assert.equal(companyWallets(env, genesis).collector.toBase58(), devCompany.collector);
+  assert.throws(
+    () => companyWallets({ ...env, LAUNCH_POLICY_VERSION: 'bond-v1' }, genesis),
+    /owner-provided/
+  );
+  assert.throws(
+    () => companyWallets({ ...env, TREASURY_PUBLIC_KEY: owner.company.treasury }, genesis),
+    /owner-provided/
+  );
+  assert.throws(
+    () =>
+      companyWallets(
+        {
+          ...env,
+          FEE_COLLECTOR_PUBLIC_KEY: owner.legacyCompanyWallets[0].collector,
+          TREASURY_PUBLIC_KEY: owner.legacyCompanyWallets[0].treasury,
+        },
+        genesis,
+        { allowLegacy: true }
       ),
     /owner-provided/
   );

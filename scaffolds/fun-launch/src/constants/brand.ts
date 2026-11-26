@@ -1,3 +1,5 @@
+import { OFFICIAL_MSKD } from './officialMskd';
+
 // MASKED (mskd.fun): supplied mask + wordmark art and shared colors for HTML, canvas,
 // wallet metadata and share cards. Black and white first; Monero orange is the only accent.
 const assets = {
@@ -8,20 +10,17 @@ const assets = {
   /** Black mask on transparent (light surfaces) */
   markBlack: '/brand/mskd-mark-black.webp',
   markBlackSmall: '/brand/mskd-mark-black-128.webp',
-  markOrange: '/brand/mskd-mark-orange.webp',
   /** MSKD.fun wordmark, white and black */
   wordmark: '/brand/mskd-wordmark.webp',
   wordmarkPng: '/brand/mskd-wordmark.png',
   wordmarkBlack: '/brand/mskd-wordmark-black.webp',
-  wordmarkBlackPng: '/brand/mskd-wordmark-black.png',
   iconDark: '/brand/mskd-icon-dark.png',
   iconLight: '/brand/mskd-icon-light.png',
   icon192: '/brand/mskd-icon-192.png',
   icon512: '/brand/mskd-icon-512.png',
   appleTouch: '/brand/mskd-apple-touch-icon.png',
   favicon: '/brand/mskd-favicon-32.png',
-  /** Intro frame: white mask on black with the eyes and mouth cut out */
-  portal: '/brand/mskd-portal.png',
+  communityInvite: '/brand/mskd-community-invite.jpg',
   /** Avatar for the $MSKD token card: black mask on Monero orange */
   token: '/brand/mskd-token.png',
 } as const;
@@ -35,18 +34,18 @@ export const BRAND = {
   tagline: 'Your keys. Your launches.',
   headline: { top: 'Your keys.', bottom: 'Your launches.' },
   /** Three-beat promise used in heroes, splash and share cards */
-  promise: ['No KYC', 'No accounts', 'No middleman'] as const,
+  promise: ['No KYC', 'No accounts', 'Wallet-signed trades'] as const,
   description:
-    'MASKED is the privacy-first Solana launchpad. No KYC, no accounts, no email: connect any wallet and launch. 1.25% flat before and after bonding, in three modes: MSKD (holders earn in Monero), Dev, and Cashback. Powered by Meteora.',
+    'MASKED is a Solana launchpad with wallet-signed trades and SOL creator rewards. The standard trading fee is 1.25% before and after bonding. Powered by Meteora.',
   url: (process.env.NEXT_PUBLIC_SITE_URL || 'https://mskd.fun').replace(/\/$/, ''),
-  /** Placeholder until the official handle is confirmed */
   xHandle: '@mskdfun',
+  telegramInvite: 'https://t.me/+4pNeyu06EkgzMTRk',
   shareImageVersion: 'mskd-20261122',
   logo: assets.mark,
   wordmarkImage: assets.wordmark,
   assets,
   /** Mint of the first-party $MSKD token pinned on the board; null hides the card until it exists. */
-  officialMint: null as string | null,
+  officialMint: process.env.NEXT_PUBLIC_NETWORK === 'mainnet-beta' ? OFFICIAL_MSKD.mint : null,
   colors: {
     /** Monero orange, our only accent (sampled from getmonero.org's official symbol) */
     orange: '#FF6600',

@@ -3,6 +3,8 @@ import { Keypair, PublicKey } from '@solana/web3.js';
 import type { PoolConfig } from '@meteora-ag/dynamic-bonding-curve-sdk';
 import { vaultAddresses } from '@/lib/vault/client';
 import owner from '../../../../docs/mainnet-authorities.public.json';
+import devCompany from '../../../../docs/mskd-mainnet-dev-wallets.public.json';
+import { QUOTES } from '@/lib/feeModes';
 import {
   NETWORK_GENESIS,
   verifyLaunchConfig,
@@ -90,17 +92,72 @@ function fixture(legacy = false) {
   return { key, config, record };
 }
 describe('runtime configuration admission', () => {
-  it.each(['mskd', 'dev', 'cashback'] as const)('binds %s to its own reviewed policy and quote mint', async mode => {
+  it('requires a mainnet hSOL registry row, a separate pin, and the official on-chain quote mint', async () => {
     const { key, config, record } = fixture();
-    // Every mode, MSKD included, pairs to SOL with the 80 SOL target (MSKD pays holders in wXMR)
-    const quoteMint = config.quoteMint;
-    Object.assign(config, { quoteMint, migratedPoolFeeBps: 125, migrationQuoteThreshold: 80000000000n });
-    Object.assign(record, { policy_version: mode + '-v1', quote_mint: quoteMint.toBase58() });
-    await expect(verifyLaunchConfig(NETWORK_GENESIS.devnet, key, config, record.config_digest, mode)).resolves.toBe(record);
-    await expect(verifyLaunchConfig(NETWORK_GENESIS.devnet, key, config, record.config_digest, mode === 'dev' ? 'cashback' : 'dev')).rejects.toThrow('mode');
-    Object.assign(record, { quote_mint: Keypair.generate().publicKey.toBase58() });
-    await expect(verifyLaunchConfig(NETWORK_GENESIS.devnet, key, config, record.config_digest, mode)).rejects.toThrow('quote mint');
+    const mainnet = NETWORK_GENESIS['mainnet-beta'];
+    const { collector, treasury } = devCompany;
+    Object.assign(config, {
+      feeClaimer: new PublicKey(collector),
+      leftoverReceiver: new PublicKey(treasury),
+      migratedPoolFeeBps: 125,
+      quoteMint: new PublicKey(QUOTES.hsol.mint),
+    });
+    Object.assign(record, {
+      network_genesis: mainnet,
+      policy_version: 'hsol-v1',
+      quote_mint: QUOTES.hsol.mint,
+      expected_fee_claimer: collector,
+      expected_leftover_receiver: treasury,
+    });
+    vi.stubEnv('FEE_COLLECTOR_PUBLIC_KEY', collector);
+    vi.stubEnv('TREASURY_PUBLIC_KEY', treasury);
+    vi.stubEnv('LAUNCH_POLICY_VERSION', 'dev-v1');
+    vi.stubEnv('MAINNET_HSOL_CONFIG_KEY', '');
+    await expect(
+      verifyLaunchConfig(mainnet, key, config, record.config_digest, 'hsol')
+    ).rejects.toThrow('reviewed');
+    vi.stubEnv('MAINNET_HSOL_CONFIG_KEY', key.toBase58());
+    await expect(
+      verifyLaunchConfig(mainnet, key, config, record.config_digest, 'hsol')
+    ).resolves.toBe(record);
+    await expect(
+      verifyLaunchConfig(NETWORK_GENESIS.devnet, key, config, record.config_digest, 'hsol')
+    ).rejects.toThrow('reviewed');
+    config.quoteMint = new PublicKey(QUOTES.sol.mint);
+    await expect(
+      verifyLaunchConfig(mainnet, key, config, record.config_digest, 'hsol')
+    ).rejects.toThrow('release policy');
   });
+  it.each(['mskd', 'dev', 'cashback'] as const)(
+    'binds %s to its own reviewed policy and quote mint',
+    async (mode) => {
+      const { key, config, record } = fixture();
+      // Every mode, MSKD included, pairs to SOL with the 80 SOL target (MSKD pays holders in wXMR)
+      const quoteMint = config.quoteMint;
+      Object.assign(config, {
+        quoteMint,
+        migratedPoolFeeBps: 125,
+        migrationQuoteThreshold: 80000000000n,
+      });
+      Object.assign(record, { policy_version: mode + '-v1', quote_mint: quoteMint.toBase58() });
+      await expect(
+        verifyLaunchConfig(NETWORK_GENESIS.devnet, key, config, record.config_digest, mode)
+      ).resolves.toBe(record);
+      await expect(
+        verifyLaunchConfig(
+          NETWORK_GENESIS.devnet,
+          key,
+          config,
+          record.config_digest,
+          mode === 'dev' ? 'cashback' : 'dev'
+        )
+      ).rejects.toThrow('mode');
+      Object.assign(record, { quote_mint: Keypair.generate().publicKey.toBase58() });
+      await expect(
+        verifyLaunchConfig(NETWORK_GENESIS.devnet, key, config, record.config_digest, mode)
+      ).rejects.toThrow('quote mint');
+    }
+  );
   it('public discovery ignores old environment keys and selects only Bond it. registry records', async () => {
     const old = Keypair.generate().publicKey.toBase58();
     const current = Keypair.generate().publicKey.toBase58();
@@ -120,6 +177,43 @@ describe('runtime configuration admission', () => {
     vi.stubEnv('POOL_CONFIG_KEY', Keypair.generate().publicKey.toBase58());
     registry.registeredConfigKeys.mockResolvedValue([]);
     await expect(discoverableConfigKeys(NETWORK_GENESIS['mainnet-beta'])).resolves.toEqual([]);
+  });
+  it('admits the pinned mainnet Dev config and discovers only Dev on that release', async () => {
+    const { key, config, record } = fixture();
+    const genesis = NETWORK_GENESIS['mainnet-beta'];
+    const { collector, treasury } = devCompany;
+    Object.assign(config, {
+      feeClaimer: new PublicKey(collector),
+      leftoverReceiver: new PublicKey(treasury),
+      migratedPoolFeeBps: 125,
+    });
+    Object.assign(record, {
+      network_genesis: genesis,
+      policy_version: 'dev-v1',
+      quote_mint: config.quoteMint.toBase58(),
+      expected_fee_claimer: collector,
+      expected_leftover_receiver: treasury,
+    });
+    vi.stubEnv('FEE_COLLECTOR_PUBLIC_KEY', collector);
+    vi.stubEnv('TREASURY_PUBLIC_KEY', treasury);
+    vi.stubEnv('LAUNCH_POLICY_VERSION', 'dev-v1');
+    vi.stubEnv('POOL_CONFIG_KEY', PublicKey.default.toBase58());
+    await expect(
+      verifyLaunchConfig(genesis, key, config, record.config_digest, 'dev')
+    ).rejects.toThrow();
+    vi.stubEnv('POOL_CONFIG_KEY', key.toBase58());
+    await expect(
+      verifyLaunchConfig(genesis, key, config, record.config_digest, 'dev')
+    ).resolves.toBe(record);
+    await expect(verifyLaunchConfig(genesis, key, config, 'b'.repeat(64), 'dev')).rejects.toThrow(
+      'reviewed record'
+    );
+    await expect(
+      verifyLaunchConfig(genesis, key, config, record.config_digest, 'cashback')
+    ).rejects.toThrow('mode');
+    registry.registeredConfigKeys.mockResolvedValue([key.toBase58()]);
+    await expect(discoverableConfigKeys(genesis)).resolves.toEqual([key.toBase58()]);
+    expect(registry.registeredConfigKeys).toHaveBeenCalledExactlyOnceWith(genesis, 'dev-v1');
   });
   it('verifies historical wallet config without redirecting it to the new active collector', async () => {
     const { key, config, record } = fixture(true);

@@ -1,4 +1,4 @@
-/* Read-only campaign/service monitoring. This command never signs, sends transactions or alerts people. */
+/* Read-only launchpad monitoring. This command never signs, sends transactions or alerts people. */
 const { performance } = require('node:perf_hooks');
 
 function monitorOrigin(value, allowLocal = false) {
@@ -56,7 +56,7 @@ function noncePolicy(headers) {
 async function collectWebHealth({
   origin,
   allowLocal = false,
-  registrationExpected = true,
+  publicExpected = false,
   timeoutMs = 5000,
   slowMs = 1500,
   fetchImpl = fetch,
@@ -73,6 +73,18 @@ async function collectWebHealth({
   )
     throw new Error('Invalid monitoring time limits');
   const alerts = [];
+  const redirectValid = (r, pathname) => {
+    const location = r.headers.get('location');
+    if (r.status !== 307 || !location) return false;
+    const target = new URL(location, origin);
+    return target.origin === origin && target.pathname === pathname;
+  };
+  const documentValid = (r, body) =>
+    r.status === 200 &&
+    hardened(r.headers) &&
+    noncePolicy(r.headers) &&
+    r.headers.get('content-type')?.includes('text/html') &&
+    /<title\b[^>]*>[^<]*(?:MASKED|MSKD|RINSED|PLZZZ)/i.test(body);
   const specs = [
     {
       name: 'health',
@@ -82,41 +94,28 @@ async function collectWebHealth({
         r.status === 200 && hardened(r.headers) && JSON.parse(body).status === 'ok',
     },
     {
-      name: 'whitelist_document',
-      path: '/whitelist',
+      name: 'admin_document',
+      path: '/admin',
       maximum: 262144,
-      valid: (r, body) =>
-        r.status === 200 &&
-        hardened(r.headers) &&
-        noncePolicy(r.headers) &&
-        r.headers.get('content-type')?.includes('text/html') &&
-        /<title\b[^>]*>[^<]*RINSED/i.test(body),
+      valid: (r, body) => (publicExpected ? redirectValid(r, '/') : documentValid(r, body)),
     },
     {
-      name: 'public_gate',
+      name: 'launchpad_access',
       path: '/',
-      maximum: 16384,
-      valid: (r) => {
-        const location = new URL(r.headers.get('location') ?? '', origin);
-        return r.status === 307 && location.origin === origin && location.pathname === '/whitelist';
-      },
+      maximum: publicExpected ? 262144 : 16384,
+      valid: (r, body) => (publicExpected ? documentValid(r, body) : redirectValid(r, '/admin')),
     },
     {
       name: 'private_api_gate',
-      path: '/api/coins',
+      path: publicExpected ? '/api/admin/config' : '/api/coins',
       maximum: 16384,
       valid: (r) => r.status === 401 && /no-store/i.test(r.headers.get('cache-control') ?? ''),
     },
     {
-      name: 'registration',
+      name: 'retired_registration',
       path: '/api/whitelist',
       maximum: 16384,
-      valid: (r, body) =>
-        !registrationExpected
-          ? r.status === 503
-          : r.status === 200 &&
-            JSON.parse(body).registration === null &&
-            Number.isSafeInteger(JSON.parse(body).count),
+      valid: (r) => r.status === 410 && /no-store/i.test(r.headers.get('cache-control') ?? ''),
     },
   ];
   const checks = await Promise.all(
@@ -151,13 +150,11 @@ async function collectWebHealth({
       }
     })
   );
-  if (!registrationExpected)
-    alerts.push({ severity: 'warning', code: 'REGISTRATION_INTENTIONALLY_DISABLED' });
   return {
     checkedAt: new Date().toISOString(),
     readOnly: true,
-    scope: 'Whitelist campaign and private launchpad gate',
-    registrationExpected,
+    scope: 'Launchpad access and service health',
+    publicExpected,
     ok: !alerts.some((a) => a.severity === 'critical'),
     checks,
     alerts,
@@ -166,7 +163,12 @@ async function collectWebHealth({
 
 async function collectDatabaseHealth({
   pool,
-  requiredTables = ['whitelist_entries', 'whitelist_challenges', 'whitelist_limits'],
+  requiredTables = [
+    'launch_schema_migrations',
+    'launch_configs',
+    'launch_coins',
+    'whitelist_limits',
+  ],
   slowMs = 1000,
   now = () => performance.now(),
 }) {
@@ -232,7 +234,7 @@ async function main() {
   const web = await collectWebHealth({
     origin: process.env.NEXT_PUBLIC_SITE_URL,
     allowLocal,
-    registrationExpected: process.env.WHITELIST_ENABLED === 'true',
+    publicExpected: process.env.LAUNCHPAD_PUBLIC === 'true',
     slowMs: Number(process.env.WEB_HEALTH_SLOW_MS || 1500),
   });
   let database = null,
@@ -249,10 +251,7 @@ async function main() {
       pool = new Pool({ ...databaseConfig(), max: 1, application_name: 'rinsed-web-health' });
       pool.on('error', () => {});
       database = await collectDatabaseHealth({ pool });
-    } else if (
-      process.env.WHITELIST_ENABLED === 'true' ||
-      process.env.FINANCIAL_WORKER_ENABLED === 'true'
-    )
+    } else if (process.env.LAUNCH_POLICY_VERSION || process.env.FINANCIAL_WORKER_ENABLED === 'true')
       database = {
         ok: false,
         readOnly: true,

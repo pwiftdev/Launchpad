@@ -9,6 +9,8 @@ import { WALLET_MEMO_PROGRAM } from './walletEvidence';
 import { WalletStore } from './walletStore';
 import type { WalletJob, WalletSigner } from './walletTypes';
 import { MINIMUM_BUYBACK_LAMPORTS } from './walletPolicy';
+import { assertPayoutTokenBacking } from './walletTokenCustody';
+import { requireFreshMskdQuote } from './walletMskdPolicy';
 
 export type WalletSigningLimits = {
   maximumBuybackLamports: string;
@@ -102,11 +104,12 @@ export async function validateWalletSignJob(
     throw new Error('Signer buyback limit exceeded');
   if (job.kind === 'buyback' && number(job.lamports) < MINIMUM_BUYBACK_LAMPORTS)
     throw new Error('Signer buyback is below the 0.025 SOL minimum');
-  if (job.kind.endsWith('_claim') && number(job.lamports) > number(limits.maximumPayoutLamports))
-    throw new Error('Signer payout limit exceeded');
   const coin = await registeredCoin(job.network_genesis, job.mint);
   if (!coin || !isWalletPolicy(coin.policy_version))
     throw new Error('Signer requires an immutable wallet launch');
+  if (job.kind === 'platform_claim' && number(job.lamports) > number(limits.maximumPayoutLamports))
+    throw new Error('Signer treasury payout limit exceeded');
+  if (job.kind === 'holder_conversion') requireFreshMskdQuote(saved.expectations.quoteCreatedAt);
   // The transport intentionally omits details; only the durable row supplies the funding route.
   if (coin.policy_version === 'bond-v1') await store.assertOperatingFunding(saved);
   const slippage = job.kind === 'buyback' ? Number(job.expectations.slippageBps) : 100;
@@ -126,9 +129,11 @@ export async function validateWalletSignJob(
             { coin, maximumSpendLamports: BigInt(job.lamports) },
             number(job.expectations.burnTokens)
           )
-        : job.kind === 'setup'
-          ? await adapter.prepareSetup({ coin })
-          : await adapter.preparePayout(job);
+        : job.kind === 'holder_conversion'
+          ? await adapter.prepareHolderConversion(saved, saved.expectations)
+          : job.kind === 'setup'
+            ? await adapter.prepareSetup({ coin })
+            : await adapter.preparePayout(saved);
   const expected = Transaction.from(Buffer.from(rebuilt.transactionBase64, 'base64'));
   const memos = tx.instructions.filter((ix) => ix.programId.equals(WALLET_MEMO_PROGRAM));
   if (
@@ -184,6 +189,8 @@ export async function validateWalletSignJob(
     );
   await assertWalletExecutionGate(rpc, job.network_genesis, { worker: true });
   await store.assertNoUnsettledSigned(job.network_genesis, wallets.collector.toBase58(), job.id);
+  await assertPayoutTokenBacking(rpc, store, wallets.collector, saved, coin);
+  if (job.kind === 'holder_conversion') requireFreshMskdQuote(saved.expectations.quoteCreatedAt);
   return { transaction: tx, collector: wallets.collector };
 }
 

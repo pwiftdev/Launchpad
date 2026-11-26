@@ -41,7 +41,7 @@ function mount(ready = false, reducedMotion = false) {
   };
 }
 describe('first-visit splash lifecycle', () => {
-  it('holds the balaclava for the intro beat, then exits as soon as data is ready', () => {
+  it('holds the lockup for the intro beat, then exits as soon as data is ready', () => {
     const first = mount(true);
     expect(first.leave).not.toHaveBeenCalled();
     vi.advanceTimersByTime(SPLASH_MIN_MS);
@@ -111,7 +111,7 @@ describe('first-visit splash lifecycle', () => {
     expect(primarySplashQuery('/whitelist', undefined)).toBeNull();
   });
   it('uses the same versioned key before paint and after hydration without depending on storage access', () => {
-    expect(SPLASH_SEEN_KEY).toBe('mskd.splash.v1');
+    expect(SPLASH_SEEN_KEY).toBe('mskd.splash.v2');
     const add = vi.fn(),
       get = vi.fn((key: string) => (key === SPLASH_SEEN_KEY ? '1' : null));
     const document = { documentElement: { classList: { add } } };
@@ -119,7 +119,7 @@ describe('first-visit splash lifecycle', () => {
     expect(add).toHaveBeenCalledWith('no-splash');
     add.mockClear();
     runInNewContext(SPLASH_BOOT_SCRIPT, {
-      sessionStorage: { getItem: (key: string) => (key === 'rinsed.splash.v2' ? '1' : null) },
+      sessionStorage: { getItem: (key: string) => (key === 'mskd.splash.v1' ? '1' : null) },
       document,
     });
     expect(add).not.toHaveBeenCalled();

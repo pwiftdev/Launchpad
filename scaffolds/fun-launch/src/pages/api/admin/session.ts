@@ -2,8 +2,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 import { verifyAdminKey } from '../../../../../../scripts/admin-key.cjs';
 import { apiGuard, clientIp } from '@/server/apiGuard';
-import { whitelistLimit } from '@/server/whitelistStore';
+import { adminLoginLimit } from '@/server/adminLoginLimit';
 import { siteOriginForHeaders } from '@/server/siteOrigin';
+import { launchpadIsPublic } from '@/lib/accessRoutes';
 import {
   ADMIN_COOKIE,
   adminConfigured,
@@ -18,6 +19,7 @@ const login = z.object({ action: z.literal('login'), key: z.string().min(16).max
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Vary', 'Cookie');
+  if (launchpadIsPublic()) return res.status(404).json({ error: 'Not found' });
   if (!apiGuard(req, res)) return;
   if (req.method === 'GET')
     return res.status(200).json({ authenticated: readAdminSession(req.cookies[ADMIN_COOKIE]) });
@@ -37,11 +39,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .json({ error: 'Admin access is locked until private setup is complete.' });
   try {
     // Reuse the persistent, keyed IP buckets; failures are never logged with the submitted key.
-    if (!(await whitelistLimit(`admin-login-ip:${clientIp(req)}`, 10))) {
+    if (!(await adminLoginLimit(`admin-login-ip:${clientIp(req)}`, 10))) {
       res.setHeader('Retry-After', '3600');
       return res.status(429).json({ error: 'Too many sign-in attempts. Try again later.' });
     }
-    if (!(await whitelistLimit('admin-login-global', 100)))
+    if (!(await adminLoginLimit('admin-login-global', 100)))
       return res.status(429).json({ error: 'Sign-in is temporarily limited. Try again later.' });
     const parsed = login.safeParse(req.body);
     if (!parsed.success || !(await verifyAdminKey(parsed.data.key, process.env.ADMIN_KEY_HASH)))
