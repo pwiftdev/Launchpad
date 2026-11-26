@@ -1,6 +1,6 @@
 {
-  "name": "plzzz-bond",
-  "description": "plzzz.bond — Meteora-powered Solana launchpad with one Bond it. mode. See docs/LIVE-DEPLOYMENT.md.",
+  "name": "masked",
+  "description": "Masked (mskd.fun): a Meteora-powered Solana launchpad. One launch type; the creator splits 0.60% of every trade with holders, claimable in XMR or SOL.",
   "stack": "heroku-24",
   "buildpacks": [
     {

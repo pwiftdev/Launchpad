@@ -1,6 +1,6 @@
 /* The supported footer attachment scopes these rules to the wallet kit's native dialog.
    Keep selectors independent of Emotion's development/production class hashes. */
-dialog:has([data-plzzz-wallet]) {
+dialog:has([data-masked-wallet]) {
   /* Keep the native top-layer picker interactive above other modal surfaces. */
   pointer-events: auto;
   box-sizing: border-box;
@@ -16,11 +16,11 @@ dialog:has([data-plzzz-wallet]) {
   backdrop-filter: blur(10px);
 }
 
-dialog:has([data-plzzz-wallet])::backdrop {
+dialog:has([data-masked-wallet])::backdrop {
   background: transparent;
 }
 
-dialog:has([data-plzzz-wallet]) > div {
+dialog:has([data-masked-wallet]) > div {
   isolation: isolate;
   max-width: 420px;
   max-height: min(680px, calc(100dvh - 32px));
@@ -37,7 +37,7 @@ dialog:has([data-plzzz-wallet]) > div {
     0 0 40px rgb(var(--primary) / 0.06);
 }
 
-dialog:has([data-plzzz-wallet]) > div::before {
+dialog:has([data-masked-wallet]) > div::before {
   position: absolute;
   inset: 0 0 auto;
   height: 2px;
@@ -46,12 +46,12 @@ dialog:has([data-plzzz-wallet]) > div::before {
 }
 
 /* Header and separator belong to the adapter; our brand sits above its title. */
-dialog:has([data-plzzz-wallet]) > div > div:first-of-type {
+dialog:has([data-masked-wallet]) > div > div:first-of-type {
   flex-shrink: 0;
   padding: 88px 24px 20px;
 }
 
-dialog:has([data-plzzz-wallet]) > div > div:first-of-type > div > div:first-child {
+dialog:has([data-masked-wallet]) > div > div:first-of-type > div > div:first-child {
   font-family: var(--font-display), var(--font-sans), sans-serif;
   font-size: 24px;
   font-weight: 700;
@@ -59,33 +59,33 @@ dialog:has([data-plzzz-wallet]) > div > div:first-of-type > div > div:first-chil
   line-height: 1.2;
 }
 
-dialog:has([data-plzzz-wallet]) > div > div:first-of-type > div > div:nth-child(2) {
+dialog:has([data-masked-wallet]) > div > div:first-of-type > div > div:nth-child(2) {
   margin-top: 8px;
   color: rgb(var(--neutral-400));
   font-size: 13px;
   line-height: 1.5;
 }
 
-dialog:has([data-plzzz-wallet]) > div > div:nth-of-type(2) {
+dialog:has([data-masked-wallet]) > div > div:nth-of-type(2) {
   flex-shrink: 0;
   border-color: rgb(var(--neutral-800));
 }
 
-dialog:has([data-plzzz-wallet]) .hideScrollbar {
+dialog:has([data-masked-wallet]) .hideScrollbar {
   min-height: 0;
   padding: 20px 24px 24px;
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
 
-dialog:has([data-plzzz-wallet]) .hideScrollbar > span {
+dialog:has([data-masked-wallet]) .hideScrollbar > span {
   color: rgb(var(--neutral-400));
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-dialog:has([data-plzzz-wallet]) button {
+dialog:has([data-masked-wallet]) button {
   min-height: 44px;
   padding: 8px 12px;
   border: 1px solid rgb(var(--neutral-750));
@@ -99,19 +99,19 @@ dialog:has([data-plzzz-wallet]) button {
     box-shadow 150ms;
 }
 
-dialog:has([data-plzzz-wallet]) button:hover {
+dialog:has([data-masked-wallet]) button:hover {
   border-color: rgb(var(--primary) / 0.55);
   background-color: rgb(var(--primary) / 0.1);
   box-shadow: 0 0 18px rgb(var(--primary) / 0.06);
 }
 
-dialog:has([data-plzzz-wallet]) button:focus-visible,
-dialog:has([data-plzzz-wallet]) a:focus-visible {
+dialog:has([data-masked-wallet]) button:focus-visible,
+dialog:has([data-masked-wallet]) a:focus-visible {
   outline: 2px solid rgb(var(--primary));
   outline-offset: 3px;
 }
 
-dialog:has([data-plzzz-wallet]) > div > div:first-of-type > button {
+dialog:has([data-masked-wallet]) > div > div:first-of-type > button {
   top: 24px;
   right: 24px;
   display: grid;
@@ -123,39 +123,39 @@ dialog:has([data-plzzz-wallet]) > div > div:first-of-type > button {
   color: rgb(var(--neutral-300));
 }
 
-dialog:has([data-plzzz-wallet]) li > button {
+dialog:has([data-masked-wallet]) li > button {
   min-height: 68px;
   gap: 12px;
   padding: 16px 14px;
 }
 
 /* Override the adapter's space-between rule as well as its base span styles. */
-dialog:has([data-plzzz-wallet]) li > button > span:not([hidden]) ~ span:not([hidden]) {
+dialog:has([data-masked-wallet]) li > button > span:not([hidden]) ~ span:not([hidden]) {
   margin: 0;
 }
 
-dialog:has([data-plzzz-wallet]) li > button > span:last-child {
+dialog:has([data-masked-wallet]) li > button > span:last-child {
   font-size: 13px;
 }
 
-dialog:has([data-plzzz-wallet]) a {
+dialog:has([data-masked-wallet]) a {
   color: rgb(var(--primary));
   text-underline-offset: 3px;
 }
 
-/* New-wallet onboarding uses the same primary action and rows as the rest of rinsed.fun. */
-dialog:has([data-plzzz-wallet]) .hideScrollbar > div:has(> img[src$='/new_user_onboarding.png']) {
+/* New-wallet onboarding uses the same primary action and rows as the rest of Masked. */
+dialog:has([data-masked-wallet]) .hideScrollbar > div:has(> img[src$='/new_user_onboarding.png']) {
   position: relative;
   padding: 28px 24px;
 }
 
-dialog:has([data-plzzz-wallet]) .hideScrollbar img[src$='/new_user_onboarding.png'] {
+dialog:has([data-masked-wallet]) .hideScrollbar img[src$='/new_user_onboarding.png'] {
   visibility: hidden;
   width: 112px;
   height: 96px;
 }
 
-dialog:has([data-plzzz-wallet])
+dialog:has([data-masked-wallet])
   .hideScrollbar
   > div:has(> img[src$='/new_user_onboarding.png'])::before {
   position: absolute;
@@ -168,26 +168,26 @@ dialog:has([data-plzzz-wallet])
   content: '';
 }
 
-dialog:has([data-plzzz-wallet]) .hideScrollbar > div:has(> img) > div:last-of-type > button {
+dialog:has([data-masked-wallet]) .hideScrollbar > div:has(> img) > div:last-of-type > button {
   min-height: 48px;
   border-color: rgb(var(--primary));
   background: rgb(var(--primary));
   color: rgb(var(--primary-950));
 }
 
-dialog:has([data-plzzz-wallet]) .hideScrollbar a:has(img) {
+dialog:has([data-masked-wallet]) .hideScrollbar a:has(img) {
   border: 1px solid rgb(var(--neutral-750));
   border-radius: 0;
   background-color: rgb(var(--neutral-900));
   color: rgb(var(--foreground));
 }
 
-dialog:has([data-plzzz-wallet]) .hideScrollbar a:has(img):hover {
+dialog:has([data-masked-wallet]) .hideScrollbar a:has(img):hover {
   border-color: rgb(var(--primary) / 0.55);
   background-color: rgb(var(--primary) / 0.1);
 }
 
-.plzzz-wallet-brand {
+.masked-wallet-brand {
   position: absolute;
   top: 24px;
   left: 24px;
@@ -197,7 +197,7 @@ dialog:has([data-plzzz-wallet]) .hideScrollbar a:has(img):hover {
   pointer-events: none;
 }
 
-.plzzz-wallet-footer {
+.masked-wallet-footer {
   display: flex;
   flex-shrink: 0;
   align-items: flex-start;
@@ -210,31 +210,31 @@ dialog:has([data-plzzz-wallet]) .hideScrollbar a:has(img):hover {
   line-height: 1.6;
 }
 
-.plzzz-wallet-footer > .iconify {
+.masked-wallet-footer > .iconify {
   margin-top: 2px;
 }
 
 @media (max-width: 380px) {
-  dialog:has([data-plzzz-wallet]) > div > div:first-of-type {
+  dialog:has([data-masked-wallet]) > div > div:first-of-type {
     padding-right: 20px;
     padding-left: 20px;
   }
 
-  dialog:has([data-plzzz-wallet]) .hideScrollbar {
+  dialog:has([data-masked-wallet]) .hideScrollbar {
     padding-right: 20px;
     padding-left: 20px;
   }
 
-  dialog:has([data-plzzz-wallet]) li > button {
+  dialog:has([data-masked-wallet]) li > button {
     gap: 8px;
     padding: 14px 10px;
   }
 
-  .plzzz-wallet-brand {
+  .masked-wallet-brand {
     left: 20px;
   }
 
-  .plzzz-wallet-footer {
+  .masked-wallet-footer {
     padding-right: 20px;
     padding-left: 20px;
   }

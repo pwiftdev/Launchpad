@@ -6,7 +6,7 @@ import {
   LAUNCH_IMAGE_MAX_MB,
   MIGRATION_THRESHOLD_SOL,
 } from '@/constants/launch';
-import { SCHEDULE, SPLIT, pct } from '@/lib/feeModes';
+import { LAUNCH_FEE_MODE, SCHEDULE, feeMode, pct } from '@/lib/feeModes';
 import { cn } from '@/lib/utils';
 export { requireAdminPage as getServerSideProps } from '@/server/adminPage';
 
@@ -24,6 +24,8 @@ type Stage = {
   features: Feature[];
 };
 
+const MASKED_SPLIT = feeMode(LAUNCH_FEE_MODE).split;
+
 const ROADMAP: Stage[] = [
   {
     id: 'shipped',
@@ -32,61 +34,31 @@ const ROADMAP: Stage[] = [
     color: 'border-neutral-700 text-foreground',
     features: [
       {
-        title: 'Confidential OTC',
-        description:
-          'Trade SOL against USDC, or pair MSKD or another eligible launchpad token with SOL or USDC. Share a fixed-price offer through an expiring link, then follow funding, settlement with Helius Privacy Rings, and withdrawal.',
-      },
-      {
-        title: 'Wallet access and screen privacy',
-        description:
-          'Connect a Solana wallet and sign actions without creating an account. Screen privacy mode blurs wallet addresses and profiles in the interface.',
+        title: 'One launch type with a locked fee split',
+        description: `Every new coin launches as Masked, paired with SOL. The creator splits ${pct(MASKED_SPLIT.beneficiaryBps)} of every trade with holders in 10% steps. The split is signed with the launch and can never change.`,
       },
       {
         title: 'Token creation and metadata',
-        description: `Set a name, ticker, description, artwork up to ${LAUNCH_IMAGE_MAX_MB} MB and social links. Preview the token and bundle an optional first buy of up to ${DEV_BUY_MAX_PERCENT_OF_SUPPLY}% of supply.`,
-      },
-      {
-        title: 'Private launch previews',
-        description:
-          'Save a draft and share it before launch with an expiring invite. You can restrict an invite to one wallet or revoke it early.',
-      },
-      {
-        title: 'Regular Dev rewards',
-        description: `Regular Dev pairs with SOL and routes ${pct(SPLIT.beneficiaryBps)} of the trade to the creator under the standard fee schedule. Creators can request their full available balance and track reserved and paid rewards separately.`,
-      },
-      {
-        title: 'Cashback and wXMR holder rewards',
-        description:
-          'Regular Cashback pays eligible holders in SOL. MSKD mode converts the holder share to wXMR on Solana. Both modes use finalized hourly balance snapshots to determine rewards.',
+        description: `Set a name, ticker, description, artwork up to ${LAUNCH_IMAGE_MAX_MB} MB and social links, and bundle an optional first buy of up to ${DEV_BUY_MAX_PERCENT_OF_SUPPLY}% of supply.`,
       },
       {
         title: 'One-slot fee guard and bonding',
-        description: `Trades in the creation slot pay ${pct(SCHEDULE.startingFeeBps)}, with the creator’s bundled first buy paying ${pct(SCHEDULE.endingFeeBps)}. The fee is ${pct(SCHEDULE.endingFeeBps)} from the next slot. At ${MIGRATION_THRESHOLD_SOL} SOL in reserves, the pool is eligible to migrate to Meteora DAMM v2, where trades pay ${pct(SCHEDULE.migrationFeeBps)}.`,
+        description: `Trades in the creation slot pay ${pct(SCHEDULE.startingFeeBps)}, with the creator’s bundled first buy paying ${pct(SCHEDULE.endingFeeBps)}. The fee is ${pct(SCHEDULE.endingFeeBps)} from the next slot. At ${MIGRATION_THRESHOLD_SOL} SOL in reserves, the pool can migrate to Meteora DAMM v2, where trades also pay ${pct(SCHEDULE.migrationFeeBps)}.`,
       },
       {
         title: 'Trading and transaction receipts',
         description:
-          'Buy and sell on the bonding curve or the migrated pool. The transaction keeps the minimum output shown before signing. Saved receipts let you check pending token creation, swaps and migrations after a refresh.',
+          'Buy and sell on the bonding curve or the migrated pool. The transaction keeps the minimum output shown before signing. Saved receipts let you check pending launches, swaps and migrations after a refresh.',
       },
       {
-        title: 'Token discovery and market data',
+        title: 'Wallet access and screen privacy',
         description:
-          'Browse new, bonding and bonded tokens. Search by name, ticker or mint from the mobile bottom bar, and star tokens for your watchlist. Token pages show price charts, recent trades, holder balances and ownership concentration.',
+          'Connect a Solana wallet and sign actions without creating an account. Screen privacy mode blurs wallet addresses in the interface.',
       },
       {
         title: 'Official MSKD mint',
         description:
-          'The board pins the verified Masked mint so you can find the official token by its address.',
-      },
-      {
-        title: 'Profiles, token chat and sharing',
-        description:
-          'Set a wallet-linked profile, post signed callouts and join wallet-gated token chat with encrypted message storage. Share token links with preview cards.',
-      },
-      {
-        title: 'Buyback and burn records',
-        description:
-          'Browse finalized buybacks for tokens with burn-enabled fee policies, including the SOL spent, tokens burned and on-chain receipt.',
+          'The board pins the verified $MSKD mint, and launches cannot reuse the Masked or MSKD name.',
       },
     ],
   },
@@ -97,9 +69,9 @@ const ROADMAP: Stage[] = [
     color: 'border-primary/50 text-primary',
     features: [
       {
-        title: 'Health monitoring and recovery',
+        title: 'Live market data',
         description:
-          'The payout worker gives user claims priority ahead of routine treasury transfers and logs alerts for delayed claims, signer errors and low SOL reserves. Service alert delivery and backup recovery are in progress.',
+          'Our own indexer streams every Masked trade into one database, so trades, charts and full holder lists update within seconds for every viewer.',
       },
     ],
   },
@@ -110,39 +82,33 @@ const ROADMAP: Stage[] = [
     color: 'border-neutral-800 text-neutral-400',
     features: [
       {
-        title: 'Customizable launch settings',
-        context: 'Idea',
-        description:
-          'Offer presets and settings for token supply, curve shape, bonding target and fee split within supported ranges. Show how the choices change pricing and liquidity before signing.',
-      },
-      {
-        title: 'More launch pool pairing options',
-        context: 'Idea',
-        description:
-          'Add USDC and other liquid quote assets alongside SOL, with bonding targets and trading quotes shown in the selected asset.',
-      },
-      {
-        title: 'Native Monero cash-out',
+        title: 'Claim in native Monero or SOL',
         context: 'Planned',
         description:
-          'Redeem wXMR rewards for native XMR through the bridge, with redemption fees and minimums shown before confirming.',
+          'One claim screen for creators and holders. Claim in native XMR, sent to the Monero address you enter, or in SOL. If native XMR payouts are down, claims are offered in wXMR instead.',
       },
       {
-        title: 'Creator and holder dashboards',
-        context: 'Idea',
+        title: 'Time-weighted holder rewards',
+        context: 'Planned',
         description:
-          'See token performance and reward balances across multiple tokens, with claim history and exportable receipts.',
+          'Holder shares follow how much you held across each hour, not one snapshot, so buying just before the hour earns nothing extra.',
       },
       {
-        title: 'Transparent token vesting',
-        context: 'Idea',
+        title: `$MSKD buyback and burn`,
+        context: 'Planned',
+        description: `${pct(MASKED_SPLIT.buybackBps)} of every Masked trade buys $MSKD on the market and burns it, with a public receipt for every burn.`,
+      },
+      {
+        title: 'Proof of payouts',
+        context: 'Planned',
         description:
-          'Support on-chain vesting for creator and team allocations. Show locked balances and unlock dates on the token page.',
+          'A public page for every payout period: fees claimed, $MSKD burned, SOL and XMR paid out and how many people were paid, with a published Monero view key.',
       },
       {
-        title: 'Watchlist alerts',
-        context: 'Idea',
-        description: 'Let users opt in to price, bonding and reward alerts for tokens they follow.',
+        title: 'Independent audit',
+        context: 'Planned',
+        description:
+          'A third-party review of fee collection, the reward ledger and the Monero treasury before the public relaunch.',
       },
     ],
   },

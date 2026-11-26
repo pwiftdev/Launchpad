@@ -25,9 +25,12 @@ function loadFonts(): Promise<Font[]> {
     const load = async (family: string, weight: Font['weight']): Promise<Font | null> => {
       try {
         const css = await (
-          await fetch(`https://fonts.googleapis.com/css2?family=${family.replace(/ /g, '+')}:wght@${weight}`, {
-            signal: AbortSignal.timeout(4000),
-          })
+          await fetch(
+            `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, '+')}:wght@${weight}`,
+            {
+              signal: AbortSignal.timeout(4000),
+            }
+          )
         ).text();
         const url = css.match(/src: url\((.+?)\) format\('(?:truetype|opentype)'\)/)?.[1];
         if (!url) return null;
@@ -100,7 +103,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(500).end();
   }
 }
-
 
 const C = BRAND.colors;
 const TEXT = '#fafafa';
@@ -195,14 +197,15 @@ async function renderCard(mint: string): Promise<ImageResponse> {
             fontWeight: 700,
           }}
         >
-          {'> THE PRIVACY-FIRST SOLANA LAUNCHPAD'}
+          {'> THE MONERO PAYOUT LAUNCHPAD'}
         </div>
         <div
           style={{
             display: 'flex',
             flexDirection: 'column',
             marginTop: 16,
-            fontSize: 68,
+            // Fits the two headline lines left of the mask artwork.
+            fontSize: 56,
             fontFamily: term,
             fontWeight: 700,
             lineHeight: 1.05,
@@ -212,7 +215,9 @@ async function renderCard(mint: string): Promise<ImageResponse> {
           <span>{BRAND.headline.top}</span>
           <span style={{ color: C.orange }}>{BRAND.headline.bottom}</span>
         </div>
-        <div style={{ display: 'flex', marginTop: 26, fontSize: 24, fontFamily: term, color: MUTED }}>
+        <div
+          style={{ display: 'flex', marginTop: 26, fontSize: 24, fontFamily: term, color: MUTED }}
+        >
           {BRAND.promise.map((p, i) => (
             <span key={p} style={{ display: 'flex' }}>
               {i > 0 && <span style={{ color: DIM, margin: '0 14px' }}>/</span>}
@@ -408,7 +413,13 @@ async function renderCard(mint: string): Promise<ImageResponse> {
               {s.label}
             </div>
             <div
-              style={{ display: 'flex', fontSize: 46, fontWeight: 700, color: s.color, marginTop: 6 }}
+              style={{
+                display: 'flex',
+                fontSize: 46,
+                fontWeight: 700,
+                color: s.color,
+                marginTop: 6,
+              }}
             >
               {s.value}
             </div>

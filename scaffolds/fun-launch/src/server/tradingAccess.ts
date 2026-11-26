@@ -16,7 +16,7 @@ import { HSOL_MODES, isFeeModeId, type FeeModeId } from '@/lib/feeModes';
 /** Live network, explicit release flag and reviewed wallet policy are all required. */
 export async function verifiedTradingAccess(mode: LaunchMode = ACTIVE_LAUNCH_MODE) {
   if (mode !== ACTIVE_LAUNCH_MODE && !isFeeModeId(mode))
-    throw new Error('Only Bond it. and reviewed MSKD modes are available for new launches');
+    throw new Error('Only reviewed launch modes can trade');
   if (mode === 'mskd-hsol' && !process.env.MSKD_PAYOUT_POOL)
     throw new Error('The reviewed MSKD payout route is unavailable');
   const expected = expectedNetworkGenesis(process.env);

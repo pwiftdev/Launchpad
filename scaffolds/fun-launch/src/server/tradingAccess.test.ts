@@ -62,7 +62,7 @@ describe('wallet policy financial rollout gate', () => {
     expect(res.status).not.toHaveBeenCalled();
     expect(rpc.getLaunchConfig).toHaveBeenCalledWith('bond');
     expect(rpc.getGenesisHash).toHaveBeenCalledTimes(2);
-    await expect(verifiedTradingAccess('community')).rejects.toThrow('Only Bond it.');
+    await expect(verifiedTradingAccess('community')).rejects.toThrow('Only reviewed launch modes');
     await verifiedTradingAccess('bond');
     expect(rpc.getLaunchConfig).toHaveBeenLastCalledWith('bond');
   });

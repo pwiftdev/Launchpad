@@ -18,8 +18,8 @@ export const WalletModalBranding = () => {
   }, [titleId]);
 
   return (
-    <div ref={footer} data-plzzz-wallet="true" className="plzzz-wallet-footer">
-      <div className="plzzz-wallet-brand" aria-hidden="true">
+    <div ref={footer} data-masked-wallet="true" className="masked-wallet-footer">
+      <div className="masked-wallet-brand" aria-hidden="true">
         <LogoMark small className="h-9 w-8 sm:h-11 sm:w-9" />
         <Wordmark className="text-[16px] sm:text-[19px]" />
       </div>

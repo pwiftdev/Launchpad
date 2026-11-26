@@ -3,7 +3,7 @@ import { SCHEDULE, pct, splitRows, type FeeMode, type SplitRow } from '@/lib/fee
 
 const TONE: Record<SplitRow['key'], string> = {
   beneficiary: 'bg-signal',
-  creator: 'bg-acid',
+  creator: 'bg-signal/45',
   holders: 'bg-signal',
   house: 'bg-foreground/70',
   buyback: 'bg-rose',
@@ -50,8 +50,8 @@ export const FeeSplit = ({
             <span className={cn('h-1.5 w-1.5 shrink-0', TONE[r.key])} aria-hidden />
             <dt className="text-neutral-400">
               {r.label}
-              {(r.key === 'holders' ||
-                (r.key === 'beneficiary' && mode.beneficiary === 'holders')) && (
+              {r.key === 'holders' && <span className="text-neutral-600"> · pro rata</span>}
+              {r.key === 'beneficiary' && mode.beneficiary === 'holders' && (
                 <span className="text-neutral-600"> · pro rata, in {mode.payoutSymbol}</span>
               )}
             </dt>

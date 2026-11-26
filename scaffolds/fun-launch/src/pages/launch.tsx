@@ -308,9 +308,9 @@ export default function Launch() {
         <header className="relative mb-8 pt-2 md:mb-10 md:pt-6">
           <p className="eyebrow">Launch</p>
           <h1 className="mt-4 font-display text-[30px] uppercase leading-[1.05] md:text-[46px]">
-            <Decrypt text="Your keys." />
+            <Decrypt text="Launch a coin." />
             <br />
-            <Decrypt text="Your launch." delay={160} className="text-holo" />
+            <Decrypt text="Pay your holders." delay={160} className="text-holo" />
           </h1>
           <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-neutral-400">
             {NETWORK === 'mainnet-beta'

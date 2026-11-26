@@ -4,7 +4,7 @@ import { BRAND } from '@/constants/brand';
 import { useLocalSetting } from '@/hooks/useLocalSetting';
 import { useLaunchpadMarket } from '@/hooks/useMarket';
 import { useUsd } from '@/hooks/useUsd';
-import { SCHEDULE, pct } from '@/lib/feeModes';
+import { SCHEDULE, SPLIT, pct } from '@/lib/feeModes';
 import { formatReadableNumber } from '@/lib/format/number';
 import { POOL_RESERVES_DESCRIPTION } from '@/lib/market';
 import { cn } from '@/lib/utils';
@@ -120,20 +120,23 @@ function BoardIntro() {
           className="flex items-center gap-2 font-term text-[11px] uppercase tracking-[0.14em] text-neutral-500 transition-colors hover:text-foreground focus-visible:text-foreground"
         >
           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-signal" />
-          Privacy-first launchpad
+          The Monero payout launchpad
         </button>
       </ThesisModal>
       <h1
         aria-label={`${BRAND.headline.top} ${BRAND.headline.bottom}`}
         className="mt-1.5 font-display text-[21px] uppercase leading-[1.1] sm:text-[24px] lg:mt-3 lg:text-[30px] 2xl:text-[40px]"
       >
-        <Decrypt text={BRAND.headline.top} />
+        {/* The headline is long for the narrow hero column: two short lines per phrase. */}
+        <Decrypt text="Earn from" /> <Decrypt text="every trade." delay={90} />
         <br className="hidden lg:block" />{' '}
-        <Decrypt text={BRAND.headline.bottom} delay={180} className="text-holo" />
+        <Decrypt text="Cash out" delay={180} className="text-holo" />{' '}
+        <Decrypt text="in Monero." delay={270} className="text-holo" />
       </h1>
       <p className="mt-2 hidden max-w-md text-[13px] leading-relaxed text-neutral-400 lg:block">
-        Connect any wallet and launch. Nothing to sign up for, nothing to verify.{' '}
-        {pct(SCHEDULE.endingFeeBps)} flat, before and after bonding.
+        Every coin splits {pct(SPLIT.beneficiaryBps)} of every trade between its creator and
+        holders, locked at launch. Claim in native XMR or SOL. {pct(SCHEDULE.endingFeeBps)} flat,
+        before and after bonding.
       </p>
       <div className="mt-3 hidden flex-wrap items-center gap-2 lg:flex">
         <Link

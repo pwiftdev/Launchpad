@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { feeMode, isFeeModeId } from '@/lib/feeModes';
 import type { Coin } from '@/lib/coin';
 import { explorerUrl } from '@/constants/network';
 import { formatReadableNumber } from '@/lib/format/number';
@@ -20,11 +21,13 @@ export function TokenAbout({ coin }: { coin: Coin }) {
       aside={
         coin.mode && (
           <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold text-primary">
-            {coin.mode === 'bond'
-              ? 'Bond it.'
-              : coin.mode === 'creator'
-                ? 'Creator Fees'
-                : 'Community'}
+            {isFeeModeId(coin.mode)
+              ? feeMode(coin.mode).label
+              : coin.mode === 'bond'
+                ? 'Bond it.'
+                : coin.mode === 'creator'
+                  ? 'Creator Fees'
+                  : 'Community'}
           </span>
         )
       }
