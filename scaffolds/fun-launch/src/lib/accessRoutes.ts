@@ -76,12 +76,24 @@ function mintAddress(value: string): boolean {
   }
 }
 
+/** A Solana transaction signature: base58 of 64 bytes. */
+export function transactionSignature(value: string): boolean {
+  if (!/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(value)) return false;
+  try {
+    return bs58.decode(value).length === 64;
+  } catch {
+    return false;
+  }
+}
+
 /** Only actual launchpad documents qualify for the renderer's admin bypass. */
 export function launchpadPage(url: string): boolean {
   const path = accessPath(url);
-  if (['/', '/launch', '/earnings', '/proof', '/rules', '/roadmap', '/404'].includes(path)) return true;
+  if (['/', '/launch', '/earnings', '/proof', '/rules', '/roadmap', '/404'].includes(path))
+    return true;
   const token = path.match(/^\/token\/([^/]+)$/);
-  return !!token && mintAddress(token[1]!);
+  const burn = path.match(/^\/proof\/burn\/([^/]+)$/);
+  return (!!token && mintAddress(token[1]!)) || (!!burn && transactionSignature(burn[1]!));
 }
 
 export function publicApi(url: string, open = launchpadIsPublic()): boolean {
@@ -100,7 +112,12 @@ export function publicApi(url: string, open = launchpadIsPublic()): boolean {
   if ((LAUNCHPAD_APIS as readonly string[]).includes(path)) return true;
   const coin = path.match(/^\/api\/coins\/([^/]+)(?:\/(?:trades|holders|live|balance))?$/);
   const og = path.match(/^\/api\/og\/([^/]+)$/);
-  return (!!coin && mintAddress(coin[1]!)) || (!!og && mintAddress(og[1]!));
+  const burn = path.match(/^\/api\/proof\/burns\/([^/]+)$/);
+  return (
+    (!!coin && mintAddress(coin[1]!)) ||
+    (!!og && mintAddress(og[1]!)) ||
+    (!!burn && transactionSignature(burn[1]!))
+  );
 }
 
 export function publicPage(url: string, open = launchpadIsPublic()): boolean {

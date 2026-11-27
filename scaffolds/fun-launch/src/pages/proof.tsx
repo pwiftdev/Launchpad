@@ -1,5 +1,6 @@
 import { Fragment, useState } from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
 import type { GetServerSideProps } from 'next';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -75,6 +76,11 @@ function Receipts({
                 {short(row.signature)}
               </a>
               <span className="text-neutral-500">{ago(row.at)}</span>
+              {tokens && (
+                <Link href={`/proof/burn/${row.signature}`} className="hover:text-primary">
+                  Receipt
+                </Link>
+              )}
               <span className="ml-auto font-mono">
                 {tokens && row.tokens
                   ? `${formatTokenUnits(row.tokens, MSKD_DECIMALS)} $MSKD`

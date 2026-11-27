@@ -3,6 +3,7 @@ import {
   hasCreatorRewards,
   isCashbackMode,
   isMaskedMode,
+  isWalletPolicy,
   isMskdMode,
 } from '@/lib/launchModes';
 import { isHsolMode } from '@/lib/feeModes';
@@ -43,6 +44,7 @@ import {
 } from './walletHolderClaims';
 import { insertMskdConversion, settleMskdConversion, mskdTokenLiability } from './walletMskdStore';
 import { queueWxmrPayments, settleWxmrPayment, type WxmrAlert } from './maskedWxmrClaims';
+import { mskdBuybackMint } from './maskedBuyback';
 import {
   MAXIMUM_MSKD_CONVERSION_LAMPORTS,
   mskdConversionPool,
@@ -417,6 +419,72 @@ export class WalletStore {
       missingOrPartialCursors: Number(cursors[0]?.missing_count ?? 0),
       totalPools: Number(cursors[0]?.total_count ?? 0),
       custody: await this.custodyRequirement(network, collector),
+      mskdBuyback: await this.mskdBuybackReadiness(network, collector),
+    };
+  }
+  /**
+   * Whether the $MSKD buyback and burn can run for this collector: the burn target must be a
+   * registered wallet-policy coin paid by the same collector as the Masked coins that fund it.
+   * Read-only; buybacks themselves run when the operator sets a buyback spend limit.
+   */
+  async mskdBuybackReadiness(network: string, collector: string) {
+    const target = mskdBuybackMint(network);
+    if (!target)
+      return {
+        ready: false,
+        target: null as string | null,
+        problems: ['No $MSKD burn target is set'],
+      };
+    const [coin, budget, moved, waiting, burns] = await Promise.all([
+      this.db.query<{ policy_version: string; collector: string }>(
+        `SELECT c.policy_version,cfg.expected_fee_claimer AS collector FROM launch_coins c
+         JOIN launch_configs cfg ON(cfg.network_genesis=c.network_genesis AND cfg.config_key=c.config_key)
+         WHERE c.network_genesis=$1 AND c.mint=$2`,
+        [network, target]
+      ),
+      this.db.query<{ available: string }>(
+        `SELECT coalesce(sum(funded-reserved-spent),0)::text AS available FROM wallet_balances
+         WHERE network_genesis=$1 AND mint=$2 AND bucket='rinse_buyback'`,
+        [network, target]
+      ),
+      this.db.query<{ lamports: string }>(
+        `SELECT coalesce(sum(lamports),0)::text AS lamports FROM masked_mskd_buyback_transfers
+         WHERE network_genesis=$1 AND target_mint=$2`,
+        [network, target]
+      ),
+      this.db.query<{ lamports: string }>(
+        `SELECT coalesce(sum(b.funded-b.reserved-b.spent),0)::text AS lamports FROM wallet_balances b
+         JOIN launch_coins c USING(network_genesis,mint)
+         WHERE b.network_genesis=$1 AND b.bucket='mskd_buyback' AND c.mode='masked'`,
+        [network]
+      ),
+      this.db.query<{ count: number; burned: string; spent: string }>(
+        `SELECT count(*)::int AS count,coalesce(sum(burned_tokens),0)::text AS burned,
+           coalesce(sum(actual_spent_lamports),0)::text AS spent
+         FROM wallet_settlements WHERE network_genesis=$1 AND mint=$2 AND kind='buyback'`,
+        [network, target]
+      ),
+    ]);
+    const row = coin.rows[0];
+    const problems = [
+      ...(!row ? ['The $MSKD coin is not registered in the launch registry'] : []),
+      ...(row && !isWalletPolicy(row.policy_version)
+        ? [`The $MSKD coin uses ${row.policy_version}, which has no wallet buybacks`]
+        : []),
+      ...(row && row.collector !== collector
+        ? ['The $MSKD coin is paid by another collector, so Masked coins cannot fund its buyback']
+        : []),
+    ];
+    return {
+      ready: problems.length === 0,
+      target,
+      problems,
+      budgetLamports: budget.rows[0]!.available,
+      fundedByMaskedLamports: moved.rows[0]!.lamports,
+      waitingInMaskedCoinsLamports: waiting.rows[0]!.lamports,
+      burns: burns.rows[0]!.count,
+      burnedTokens: burns.rows[0]!.burned,
+      spentLamports: burns.rows[0]!.spent,
     };
   }
   async pendingJobs(network: string, mint: string, limit = 20): Promise<WalletJob[]> {

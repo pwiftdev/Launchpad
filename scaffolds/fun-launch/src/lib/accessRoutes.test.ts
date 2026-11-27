@@ -5,7 +5,9 @@ import {
   launchpadPage,
   publicApi,
   publicPage,
+  transactionSignature,
 } from './accessRoutes';
+import bs58 from 'bs58';
 beforeEach(() => vi.stubEnv('LAUNCHPAD_PUBLIC', ''));
 afterEach(() => vi.unstubAllEnvs());
 
@@ -176,5 +178,26 @@ describe('public launchpad admission', () => {
     expect(publicPage(`/_next/data/build/token/${mint}.json?query=1`)).toBe(true);
     expect(publicPage('/_next/data/build/admin/wallet.json')).toBe(false);
     expect(publicPage('/_next/data/build/unknown.json')).toBe(false);
+  });
+});
+
+describe('public proof routes', () => {
+  const signature = bs58.encode(new Uint8Array(64).fill(7));
+  it('opens burn receipts only for real transaction signatures', () => {
+    vi.stubEnv('LAUNCHPAD_PUBLIC', 'true');
+    expect(transactionSignature(signature)).toBe(true);
+    expect(transactionSignature(bs58.encode(new Uint8Array(32).fill(7)))).toBe(false);
+    expect(launchpadPage('/proof')).toBe(true);
+    expect(launchpadPage(`/proof/burn/${signature}`)).toBe(true);
+    expect(launchpadPage('/proof/burn/abc')).toBe(false);
+    expect(launchpadPage(`/proof/burn/${signature}/x`)).toBe(false);
+    expect(publicApi('/api/proof')).toBe(true);
+    expect(publicApi('/api/proof/key-images')).toBe(true);
+    expect(publicApi(`/api/proof/burns/${signature}`)).toBe(true);
+    expect(publicApi('/api/proof/burns/abc')).toBe(false);
+  });
+  it('keeps proof private while the launchpad is closed', () => {
+    expect(publicApi('/api/proof')).toBe(false);
+    expect(publicPage('/proof')).toBe(false);
   });
 });

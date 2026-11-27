@@ -7,6 +7,7 @@ import { ed25519 } from '@noble/curves/ed25519';
 import { fixtureGenesis, fixtureWallet } from './economics/financialFixtures';
 import { MaskedTreasuryProof } from './economics/maskedTreasuryProof';
 import { ProofStore } from './proofStore';
+import { WalletStore } from './economics/walletStore';
 import { moneroAddressFrom } from '@/lib/monero';
 
 const key = () => fixtureWallet().publicKey.toBase58();
@@ -205,5 +206,50 @@ describe('public proof', () => {
       ['Meteora bonding curve program', expect.any(String)],
       ['Meteora DAMM v2 program', expect.any(String)],
     ]);
+  });
+
+  it('numbers each burn and keeps running totals for its receipt', async () => {
+    await finalized(mskd, 'buyback', 100_000_000, '2026-11-24T08:00:00Z', null, 4_000_000);
+    await finalized(mskd, 'buyback', 200_000_000, '2026-11-25T08:00:00Z', null, 6_000_000);
+    await pg.query(
+      `INSERT INTO masked_mskd_buyback_transfers(id,network_genesis,source_mint,target_mint,lamports,created_at)
+       VALUES($1,$2,$3,$4,300000000,'2026-11-24T12:00:00Z')`,
+      [randomUUID(), fixtureGenesis, mint, mskd]
+    );
+    const signature = (
+      await pg.query<{ signature: string }>(
+        `SELECT signature FROM wallet_settlements WHERE kind='buyback' ORDER BY created_at DESC LIMIT 1`
+      )
+    ).rows[0]!.signature;
+    expect(await new ProofStore(db).burn(fixtureGenesis, mskd, signature)).toMatchObject({
+      number: 2,
+      totalBurns: 2,
+      lamports: '200000000',
+      tokens: '6000000',
+      burnedToDateTokens: '10000000',
+      fundedByMaskedLamports: '300000000',
+    });
+    expect(await new ProofStore(db).burn(fixtureGenesis, mint, signature)).toBeNull();
+  });
+
+  it('reports whether the $MSKD burn can run for this collector', async () => {
+    vi.stubEnv('MASKED_TEST_BUYBACK_MINT', mskd);
+    try {
+      const store = new WalletStore(db as never);
+      expect(await store.mskdBuybackReadiness(fixtureGenesis, collector)).toMatchObject({
+        ready: true,
+        target: mskd,
+        problems: [],
+      });
+      const elsewhere = await store.mskdBuybackReadiness(fixtureGenesis, key());
+      expect(elsewhere.ready).toBe(false);
+      expect(elsewhere.problems[0]).toContain('another collector');
+      vi.stubEnv('MASKED_TEST_BUYBACK_MINT', key());
+      expect((await store.mskdBuybackReadiness(fixtureGenesis, collector)).problems[0]).toContain(
+        'not registered'
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

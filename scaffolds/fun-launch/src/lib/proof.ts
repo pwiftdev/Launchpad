@@ -23,6 +23,29 @@ export type ProofDay = {
   peoplePaid: number;
 };
 
+/** One $MSKD buyback and burn, as its public receipt shows it. */
+export type BurnReceipt = {
+  signature: string;
+  at: string;
+  slot: string;
+  /** SOL spent buying $MSKD. */
+  lamports: string;
+  /** $MSKD bought and destroyed in the same transaction. */
+  tokens: string;
+  /** Pool the $MSKD was bought from, and whether it was the bonding curve or the graduated pool. */
+  pool: string | null;
+  route: string | null;
+  /** This burn's place among all burns, oldest first. */
+  number: number;
+  totalBurns: number;
+  burnedToDateTokens: string;
+  /** SOL moved from Masked coins' 0.10% share into the buyback budget, up to this burn. */
+  fundedByMaskedLamports: string;
+  mint: string;
+  /** Current $MSKD supply read from the chain, when available. */
+  supply: { amount: string; decimals: number } | null;
+};
+
 export type ProofControl = {
   label: string;
   address: string;

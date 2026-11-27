@@ -150,6 +150,56 @@ export class ProofStore {
     return { collections: collections.rows.map(iso), burns: burns.rows.map(iso) };
   }
 
+  /** One finalized $MSKD burn and its running totals; null when the signature is not a burn. */
+  async burn(network: string, mskdMint: string, signature: string) {
+    const row = (
+      await this.db.query<{
+        signature: string;
+        at: Date;
+        slot: string;
+        lamports: string;
+        tokens: string;
+        pool: string | null;
+        route: string | null;
+        number: number;
+        total: number;
+        burned: string;
+        funded: string;
+      }>(
+        `WITH burns AS (
+           SELECT s.signature,s.created_at,s.finalized_slot,s.actual_spent_lamports,s.burned_tokens,
+             j.expectations->>'pool' AS pool,j.expectations->>'route' AS route,
+             row_number() OVER(ORDER BY s.created_at,s.signature)::int AS number,
+             count(*) OVER()::int AS total,
+             sum(s.burned_tokens) OVER(ORDER BY s.created_at,s.signature) AS burned
+           FROM wallet_settlements s JOIN wallet_jobs j ON j.id=s.job_id
+           WHERE s.network_genesis=$1 AND s.mint=$2 AND s.kind='buyback')
+         SELECT b.signature,b.created_at AS at,b.finalized_slot::text AS slot,
+           b.actual_spent_lamports::text AS lamports,b.burned_tokens::text AS tokens,b.pool,b.route,
+           b.number,b.total,b.burned::text AS burned,
+           (SELECT coalesce(sum(t.lamports),0) FROM masked_mskd_buyback_transfers t
+             WHERE t.network_genesis=$1 AND t.target_mint=$2 AND t.created_at<=b.created_at)::text AS funded
+         FROM burns b WHERE b.signature=$3`,
+        [network, mskdMint, signature]
+      )
+    ).rows[0];
+    if (!row) return null;
+    return {
+      signature: row.signature,
+      at: new Date(row.at).toISOString(),
+      slot: row.slot,
+      lamports: row.lamports,
+      tokens: row.tokens,
+      pool: row.pool,
+      route: row.route,
+      number: row.number,
+      totalBurns: row.total,
+      burnedToDateTokens: row.burned,
+      fundedByMaskedLamports: row.funded,
+      mint: mskdMint,
+    };
+  }
+
   async xmrReserves(network: string) {
     const [status, waiting] = await Promise.all([
       this.db.query<{ unlocked: string; heartbeat_at: Date }>(

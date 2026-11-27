@@ -152,6 +152,13 @@ function BoardIntro() {
         >
           How fees work
         </Link>
+        <Link
+          href="/proof"
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 px-2 text-xs font-medium text-neutral-400 transition-colors hover:bg-neutral-900 hover:text-foreground"
+        >
+          <span aria-hidden="true" className="iconify h-4 w-4 ph--seal-check" />
+          See the proof
+        </Link>
       </div>
     </div>
   );

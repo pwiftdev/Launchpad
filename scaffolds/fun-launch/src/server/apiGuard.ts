@@ -72,7 +72,8 @@ function pollingClass(req: NextApiRequest): keyof typeof POLLING_LIMITS | undefi
       '/api/proof',
       '/api/proof/key-images',
     ].includes(path) ||
-    /^\/api\/coins\/[1-9A-HJ-NP-Za-km-z]{32,44}(?:\/(?:trades|holders|live))?$/.test(path)
+    /^\/api\/coins\/[1-9A-HJ-NP-Za-km-z]{32,44}(?:\/(?:trades|holders|live))?$/.test(path) ||
+    /^\/api\/proof\/burns\/[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(path)
   )
     return 'market';
   if (

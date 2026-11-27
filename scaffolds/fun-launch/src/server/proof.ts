@@ -7,7 +7,7 @@ import { ProofStore, PROOF_DAYS } from './proofStore';
 import { WalletStore } from './economics/walletStore';
 import { mskdBuybackMint } from './economics/maskedBuyback';
 import type { MoneroNetwork } from '@/lib/monero';
-import type { ProofView } from '@/lib/proof';
+import type { BurnReceipt, ProofView } from '@/lib/proof';
 
 const store = new ProofStore();
 export const proofMoneroNetwork = (genesis: string): MoneroNetwork =>
@@ -70,5 +70,28 @@ async function build(genesis: string): Promise<ProofView> {
 
 export const proofView = (genesis: string) =>
   sharedRead(`proof:${genesis}`, () => build(genesis), 30_000);
+async function tokenSupply(mint: string) {
+  try {
+    const supply = await connection.getTokenSupply(new PublicKey(mint), 'finalized');
+    return { amount: supply.value.amount, decimals: supply.value.decimals };
+  } catch {
+    return null;
+  }
+}
+
+/** A burn's public receipt, or null when the signature is not a finalized $MSKD burn. */
+export async function burnReceipt(genesis: string, signature: string): Promise<BurnReceipt | null> {
+  const mint = mskdBuybackMint(genesis);
+  if (!mint) return null;
+  const burn = await sharedRead(`burn:${genesis}:${signature}`, () =>
+    store.burn(genesis, mint, signature)
+  );
+  if (!burn) return null;
+  return {
+    ...burn,
+    supply: await sharedRead(`supply:${genesis}:${mint}`, () => tokenSupply(mint), 60_000),
+  };
+}
+
 export const latestKeyImages = (genesis: string) =>
   sharedRead(`key-images:${genesis}`, () => store.latestKeyImages(genesis), 60_000);
