@@ -21,6 +21,8 @@ export type FeeSource = {
   configKey: string;
   activationPoint: number;
   mode: LaunchMode;
+  /** Masked coins: the creator's locked share, needed to split their fees. */
+  creatorShareBps?: number | null;
   programId?: string;
 };
 export type VerifiedFeeEvent = {
@@ -187,6 +189,7 @@ function decodeFinalizedFees(
       tradeTime,
       mode: source.mode,
       phase: phase === 0 ? 'rinse' : 'post',
+      creatorShareBps: source.creatorShareBps,
     });
     const result: VerifiedFeeEvent = {
       networkGenesis: evidence.networkGenesis,

@@ -62,6 +62,7 @@ export class WalletWorker {
         configKey: coin.config_key,
         activationPoint: Number(coin.activation_point),
         mode: coin.mode,
+        creatorShareBps: coin.creator_share_bps,
       },
       indexer = new FinalizedFeeIndexer(this.rpc, this.store);
     const dbc = await indexer.runPool(source, {

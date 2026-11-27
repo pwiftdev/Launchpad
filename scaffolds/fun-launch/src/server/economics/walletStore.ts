@@ -949,7 +949,7 @@ export class WalletStore {
       let count = 0;
       for (const event of events) {
         const a = event.allocation,
-          net = a.rinseBuyback + a.creator + a.community + a.platform;
+          net = a.rinseBuyback + a.creator + a.community + a.platform + a.mskdBuyback;
         const inserted = await client.query(
           `INSERT INTO wallet_fee_events(network_genesis,mint,pool,signature,instruction_index,event_index,finalized_slot,trade_time,phase,total,protocol,referral,net,event_digest)
     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)ON CONFLICT DO NOTHING RETURNING event_digest`,

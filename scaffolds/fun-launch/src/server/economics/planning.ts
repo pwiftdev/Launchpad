@@ -57,6 +57,7 @@ export async function planFinancialCoin(input: {
     configKey: coin.config_key,
     activationPoint: Number(coin.activation_point),
     mode: coin.mode,
+    creatorShareBps: coin.creator_share_bps,
   };
   const indexer = new FinalizedFeeIndexer(rpc, store),
     dbc = await indexer.runPool(source, {

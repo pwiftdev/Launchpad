@@ -93,6 +93,27 @@ describe('finalized migrated-pool fees', () => {
     expect(result).toHaveLength(1);
     expect(result[0]!.phase).toBe(1);
     expect(result[0]!.allocation.community).toBe(50n);
+    // A Masked coin splits the same 100 collected units by its locked creator share.
+    const masked = decodeFinalizedDammFees(
+      await test.evidence(),
+      { ...source, mode: 'masked' as const, creatorShareBps: 3000 },
+      coder,
+      CP_AMM_PROGRAM_ID.toBase58()
+    );
+    expect(masked[0]!.allocation).toMatchObject({
+      creator: 18n,
+      community: 42n,
+      platform: 30n,
+      mskdBuyback: 10n,
+    });
+    expect(() =>
+      decodeFinalizedDammFees(
+        {} as never,
+        { ...source, mode: 'masked' as const },
+        coder,
+        CP_AMM_PROGRAM_ID.toBase58()
+      )
+    ).toThrow();
     raw.swap_result.compounding_fee = new BN(1);
     emit();
     expect(() =>
