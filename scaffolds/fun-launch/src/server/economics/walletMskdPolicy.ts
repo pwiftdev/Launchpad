@@ -9,9 +9,9 @@ export const MSKD_QUOTE_LIFETIME_MS = 20_000;
 export const MSKD_SLIPPAGE_BPS = 100;
 export const HSOL_BRIDGE_POOL = new PublicKey('6a7EnjAoiRBbminKkWPdytMFFf5ogjLutqwpvAVyZ89j');
 
-export function mskdPayoutMint(genesis: string) {
+export function mskdPayoutMint(genesis: string, env = process.env) {
   const network = genesis === NETWORK_GENESIS['mainnet-beta'] ? 'mainnet-beta' : 'devnet';
-  const value = payoutMintFor('mskd', network, process.env);
+  const value = payoutMintFor('mskd', network, env);
   if (!value) return null;
   const mint = new PublicKey(value);
   if (mint.equals(PublicKey.default) || value === SOL_REWARD_MINT || mint.toBase58() !== value)
@@ -19,9 +19,19 @@ export function mskdPayoutMint(genesis: string) {
   return mint;
 }
 
-export function mskdConversionPool() {
-  const value = process.env.MSKD_PAYOUT_POOL;
+export function mskdConversionPool(env = process.env) {
+  const value = env.MSKD_PAYOUT_POOL;
   return value ? new PublicKey(value) : null;
+}
+
+export function wxmrClaimsEnabled(genesis: string, env = process.env) {
+  if (env.MASKED_WXMR_PAYOUTS_ENABLED !== 'true') return false;
+  try {
+    const pool = mskdConversionPool(env);
+    return !!pool && !pool.equals(PublicKey.default) && !!mskdPayoutMint(genesis, env);
+  } catch {
+    return false;
+  }
 }
 
 export function signedRewardMint(mode: LaunchMode, genesis: string): string | null | undefined {
@@ -31,12 +41,15 @@ export function signedRewardMint(mode: LaunchMode, genesis: string): string | nu
   return undefined;
 }
 
-export function requireFreshMskdQuote(created: unknown, now = Date.now()) {
-  if (
-    typeof created !== 'number' ||
-    !Number.isSafeInteger(created) ||
-    created > now ||
-    now - created > MSKD_QUOTE_LIFETIME_MS
-  )
-    throw new Error('MSKD conversion quote has expired');
+export function isFreshMskdQuote(created: unknown, now = Date.now()) {
+  return (
+    typeof created === 'number' &&
+    Number.isSafeInteger(created) &&
+    created <= now &&
+    now - created <= MSKD_QUOTE_LIFETIME_MS
+  );
+}
+
+export function requireFreshMskdQuote(created: unknown) {
+  if (!isFreshMskdQuote(created)) throw new Error('MSKD conversion quote has expired');
 }

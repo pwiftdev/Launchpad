@@ -17,50 +17,50 @@ export const SideRail = () => {
   return (
     <aside
       className={cn(
-        'sticky top-0 z-20 hidden h-screen shrink-0 flex-col border-r border-white/[0.08] bg-panel transition-[width] duration-200 ease-out md:flex',
-        expanded ? 'w-[212px]' : 'w-[64px]'
+        'glass z-20 hidden h-full shrink-0 flex-col rounded-3xl transition-[width] duration-300 ease-out md:flex',
+        expanded ? 'w-[220px]' : 'w-[68px]'
       )}
       aria-label="Sidebar"
     >
       <div
         className={cn(
-          'flex h-14 items-center',
-          expanded ? 'justify-between px-3' : 'justify-center'
+          'flex h-16 items-center',
+          expanded ? 'justify-between px-3.5' : 'justify-center'
         )}
       >
         <Link
           href="/"
           aria-label={`${BRAND.name} home`}
-          className="group flex items-center gap-2 rounded-lg p-1"
+          className="group flex items-center gap-2 rounded-xl p-1"
         >
           <LogoMark
             small
-            className="h-8 w-7 transition-transform duration-300 group-hover:scale-105"
+            className="h-8 w-7 drop-shadow-[0_6px_14px_rgba(255,102,0,0.35)] transition-transform duration-300 ease-spring group-hover:-rotate-6 group-hover:scale-110"
           />
           {expanded && <Wordmark className="text-[16px]" />}
         </Link>
         {expanded && <CollapseButton expanded onClick={() => setExpanded(false)} />}
       </div>
 
-      <div className={cn('px-3 pb-2', !expanded && 'flex justify-center px-0')}>
+      <div className={cn('px-3 pb-3', !expanded && 'flex justify-center px-0')}>
         <RailTip label="Launch a coin" show={!expanded}>
           <Link
             href="/launch"
             className={cn(
-              'btn-holo flex h-10 items-center justify-center gap-2 rounded-lg text-[13px]',
-              expanded ? 'w-full text-sm' : 'w-10'
+              'btn-holo group flex h-11 items-center justify-center gap-2 rounded-2xl text-[13px]',
+              expanded ? 'w-full text-sm' : 'w-11'
             )}
             aria-label="Launch a coin"
           >
-            <span className="iconify h-5 w-5 ph--plus-bold" />
-            {expanded && 'Launch'}
+            <span className="iconify h-5 w-5 transition-transform duration-200 ease-spring group-hover:rotate-90 ph--plus-bold" />
+            {expanded && 'Launch a coin'}
           </Link>
         </RailTip>
       </div>
 
       <nav
         aria-label="Main"
-        className={cn('mt-2 flex flex-col gap-0.5', expanded ? 'px-3' : 'items-center')}
+        className={cn('mt-1 flex flex-col gap-1', expanded ? 'px-3' : 'items-center')}
       >
         {NAV_ITEMS.map((item) => {
           const active = isActivePath(pathname, item.href);
@@ -71,23 +71,25 @@ export const SideRail = () => {
                 aria-current={active ? 'page' : undefined}
                 aria-label={item.label}
                 className={cn(
-                  'relative flex h-10 items-center gap-3 rounded-lg text-sm transition-colors',
-                  expanded ? 'w-full px-3' : 'w-10 justify-center',
+                  'group relative flex h-11 items-center gap-3 rounded-2xl text-sm transition-all duration-200 ease-out',
+                  expanded ? 'w-full px-3' : 'w-11 justify-center',
                   active
-                    ? 'bg-neutral-900 text-foreground'
-                    : 'text-neutral-500 hover:bg-neutral-900/60 hover:text-neutral-100'
+                    ? 'bg-gradient-to-b from-white/[0.10] to-white/[0.03] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_8px_20px_-12px_rgba(0,0,0,0.9)]'
+                    : 'text-neutral-400 hover:bg-white/[0.05] hover:text-neutral-100'
                 )}
               >
                 {active && (
                   <span
-                    className="bg-holo absolute -left-3 top-2.5 h-5 w-[2px] rounded-full"
+                    className="absolute -left-3 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_12px_2px_rgba(255,102,0,0.6)]"
                     aria-hidden
                   />
                 )}
                 <span
                   className={cn(
-                    'iconify h-5 w-5 shrink-0',
-                    active ? `${item.activeIcon} text-primary` : item.icon
+                    'iconify h-5 w-5 shrink-0 transition-transform duration-200 ease-spring group-hover:scale-110',
+                    active
+                      ? `${item.activeIcon} text-primary drop-shadow-[0_0_8px_rgba(255,102,0,0.55)]`
+                      : item.icon
                   )}
                 />
                 {expanded && <span className="flex-1 text-[13px] font-medium">{item.label}</span>}
@@ -108,9 +110,9 @@ export const SideRail = () => {
             aria-pressed={privacy.enabled}
             aria-label="Privacy mode: blur wallet addresses"
             className={cn(
-              'flex h-10 items-center gap-3 rounded-lg text-sm transition-colors hover:bg-neutral-900/60',
-              privacy.enabled ? 'text-acid' : 'text-neutral-500 hover:text-neutral-100',
-              expanded ? 'w-full px-3' : 'w-10 justify-center'
+              'flex h-10 items-center gap-3 rounded-2xl text-sm transition-all duration-200 ease-out hover:bg-white/[0.05]',
+              privacy.enabled ? 'text-primary' : 'text-neutral-400 hover:text-neutral-100',
+              expanded ? 'w-full px-3' : 'w-11 justify-center'
             )}
           >
             <span
@@ -129,8 +131,8 @@ export const SideRail = () => {
             rel="noreferrer"
             aria-label={`${BRAND.name} on X`}
             className={cn(
-              'flex h-10 items-center gap-3 rounded-lg text-sm text-neutral-500 transition-colors hover:bg-neutral-900/60 hover:text-neutral-100',
-              expanded ? 'w-full px-3' : 'w-10 justify-center'
+              'flex h-10 items-center gap-3 rounded-2xl text-sm text-neutral-400 transition-all duration-200 ease-out hover:bg-white/[0.05] hover:text-neutral-100',
+              expanded ? 'w-full px-3' : 'w-11 justify-center'
             )}
           >
             <span className="iconify h-5 w-5 ph--x-logo" />
@@ -149,7 +151,7 @@ const CollapseButton = ({ expanded, onClick }: { expanded: boolean; onClick: () 
     onClick={onClick}
     aria-label={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
     title={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
-    className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-900 hover:text-neutral-100"
+    className="flex h-8 w-8 items-center justify-center rounded-xl text-neutral-500 transition-all duration-200 ease-out hover:bg-white/[0.06] hover:text-neutral-100"
   >
     <span
       className={cn(
@@ -174,7 +176,7 @@ const RailTip = ({
         <Tooltip.Content
           side="right"
           sideOffset={10}
-          className="z-50 rounded-md border border-neutral-800 bg-neutral-900 px-2.5 py-1.5 text-xs font-medium text-neutral-100 shadow-lg data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0"
+          className="glass-strong z-50 rounded-xl px-3 py-1.5 text-xs font-medium text-neutral-100 data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:slide-in-from-left-1 data-[state=delayed-open]:duration-200"
         >
           {label}
         </Tooltip.Content>

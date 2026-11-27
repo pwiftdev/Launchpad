@@ -31,9 +31,9 @@ export const TaxBanner = ({
       <section
         aria-label="Trading fee"
         title={bond.title}
-        className={cn('flex items-center justify-between gap-3 px-4 py-2.5', className)}
+        className={cn('flex items-center justify-between gap-3 px-4 py-3', className)}
       >
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+        <span className="text-[11.5px] font-medium text-neutral-400">
           {isMigrated ? 'After bonding' : '99% launch slot · then'}
         </span>
         <span className="font-mono text-sm text-emerald">{bond.label}</span>
@@ -43,9 +43,9 @@ export const TaxBanner = ({
     return (
       <section
         aria-label="Trading fee"
-        className={cn('flex items-center justify-between gap-3 px-4 py-2.5', className)}
+        className={cn('flex items-center justify-between gap-3 px-4 py-3', className)}
       >
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+        <span className="text-[11.5px] font-medium text-neutral-400">
           {feePolicyVersion === 'legacy-devnet' ? 'Legacy fee schedule' : 'Trading fee'}
         </span>
         <span
@@ -67,14 +67,15 @@ export const TaxBanner = ({
     <section
       aria-label="Snipe tax"
       title={`Starting tax: ${LAUNCH_TAX_CLIFF_PERCENT}%, reducing toward ${BASE_FEE_PERCENT}% over up to ${LAUNCH_TAX_WINDOW_SECONDS}s or graduation. On-chain rounding affects the exact total.`}
-      className={cn('px-4 py-2.5 transition-colors', !isClean && 'bg-rose/[0.07]', className)}
+      className={cn(
+        'px-4 py-3 transition-colors duration-300',
+        !isClean && 'bg-rose/[0.08]',
+        className
+      )}
     >
       <div className="flex items-center justify-between gap-3">
         <span
-          className={cn(
-            'text-[10px] font-semibold uppercase tracking-wider',
-            isClean ? 'text-neutral-500' : 'text-rose'
-          )}
+          className={cn('text-[11.5px] font-medium', isClean ? 'text-neutral-400' : 'text-rose')}
         >
           {isClean ? 'Snipe tax over' : 'Snipe tax'}
         </span>
@@ -101,9 +102,9 @@ export const TaxBanner = ({
             const fill = Math.min(Math.max(windowProgress * 9 - i, 0), 1);
             const current = i === Math.floor(windowProgress * 9);
             return (
-              <span key={i} className="h-0.5 flex-1 overflow-hidden rounded-full bg-neutral-850">
+              <span key={i} className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
                 <span
-                  className="block h-full rounded-full bg-rose"
+                  className="block h-full rounded-full bg-rose shadow-[0_0_8px_rgba(255,92,108,0.7)]"
                   style={{ width: `${(current ? stepProgress : fill) * 100}%` }}
                 />
               </span>

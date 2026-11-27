@@ -252,7 +252,7 @@ describe('private wallet signer configuration', () => {
   it('accepts explicit ordinary owner wallets without a native program setting', () => {
     expect(walletSignerConfig(policy()).purpose).toBe('rinsed-wallet-signer');
   });
-  it('requires the Dev collector, treasury and pool config pin for mainnet Dev', () => {
+  it('requires the Dev company and pool pin and accepts the additional Masked payout config', () => {
     const p = policy();
     const environment = {
       ...p.environment,
@@ -262,10 +262,22 @@ describe('private wallet signer configuration', () => {
     };
     expect(() => walletSignerConfig({ ...p, environment })).toThrow('pool config pin');
     const POOL_CONFIG_KEY = fixtureWallet().publicKey.toBase58();
-    expect(
-      walletSignerConfig({ ...p, environment: { ...environment, POOL_CONFIG_KEY } }).environment
-        .POOL_CONFIG_KEY
-    ).toBe(POOL_CONFIG_KEY);
+    const MAINNET_MASKED_CONFIG_KEY = fixtureWallet().publicKey.toBase58();
+    const MSKD_PAYOUT_POOL = fixtureWallet().publicKey.toBase58();
+    const signer = walletSignerConfig({
+      ...p,
+      environment: {
+        ...environment,
+        POOL_CONFIG_KEY,
+        MAINNET_MASKED_CONFIG_KEY,
+        MSKD_PAYOUT_POOL,
+      },
+    });
+    expect(signer.environment).toMatchObject({
+      POOL_CONFIG_KEY,
+      MAINNET_MASKED_CONFIG_KEY,
+      MSKD_PAYOUT_POOL,
+    });
   });
   it('rejects disabled or missing explicit gates, inherited settings and swapped wallets', () => {
     const p = policy();

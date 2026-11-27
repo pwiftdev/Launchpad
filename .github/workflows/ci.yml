@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, mskd-rebrand, masked-overhaul]
   pull_request:
-    branches: [main, develop]
+    branches: [main, develop, mskd-rebrand, masked-overhaul]
 
 jobs:
   lint-and-format:
@@ -113,6 +113,13 @@ jobs:
           NEXT_PUBLIC_NETWORK: mainnet-beta
           FEE_COLLECTOR_PUBLIC_KEY: 3j4vUdPKF7HNqKoaWdezQoX9Hognn6Us7ua6thZZiaed
           TREASURY_PUBLIC_KEY: GfgpgQa2ZqNm17rJ6fw2t5nBApKKPZBn5M5niWW3riZZ
+        run: node scripts/audit-launch-config.mjs --template
+      - name: Audit the Masked template offline
+        env:
+          NEXT_PUBLIC_NETWORK: mainnet-beta
+          LAUNCH_POLICY_VERSION: masked-v1
+          FEE_COLLECTOR_PUBLIC_KEY: FiFmAXm5cTx1sCH5zSUpBbDFt9rVgCfuGhMVahDWLmHm
+          TREASURY_PUBLIC_KEY: GHCkJgsWsy5PGZHQuwoJtBv6BgyQQB7FA8KgRStyoqwH
         run: node scripts/audit-launch-config.mjs --template
 
   heroku-artifact:

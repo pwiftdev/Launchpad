@@ -1,9 +1,9 @@
 export const SPLASH_SEEN_KEY = 'mskd.splash.v2';
 export const SPLASH_MAX_MS = 3000;
 /** Briefly hold the lockup even when data is already cached. */
-export const SPLASH_MIN_MS = 900;
+export const SPLASH_MIN_MS = 600;
 /** Keep the veil mounted until its CSS fade finishes. */
-export const SPLASH_EXIT_MS = 820;
+export const SPLASH_EXIT_MS = 640;
 /** _document runs this before paint; storage failure simply leaves the first-visit veil in place. */
 export const SPLASH_BOOT_SCRIPT = `try{if(sessionStorage.getItem(${JSON.stringify(SPLASH_SEEN_KEY)})==='1')document.documentElement.classList.add('no-splash')}catch(e){}`;
 

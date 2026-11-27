@@ -101,18 +101,21 @@ it('persists the locally derived receipt BEFORE a relay that broadcasts then los
     f.context.messageBase64
   );
 });
-it('recovers a Bond it. launch receipt after a lost relay response', async () => {
-  const f = launchFixture(),
-    storage = memory();
-  fetchMock.mockRejectedValue(new Error('response lost after broadcast'));
-  await submitPreparedLaunch(
-    { signed: f.transaction, expectedMessage: f.message, receipt: { ...f.receipt, mode: 'bond' } },
-    storage
-  );
-  const recovered = pendingLaunchFor(f.receipt.wallet, f.context.genesis, storage);
-  expect(recovered?.mode).toBe('bond');
-  expect(recovered?.signature).toBe(f.signature);
-});
+it.each(['bond', 'masked'] as const)(
+  'recovers a %s launch receipt after a lost relay response',
+  async (mode) => {
+    const f = launchFixture(),
+      storage = memory();
+    fetchMock.mockRejectedValue(new Error('response lost after broadcast'));
+    await submitPreparedLaunch(
+      { signed: f.transaction, expectedMessage: f.message, receipt: { ...f.receipt, mode } },
+      storage
+    );
+    const recovered = pendingLaunchFor(f.receipt.wallet, f.context.genesis, storage);
+    expect(recovered?.mode).toBe(mode);
+    expect(recovered?.signature).toBe(f.signature);
+  }
+);
 it('blocks relay when storage throws or silently fails, and never stores signed wire or keys', async () => {
   const f = launchFixture();
   for (const storage of [

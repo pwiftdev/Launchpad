@@ -35,6 +35,26 @@ const valid = {
 test('accepts a complete deployment configuration', () => {
   assert.doesNotThrow(() => validateEnv(valid));
 });
+test('allows only official Axiom referral URLs and pins that public setting to the build', () => {
+  const linked = {
+    ...valid,
+    NEXT_PUBLIC_AXIOM_REFERRAL_URL: 'https://axiom.trade/@masked-fixture',
+  };
+  assert.doesNotThrow(() => validateEnv(linked));
+  assert.throws(
+    () => validatePublicBuildEnvironment(publicBuildEnvironment(linked), valid),
+    /differs from runtime/
+  );
+  for (const url of [
+    'https://axiom.trade.example/@masked',
+    'http://axiom.trade/@masked',
+    'https://axiom.trade/@masked?next=https://other.example',
+  ])
+    assert.throws(
+      () => validateEnv({ ...valid, NEXT_PUBLIC_AXIOM_REFERRAL_URL: url }),
+      /official Axiom referral URL/
+    );
+});
 test('permits known historical collector pins only for a closed web transition, never live admission', () => {
   const roles = createRequire(import.meta.url)('../docs/mainnet-authorities.public.json');
   const env = {

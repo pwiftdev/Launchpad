@@ -29,7 +29,7 @@ export const TaxBadge = ({
     return hideWhenClean ? null : (
       <span
         className={cn(
-          'rounded bg-emerald/10 px-1.5 py-0.5 font-mono text-[11px] text-emerald',
+          'rounded-full bg-emerald/10 px-2 py-0.5 font-mono text-[10.5px] text-emerald ring-1 ring-inset ring-emerald/20',
           className
         )}
         title={bond.title}
@@ -42,7 +42,7 @@ export const TaxBadge = ({
     return hideWhenClean ? null : (
       <span
         className={cn(
-          'inline-flex rounded bg-neutral-850 px-1.5 py-0.5 text-[11px] text-neutral-400',
+          'inline-flex rounded-full bg-white/[0.05] px-2 py-0.5 text-[10.5px] text-neutral-400 ring-1 ring-inset ring-white/[0.07]',
           className
         )}
         title="This coin uses its original fee configuration. Check the live quote for its trading fee."
@@ -57,8 +57,10 @@ export const TaxBadge = ({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] font-medium tabular',
-        isClean ? 'bg-emerald/10 text-emerald' : 'bg-rose/15 text-rose',
+        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[10.5px] font-medium tabular ring-1 ring-inset',
+        isClean
+          ? 'bg-emerald/10 text-emerald ring-emerald/20'
+          : 'bg-rose/15 text-rose ring-rose/25',
         className
       )}
       title={

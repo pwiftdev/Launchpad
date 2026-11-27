@@ -60,20 +60,20 @@ function fixture(count: number, missing = new Set<string>()) {
         newest_signature: string | null;
         backfill_before: string | null;
         backfill_complete: boolean;
+        forward_head: string | null;
+        forward_before: string | null;
       }
     | undefined;
   const store = {
     cursor: vi.fn(async () => cursor),
     saveCursor: vi.fn(
-      async (
-        _: string,
-        __: string,
-        c: { newest: string | null; backfillBefore: string | null; complete: boolean }
-      ) => {
+      async (_: string, __: string, c: Parameters<DisplayStore['saveCursor']>[2]) => {
         cursor = {
           newest_signature: c.newest,
           backfill_before: c.backfillBefore,
           backfill_complete: c.complete,
+          forward_head: c.forwardHead,
+          forward_before: c.forwardBefore,
         };
       }
     ),
@@ -82,7 +82,16 @@ function fixture(count: number, missing = new Set<string>()) {
       return trades.length;
     }),
   } as unknown as DisplayStore;
-  return { rpc, store, inserted, cursor: () => cursor };
+  return {
+    rpc,
+    store,
+    inserted,
+    cursor: () => cursor,
+    addSignatures(total: number) {
+      const count = all.length;
+      all.unshift(...Array.from({ length: total - count }, (_, i) => sig(total - i)));
+    },
+  };
 }
 
 describe('pool scan', () => {
@@ -95,6 +104,8 @@ describe('pool scan', () => {
       newest_signature: 'sig-5',
       backfill_before: null,
       backfill_complete: true,
+      forward_head: null,
+      forward_before: null,
     });
     // Nothing new: the next pass asks only for signatures after the cursor.
     await scanPool({ rpc: f.rpc as never, store: f.store, pool: POOL, coin });
@@ -131,5 +142,39 @@ describe('pool scan', () => {
     expect(f.cursor()!.backfill_complete).toBe(true);
     expect(new Set(f.inserted).size).toBe(2600);
     expect(f.cursor()!.newest_signature).toBe('sig-2600');
+  });
+
+  it('resumes an established cursor through a backlog and an uncertain write', async () => {
+    const unavailable = new Set(['sig-2010']);
+    const f = fixture(1, unavailable);
+    const pass = () => scanPool({ rpc: f.rpc as never, store: f.store, pool: POOL, coin });
+    await pass();
+    f.addSignatures(2600);
+    const insert = vi.mocked(f.store.insertTrades).getMockImplementation()!;
+    vi.mocked(f.store.insertTrades).mockImplementationOnce(async (mint, trades) => {
+      await insert(mint, trades);
+      throw new Error('connection lost after database accepted trades');
+    });
+    await expect(pass()).rejects.toThrow('connection lost');
+    expect(f.cursor()!.newest_signature).toBe('sig-1');
+    await pass();
+    expect(f.cursor()).toMatchObject({
+      newest_signature: 'sig-1',
+      forward_head: 'sig-2600',
+      forward_before: 'sig-2201',
+    });
+    await pass();
+    expect(f.cursor()!.forward_before).toBe('sig-2201');
+    unavailable.clear();
+    f.addSignatures(2700);
+    let more = true;
+    for (let i = 0; i < 15 && more; i++) ({ more } = await pass());
+    expect(more).toBe(false);
+    expect(new Set(f.inserted).size).toBe(2700);
+    expect(f.cursor()).toMatchObject({
+      newest_signature: 'sig-2700',
+      forward_head: null,
+      forward_before: null,
+    });
   });
 });

@@ -30,16 +30,31 @@ export default {
         code: ['var(--font-code)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
 
-      // Brutalist: no rounded corners anywhere. Only rounded-full survives, for status dots.
+      // Liquid glass: soft, generous corners. Panels use 2xl/3xl, controls lg/xl, chips full.
       borderRadius: {
         none: '0',
-        sm: '0',
-        DEFAULT: '0',
-        md: '0',
-        lg: '0',
-        xl: '0',
-        '2xl': '0',
-        '3xl': '0',
+        sm: '6px',
+        DEFAULT: '8px',
+        md: '10px',
+        lg: '12px',
+        xl: '16px',
+        '2xl': '20px',
+        '3xl': '28px',
+      },
+
+      // Depth: every layer casts a soft shadow and catches light on its top edge
+      boxShadow: {
+        glass:
+          'inset 0 1px 0 rgb(255 255 255 / 0.10), inset 0 -1px 0 rgb(0 0 0 / 0.25), 0 1px 2px rgb(0 0 0 / 0.30), 0 18px 48px -22px rgb(0 0 0 / 0.75)',
+        lift: 'inset 0 1px 0 rgb(255 255 255 / 0.14), 0 2px 4px rgb(0 0 0 / 0.30), 0 26px 60px -24px rgb(0 0 0 / 0.85), 0 0 0 1px rgb(255 120 40 / 0.10)',
+        glow: '0 10px 30px -8px rgb(255 102 0 / 0.55), 0 0 0 1px rgb(255 140 60 / 0.35)',
+        inset: 'inset 0 2px 6px rgb(0 0 0 / 0.45), inset 0 0 0 1px rgb(255 255 255 / 0.06)',
+      },
+
+      transitionTimingFunction: {
+        // Fast start, long soft landing: every hover, open and swap uses it
+        out: 'cubic-bezier(0.16, 1, 0.3, 1)',
+        spring: 'cubic-bezier(0.34, 1.4, 0.64, 1)',
       },
 
       fontSize: {
@@ -69,6 +84,22 @@ export default {
           '50%': { transform: 'translateY(-6px)' },
         },
         // Name kept for existing call sites; now a short glitch jitter
+        rise: {
+          from: { opacity: '0', transform: 'translateY(10px) scale(0.985)', filter: 'blur(4px)' },
+          to: { opacity: '1', transform: 'none', filter: 'none' },
+        },
+        'scale-in': {
+          from: { opacity: '0', transform: 'scale(0.96)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        shimmer: {
+          from: { backgroundPosition: '-200% 0' },
+          to: { backgroundPosition: '200% 0' },
+        },
+        'glow-pulse': {
+          '0%, 100%': { opacity: '0.55' },
+          '50%': { opacity: '1' },
+        },
         pray: {
           '0%, 100%': { transform: 'translate(0, 0)' },
           '20%': { transform: 'translate(-1px, 1px)' },
@@ -83,6 +114,10 @@ export default {
         'shine-reverse': 'shine 3s linear infinite reverse',
         float: 'float 3.5s ease-in-out infinite',
         pray: 'pray 0.35s steps(2) infinite',
+        rise: 'rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both',
+        'scale-in': 'scale-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both',
+        shimmer: 'shimmer 1.6s linear infinite',
+        'glow-pulse': 'glow-pulse 2.4s ease-in-out infinite',
       },
 
       colors: {

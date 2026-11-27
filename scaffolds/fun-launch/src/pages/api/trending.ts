@@ -1,6 +1,6 @@
 import { apiGuard } from '@/server/apiGuard';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { displayClock, displayStore } from '@/server/display';
+import { displayStore, sharedClock, sharedCoins, sharedRead } from '@/server/display';
 import type { TrendingCoin, TrendingResponse } from '@/lib/coin';
 
 /** Runners by market cap, and unbonded coins ranked by swaps in the last hour, from the index. */
@@ -16,9 +16,9 @@ export default async function handler(
     return res.status(200).json({ runners: [], trending: [], serverTime: 0, clockStale: true });
   try {
     const [coins, counts, clock] = await Promise.all([
-      store.coins(),
-      store.recentSwapCounts(3600),
-      displayClock(store),
+      sharedCoins(store),
+      sharedRead(`trending:${store.genesis}`, () => store.recentSwapCounts(3600)),
+      sharedClock(store),
     ]);
     const runners = [...coins].sort((a, b) => b.marketCapSol - a.marketCapSol).slice(0, 10);
     const trending: TrendingCoin[] = coins

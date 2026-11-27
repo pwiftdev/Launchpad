@@ -10,6 +10,7 @@ import { BRAND } from '@/constants/brand';
 import { NETWORK, explorerUrl } from '@/constants/network';
 import { adminPageRedirect } from '@/server/adminPage';
 import { formatXmr } from '@/lib/monero';
+import { formatWxmr } from '@/lib/maskedEarnings';
 import { formatSol, formatTokenUnits } from '@/lib/tokenUnits';
 import type { ProofDay, ProofReceipt, ProofView } from '@/lib/proof';
 
@@ -41,9 +42,9 @@ function copy(text: string, what: string) {
 
 function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
-    <div className="rounded-xl border border-neutral-850 bg-neutral-950 p-4">
+    <div className="tile tile-hover p-4">
       <p className="text-xs text-neutral-500">{label}</p>
-      <p className="mt-2 font-mono text-lg">{value}</p>
+      <p className="mt-2 font-mono text-[22px] font-semibold tracking-tight">{value}</p>
       {note && <p className="mt-1 text-xs text-neutral-500">{note}</p>}
     </div>
   );
@@ -64,7 +65,7 @@ function Receipts({
       {rows.length === 0 ? (
         <p className="mt-2 text-xs text-neutral-500">None yet.</p>
       ) : (
-        <ul className="mt-2 divide-y divide-neutral-850 text-xs">
+        <ul className="mt-2 divide-y divide-white/[0.05] text-xs">
           {rows.map((row) => (
             <li key={row.signature} className="flex items-center gap-3 py-2">
               <a
@@ -108,6 +109,9 @@ export default function Proof() {
   });
   const [open, setOpen] = useState<string | null>(null);
   const data = proof.data;
+  const hasNativeHistory = data?.days.some(
+    (day) => BigInt(day.xmrPaidAtomic) > 0n || BigInt(day.xmrReceivedAtomic) > 0n
+  );
 
   return (
     <Page containerClassName="max-w-4xl">
@@ -116,27 +120,34 @@ export default function Proof() {
       </Head>
       <header className="pb-8 pt-4 md:pt-8">
         <p className="eyebrow">Proof</p>
-        <h1 className="mt-4 font-display text-[30px] uppercase leading-[1.05] md:text-[44px]">
+        <h1 className="mt-4 text-[30px] font-semibold leading-[1.02] tracking-[-0.045em] md:text-[44px]">
           <Decrypt text="Every fee in." />
           <br />
           <Decrypt text="Every payout out." delay={160} className="text-holo" />
         </h1>
         <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-neutral-400">
           What Masked collected, burned and paid each day, what it holds against what it owes, and
-          which keys control what. Payouts are shown as daily totals: we prove the money moved
-          without pointing at who earned it.
+          which keys control what. wXMR and SOL payouts appear as daily totals. Transfers are public
+          on Solana.
         </p>
       </header>
 
       {proof.isLoading ? (
-        <div className="surface p-6 text-sm text-neutral-400">Loading proof…</div>
+        <div className="surface space-y-3 rounded-3xl p-6" aria-busy aria-label="Loading proof">
+          <div className="skeleton h-3 w-24" />
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="skeleton h-20 rounded-2xl" />
+            <div className="skeleton h-20 rounded-2xl" />
+            <div className="skeleton h-20 rounded-2xl" />
+          </div>
+        </div>
       ) : proof.error || !data ? (
-        <div className="surface p-6 text-sm text-rose" role="alert">
+        <div className="surface rounded-3xl p-6 text-sm text-rose" role="alert">
           {proof.error instanceof Error ? proof.error.message : 'Proof is unavailable'}
         </div>
       ) : (
         <div className="flex flex-col gap-5">
-          <section className="surface p-6" aria-labelledby="totals">
+          <section className="surface rounded-3xl p-6" aria-labelledby="totals">
             <p id="totals" className="eyebrow">
               Last 30 days
             </p>
@@ -146,13 +157,13 @@ export default function Proof() {
                 value={formatSol(total(data.days, (day) => day.feesCollectedLamports))}
               />
               <Stat
-                label="Paid to creators and holders"
+                label="Earnings paid (SOL value)"
                 value={formatSol(
                   total(data.days, (day) => day.solPaidLamports) +
                     total(data.days, (day) => day.wxmrPaidLamports) +
                     total(data.days, (day) => day.xmrPaidLamports)
                 )}
-                note={`${xmr(total(data.days, (day) => day.xmrPaidAtomic))} sent as native XMR`}
+                note={`${formatWxmr(total(data.days, (day) => day.wxmrPaidAtomic))} sent on Solana`}
               />
               <Stat
                 label="$MSKD bought and burned"
@@ -166,7 +177,7 @@ export default function Proof() {
           </section>
 
           {data.reserves && (
-            <section className="surface p-6" aria-labelledby="reserves">
+            <section className="surface rounded-3xl p-6" aria-labelledby="reserves">
               <p id="reserves" className="eyebrow">
                 Reserves
               </p>
@@ -190,24 +201,24 @@ export default function Proof() {
                       : 'Checked on chain'
                   }
                 />
-                <Stat
-                  label="Monero treasury can spend"
-                  value={
-                    data.reserves.xmrUnlockedAtomic === null
-                      ? 'Not reported yet'
-                      : xmr(data.reserves.xmrUnlockedAtomic)
-                  }
-                  note={
-                    data.reserves.xmrHeartbeatAt
-                      ? `Reported ${ago(data.reserves.xmrHeartbeatAt)}`
-                      : undefined
-                  }
-                />
-                <Stat
-                  label="XMR claims waiting"
-                  value={String(data.reserves.xmrClaimsWaiting)}
-                  note={`${formatSol(data.reserves.xmrClaimsWaitingLamports)} of earnings, paid in the daily batch`}
-                />
+                {data.reserves.xmrUnlockedAtomic !== null && (
+                  <Stat
+                    label="Monero treasury can spend"
+                    value={xmr(data.reserves.xmrUnlockedAtomic)}
+                    note={
+                      data.reserves.xmrHeartbeatAt
+                        ? `Reported ${ago(data.reserves.xmrHeartbeatAt)}`
+                        : undefined
+                    }
+                  />
+                )}
+                {data.reserves.xmrClaimsWaiting > 0 && (
+                  <Stat
+                    label="Native XMR claims waiting"
+                    value={String(data.reserves.xmrClaimsWaiting)}
+                    note={`${formatSol(data.reserves.xmrClaimsWaitingLamports)} of earnings`}
+                  />
+                )}
               </div>
               <p className="mt-3 text-xs text-neutral-500">
                 Check the fee wallet yourself:{' '}
@@ -223,7 +234,7 @@ export default function Proof() {
             </section>
           )}
 
-          <section className="surface p-6" aria-labelledby="daily">
+          <section className="surface rounded-3xl p-6" aria-labelledby="daily">
             <p id="daily" className="eyebrow">
               Day by day (UTC)
             </p>
@@ -233,12 +244,17 @@ export default function Proof() {
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full min-w-[640px] text-left text-xs">
                   <thead className="text-neutral-500">
-                    <tr className="border-b border-neutral-850">
+                    <tr className="border-b border-white/[0.06]">
                       <th className="py-2 font-medium">Day</th>
                       <th className="py-2 font-medium">Fees collected</th>
                       <th className="py-2 font-medium">Paid in SOL</th>
-                      <th className="py-2 font-medium">Paid in XMR</th>
-                      <th className="py-2 font-medium">XMR bought</th>
+                      <th className="py-2 font-medium">Paid in wXMR</th>
+                      {hasNativeHistory && (
+                        <>
+                          <th className="py-2 font-medium">Paid in native XMR</th>
+                          <th className="py-2 font-medium">XMR received</th>
+                        </>
+                      )}
                       <th className="py-2 font-medium">$MSKD burned</th>
                       <th className="py-2 text-right font-medium">People paid</th>
                     </tr>
@@ -247,31 +263,35 @@ export default function Proof() {
                     {data.days.map((day) => (
                       <Fragment key={day.day}>
                         <tr
-                          className="cursor-pointer border-b border-neutral-850 hover:bg-neutral-900"
+                          className="cursor-pointer border-b border-white/[0.06] hover:bg-white/[0.035]"
                           onClick={() => setOpen(open === day.day ? null : day.day)}
                           aria-expanded={open === day.day}
                         >
                           <td className="py-2">{day.day}</td>
                           <td className="py-2">{formatSol(day.feesCollectedLamports)}</td>
                           <td className="py-2">{formatSol(day.solPaidLamports)}</td>
-                          <td className="py-2">
-                            {xmr(BigInt(day.xmrPaidAtomic) + BigInt(day.wxmrPaidAtomic))}
-                          </td>
-                          <td className="py-2">{xmr(day.xmrReceivedAtomic)}</td>
+                          <td className="py-2">{formatWxmr(day.wxmrPaidAtomic)}</td>
+                          {hasNativeHistory && (
+                            <>
+                              <td className="py-2">{xmr(day.xmrPaidAtomic)}</td>
+                              <td className="py-2">{xmr(day.xmrReceivedAtomic)}</td>
+                            </>
+                          )}
                           <td className="py-2">
                             {formatTokenUnits(day.mskdBurnedTokens, MSKD_DECIMALS)}
                           </td>
                           <td className="py-2 text-right">{day.peoplePaid}</td>
                         </tr>
                         {open === day.day && (
-                          <tr className="border-b border-neutral-850">
-                            <td colSpan={7} className="py-3 font-sans text-neutral-400">
+                          <tr className="border-b border-white/[0.06]">
+                            <td
+                              colSpan={hasNativeHistory ? 8 : 6}
+                              className="py-3 font-sans text-neutral-400"
+                            >
                               <p>
                                 {day.collections} fee collection
                                 {day.collections === 1 ? '' : 's'} · {day.burns} burn
                                 {day.burns === 1 ? '' : 's'}
-                                {BigInt(day.wxmrPaidAtomic) > 0n &&
-                                  ` · ${xmr(day.wxmrPaidAtomic)} of it as wXMR`}
                               </p>
                               {day.xmrTransactions.length > 0 && (
                                 <p className="mt-2">
@@ -300,25 +320,28 @@ export default function Proof() {
             )}
           </section>
 
-          <section className="surface grid gap-6 p-6 md:grid-cols-2" aria-label="Receipts">
+          <section
+            className="surface grid gap-6 rounded-3xl p-6 md:grid-cols-2"
+            aria-label="Receipts"
+          >
             <Receipts title="Latest fee collections" rows={data.recentCollections} />
             <Receipts title="Latest $MSKD burns" rows={data.recentBurns} tokens />
           </section>
 
-          <section className="surface p-6" aria-labelledby="treasury">
+          <section className="surface rounded-3xl p-6" aria-labelledby="treasury">
             <p id="treasury" className="eyebrow">
               Monero treasury
             </p>
             {!data.treasury ? (
               <p className="mt-4 text-sm text-neutral-500">
-                The treasury’s view key is published once XMR payouts start.
+                Direct payouts to Monero wallets are in development.
               </p>
             ) : (
               <div className="mt-4 flex flex-col gap-4 text-sm">
                 <p className="text-neutral-400">
                   Anyone can watch this wallet. Import the address and view key into a view-only
-                  Monero wallet to see everything it receives; import the key images to see what it
-                  spends. Neither can move funds.
+                  Monero wallet to see everything it receives. Import the key images to see what it
+                  spends.
                 </p>
                 {[
                   ['Address', data.treasury.address],
@@ -329,7 +352,7 @@ export default function Proof() {
                     <button
                       type="button"
                       onClick={() => copy(value!, label!)}
-                      className="mt-1 w-full break-all rounded-lg border border-neutral-850 bg-neutral-950 px-3 py-2 text-left font-mono text-xs hover:border-neutral-600"
+                      className="well mt-1 w-full break-all rounded-xl px-3.5 py-2.5 text-left font-mono text-xs transition-colors duration-200 hover:border-white/20"
                     >
                       {value}
                     </button>
@@ -354,7 +377,7 @@ export default function Proof() {
                       <a
                         href="/api/proof/key-images"
                         download
-                        className="btn-holo inline-flex h-10 items-center rounded-lg px-4 text-sm"
+                        className="btn-holo inline-flex h-10 items-center px-4 text-[13px]"
                       >
                         Download key images
                       </a>
@@ -393,11 +416,11 @@ export default function Proof() {
             )}
           </section>
 
-          <section className="surface p-6" aria-labelledby="controls">
+          <section className="surface rounded-3xl p-6" aria-labelledby="controls">
             <p id="controls" className="eyebrow">
               Who controls what
             </p>
-            <ul className="mt-4 divide-y divide-neutral-850">
+            <ul className="mt-4 divide-y divide-white/[0.05]">
               {data.controls.map((control) => (
                 <li key={`${control.label}:${control.address}`} className="py-3">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">

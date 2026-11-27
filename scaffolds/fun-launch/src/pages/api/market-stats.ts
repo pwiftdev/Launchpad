@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiGuard } from '@/server/apiGuard';
 import { BRAND } from '@/constants/brand';
-import { displayClock, displayStore } from '@/server/display';
+import { displayStore, sharedClock, sharedCoins, sharedRead } from '@/server/display';
 import type { MarketStats } from '@/lib/market';
 
 /** 24-hour launchpad figures from indexed trades, plus the network sample the indexer records. */
@@ -12,13 +12,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!store)
     return res.status(503).json({ error: 'Market statistics are temporarily unavailable' });
   try {
-    const [coins, clock] = await Promise.all([store.coins(), displayClock(store)]);
+    const [coins, clock] = await Promise.all([sharedCoins(store), sharedClock(store)]);
     const ordered = [...coins].sort(
       (a, b) =>
         Number(b.mint === BRAND.officialMint) - Number(a.mint === BRAND.officialMint) ||
         b.launchedAt - a.launchedAt
     );
-    const tokens = await store.markets(ordered);
+    const tokens = await sharedRead(`markets:${store.genesis}`, () => store.markets(ordered));
     const tracked = Object.values(tokens);
     const data: MarketStats = {
       updatedAt: Math.floor(Date.now() / 1000),

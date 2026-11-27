@@ -45,8 +45,7 @@ function fixture() {
     previousBlockhash: i === 0 ? fixtureWallet().publicKey.toBase58() : hashes[i - 1]!,
   }));
   const statuses = vi.fn(async () => ({ value: [null] })),
-    getBlocks = vi.fn(async () => slots),
-    getBlock = vi.fn(async (slot: number) => blocks.find((b) => b.slot === slot) ?? null);
+    getBlocks = vi.fn(async () => slots);
   const getBlockSignatures = vi.fn(async (slot: number) => ({
     ...blocks.find((b) => b.slot === slot),
     signatures: ['another-signature'],
@@ -59,7 +58,6 @@ function fixture() {
     getTransaction: vi.fn(async () => null),
     getFirstAvailableBlock: vi.fn(async () => 900),
     getBlocks,
-    getBlock,
     getBlockSignatures,
   } as unknown as Connection;
   return { rpc, job, signed, slots, blocks, getBlocks, getBlockSignatures, statuses };
@@ -76,6 +74,15 @@ describe('positive standard-wallet expiry recovery', () => {
   it('refuses missing intermediate produced blocks despite missing signature status', async () => {
     const f = fixture();
     f.getBlocks.mockResolvedValue([1000, 1003, 1005]);
+    await expect(verifyWalletRecovery(f.rpc, f.job)).rejects.toThrow('inconsistent finalized');
+  });
+  it('requires the block height in the finalized signature response', async () => {
+    const f = fixture();
+    f.getBlockSignatures.mockImplementation(async (slot: number) => ({
+      ...f.blocks.find((b) => b.slot === slot),
+      blockHeight: undefined,
+      signatures: [],
+    }));
     await expect(verifyWalletRecovery(f.rpc, f.job)).rejects.toThrow('inconsistent finalized');
   });
   it('finds an already processed payout even when the status index returns null', async () => {

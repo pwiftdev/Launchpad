@@ -23,10 +23,10 @@ export const StatusBar = () => {
   return (
     <footer
       aria-label="Market and Solana statistics"
-      className="fixed inset-x-0 bottom-16 z-30 flex h-10 shrink-0 items-center gap-3 border-t border-white/[0.08] bg-panel px-3 text-[10px] md:static md:z-auto md:h-11 md:gap-4 md:px-4"
+      className="fixed inset-x-0 bottom-[76px] z-30 flex h-9 shrink-0 items-center gap-3 border-y border-white/[0.06] bg-[rgb(18_15_14/0.72)] px-3 text-[10.5px] backdrop-blur-xl md:glass md:relative md:inset-auto md:z-auto md:h-10 md:gap-4 md:rounded-2xl md:border md:px-4"
     >
       <div
-        className="flex shrink-0 items-center gap-2 border-r border-neutral-800 pr-3"
+        className="flex shrink-0 items-center gap-2 border-r border-white/[0.07] pr-3"
         title={
           live
             ? 'Cluster statistics refreshed ' + Math.max(0, Math.round(age ?? 0)) + ' seconds ago'
@@ -35,17 +35,15 @@ export const StatusBar = () => {
       >
         <span
           className={cn(
-            'h-1.5 w-1.5 rounded-full',
-            live ? 'bg-signal shadow-[0_0_8px_rgba(255,102,0,0.6)]' : 'bg-amber',
+            'h-2 w-2 rounded-full',
+            live ? 'bg-emerald shadow-[0_0_10px_rgba(62,222,140,0.7)]' : 'bg-amber',
             isFetching && 'animate-pulse'
           )}
         />
-        <span className="font-term font-medium uppercase tracking-wider text-neutral-300">
+        <span className="font-medium text-neutral-200">
           {NETWORK === 'mainnet-beta' ? 'Solana' : NETWORK_LABEL}
         </span>
-        <span className="hidden font-term text-neutral-500 lg:inline">
-          {live ? 'connected' : 'syncing…'}
-        </span>
+        <span className="hidden text-neutral-500 lg:inline">{live ? 'connected' : 'syncing…'}</span>
       </div>
       <dl
         ref={statsRef}
@@ -96,16 +94,22 @@ export const StatusBar = () => {
         type="button"
         aria-label="More market stats"
         onClick={() => statsRef.current?.scrollBy({ left: 220, behavior: 'smooth' })}
-        className="flex h-7 w-6 shrink-0 items-center justify-center rounded text-neutral-400 hover:text-primary md:hidden"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-neutral-400 hover:text-primary md:hidden"
       >
         <span className="iconify h-3.5 w-3.5 ph--caret-right-bold" />
       </button>
       <nav
-        className="hidden shrink-0 items-center gap-3 border-l border-neutral-800 pl-4 font-term uppercase tracking-wider text-neutral-500 xl:flex"
+        className="hidden shrink-0 items-center gap-4 border-l border-white/[0.07] pl-4 text-neutral-400 xl:flex"
         aria-label="Footer links"
       >
-        <Link href="/rules" className="hover:text-primary">
+        <Link href="/proof" className="transition-colors hover:text-primary">
+          Proof
+        </Link>
+        <Link href="/rules" className="transition-colors hover:text-primary">
           Rules
+        </Link>
+        <Link href="/privacy" className="transition-colors hover:text-primary">
+          Privacy
         </Link>
       </nav>
     </footer>
@@ -128,7 +132,7 @@ function Stat({
   return (
     <div className="flex shrink-0 items-center gap-1.5" title={title}>
       {icon && <span aria-hidden className={cn('iconify h-3.5 w-3.5', icon, 'text-primary')} />}
-      <dt className="font-term uppercase tracking-wider text-neutral-500">{label}</dt>
+      <dt className="text-neutral-500">{label}</dt>
       <dd
         className={cn(
           'font-mono font-medium tabular',

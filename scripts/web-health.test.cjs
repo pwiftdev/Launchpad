@@ -28,7 +28,7 @@ function response(path, overrides = {}) {
       ? '<!DOCTYPE html><title data-next-head="">MASKED | Your keys. Your launches.</title>'
       : path === '/admin'
         ? '<!DOCTYPE html><title data-next-head="">Admin | MSKD.fun</title>'
-        : path === '/api/health'
+        : path.startsWith('/api/health')
           ? '{"status":"ok"}'
           : '{}';
   return new Response(overrides.body ?? body, {
@@ -45,7 +45,8 @@ function fixture(changes = {}) {
       assert.equal(options.redirect, 'manual');
       assert.ok(options.signal instanceof AbortSignal);
       assert.equal(options.headers.cookie, undefined);
-      const path = new URL(url).pathname;
+      const { pathname, search } = new URL(url);
+      const path = pathname + search;
       calls.push(path);
       if (changes[path] instanceof Error) throw changes[path];
       return response(path, changes[path]);
@@ -60,6 +61,16 @@ test('probes a closed launchpad, retired registration and private gates without 
   assert.equal(result.checks.length, 5);
   assert.equal(result.alerts.length, 0);
   assert.ok(f.calls.includes('/api/whitelist'));
+});
+test('optional display readiness flags a stale index independently of web liveness', async () => {
+  const f = fixture({
+    '/api/health?check=display': { status: 503, body: '{"status":"unavailable"}' },
+  });
+  const report = await collectWebHealth({ origin, displayExpected: true, fetchImpl: f.fetchImpl });
+  assert.equal(report.checks.find((check) => check.name === 'health').ok, true);
+  assert.deepEqual(report.alerts, [
+    { severity: 'critical', code: 'WEB_PROBE_FAILED', check: 'display_index' },
+  ]);
 });
 test('flags an exposed launchpad/API, absent nonce policy and active registration as critical', async () => {
   const f = fixture({

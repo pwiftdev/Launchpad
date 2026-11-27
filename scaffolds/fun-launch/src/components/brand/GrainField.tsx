@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
-// Domain-warped fbm smoke in Monero orange over near-black, plus per-frame film
-// grain. Rendered at half resolution on purpose: the upscale makes the grain chunky and filmic.
+// A dark orange-black mist: domain-warped fbm, no grain. Rendered at half resolution, which the
+// mist is soft enough to hide completely.
 const FRAG = `
 #ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
@@ -37,46 +37,46 @@ float fbm(vec2 p) {
 void main() {
   vec2 uv = gl_FragCoord.xy / u_res;
   vec2 p = (gl_FragCoord.xy - 0.5 * u_res) / u_res.y;
-  float t = u_time * 0.04;
-  vec2 m = (u_mouse - 0.5) * vec2(0.35, 0.25);
+  float t = u_time * 0.022;
+  vec2 m = (u_mouse - 0.5) * vec2(0.25, 0.18);
 
-  vec2 q = vec2(fbm(p * 1.3 + t + m), fbm(p * 1.3 - t * 1.25 + vec2(4.7, 1.3)));
+  // Two rounds of domain warping at low frequency: broad, slow, folding mist
+  vec2 q = vec2(fbm(p * 0.8 + t + m), fbm(p * 0.8 - t * 1.1 + vec2(4.7, 1.3)));
   vec2 r = vec2(
-    fbm(p * 1.7 + 2.3 * q + vec2(1.7, 9.2) + t * 0.6),
-    fbm(p * 1.7 + 2.3 * q + vec2(8.3, 2.8) - t * 0.45)
+    fbm(p * 1.0 + 1.7 * q + vec2(1.7, 9.2) + t * 0.5),
+    fbm(p * 1.0 + 1.7 * q + vec2(8.3, 2.8) - t * 0.4)
   );
-  float f = fbm(p * 1.5 + 2.4 * r);
+  // The warped fbm only spans roughly 0.22 to 0.56; stretch that to 0..1 density
+  float n = smoothstep(0.22, 0.54, fbm(p * 0.9 + 1.8 * r));
 
-  // near-black with a violet cast
-  vec3 col = vec3(0.012, 0.010, 0.010);
-  // purple smoke
-  col = mix(col, vec3(0.36, 0.13, 0.0), smoothstep(0.28, 0.95, f));
-  // deeper indigo pooling in the folds
-  col += vec3(0.07, 0.025, 0.0) * smoothstep(0.45, 1.0, r.y);
-  // lilac-magenta highlights where the smoke thickens
-  float lift = smoothstep(0.62, 0.98, f * (0.6 + r.x));
-  col += vec3(1.0, 0.40, 0.0) * lift * lift * 0.6;
-  // one soft light from above, heavy vignette
-  col += vec3(0.045, 0.02, 0.0) * smoothstep(1.1, 0.0, length(uv - vec2(0.62, 1.12)));
-  col *= smoothstep(1.6, 0.15, length(p * vec2(0.8, 1.1)));
-  // film grain, new every frame
-  float g = hash(gl_FragCoord.xy + fract(u_time * 7.13) * vec2(91.7, 37.3));
-  // mostly multiplicative so the grain keeps the purple instead of graying it
-  col *= 0.72 + g * 0.56;
-  col += (g - 0.5) * 0.035;
+  // Near-black where the mist thins, dark Monero orange where it gathers
+  vec3 col = mix(vec3(0.018, 0.014, 0.012), vec3(0.25, 0.095, 0.014), pow(n, 1.5));
+  // A warmer glow in the thickest folds
+  float glow = smoothstep(0.55, 1.0, n * (0.85 + 0.3 * smoothstep(0.3, 0.5, r.x)));
+  col += vec3(0.62, 0.25, 0.04) * glow * glow * 0.5;
+  // Soft light from the top right and an ember low on the left
+  col += vec3(0.12, 0.05, 0.012) * smoothstep(1.25, 0.0, length(uv - vec2(0.72, 1.08)));
+  col += vec3(0.07, 0.025, 0.004) * smoothstep(0.9, 0.0, length(uv - vec2(0.02, -0.06)));
+  col *= smoothstep(2.1, 0.25, length(p * vec2(0.7, 1.0)));
+  // A fixed dither below one 8-bit step: invisible, it only stops the dark gradients banding
+  col += (hash(gl_FragCoord.xy) - 0.5) * (1.0 / 255.0);
   gl_FragColor = vec4(max(col, 0.0), 1.0);
 }`;
 
 const VERT = `attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}`;
 
 const SCALE = 0.5;
-const FRAME_MS = 1000 / 30;
+// The smoke drifts slowly, so 24 frames a second looks the same as 60 and leaves the GPU
+// free for the glass panels that blur it.
+const FRAME_MS = 1000 / 24;
+// While the page scrolls the field holds still, so scrolling gets the whole frame budget.
+const SCROLL_REST_MS = 180;
 
 // One clock for every instance, so the splash draws the exact frame the page background
 // draws beneath it and the hand-off when the splash fades is invisible.
 let sharedT0: number | null = null;
 
-/** Grainy mist for the page background, also drawn identically behind the first-visit splash. */
+/** Moving mist for the page background, also drawn identically behind the first-visit splash. */
 export const GrainField = ({ splash = false }: { splash?: boolean }) => {
   const canvas = useRef<HTMLCanvasElement>(null);
 
@@ -145,7 +145,11 @@ export const GrainField = ({ splash = false }: { splash?: boolean }) => {
     sharedT0 ??= performance.now() - 40_000 * Math.random();
     const t0 = sharedT0;
     let raf = 0,
-      last = 0;
+      last = 0,
+      scrolledAt = 0;
+    const onScroll = () => {
+      scrolledAt = performance.now();
+    };
     const draw = (now: number) => {
       mouse.x += (target.x - mouse.x) * 0.04;
       mouse.y += (target.y - mouse.y) * 0.04;
@@ -155,7 +159,7 @@ export const GrainField = ({ splash = false }: { splash?: boolean }) => {
     };
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
-      if (document.hidden || now - last < FRAME_MS) return;
+      if (document.hidden || now - last < FRAME_MS || now - scrolledAt < SCROLL_REST_MS) return;
       last = now;
       draw(now);
     };
@@ -163,6 +167,8 @@ export const GrainField = ({ splash = false }: { splash?: boolean }) => {
     window.addEventListener('resize', resize);
     if (!stillFrame) {
       window.addEventListener('pointermove', onMove, { passive: true });
+      // Scroll events do not bubble; capture catches every scrolling panel, not just the window
+      document.addEventListener('scroll', onScroll, { passive: true, capture: true });
       raf = requestAnimationFrame(loop);
     }
     el.setAttribute('data-ready', '');
@@ -171,6 +177,7 @@ export const GrainField = ({ splash = false }: { splash?: boolean }) => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
       window.removeEventListener('pointermove', onMove);
+      document.removeEventListener('scroll', onScroll, { capture: true });
       gl.getExtension('WEBGL_lose_context')?.loseContext();
     };
   }, [splash]);

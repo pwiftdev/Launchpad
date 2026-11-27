@@ -4,10 +4,6 @@ vi.mock('@tanstack/react-query', () => ({ useQuery: mocks.query, useQueryClient:
 vi.mock('./useDemoMode', () => ({ useDemoMode: () => ({ visible: false }) }));
 vi.mock('./useNow', () => ({ syncServerClock: mocks.sync }));
 vi.mock('./useBoardLive', () => ({ useBoardLive: () => ({ connected: false }) }));
-vi.mock('./useLiveCoin', () => ({
-  useLiveCoin: () => ({ connected: false }),
-  invalidateCoinQueries: vi.fn(),
-}));
 import { useCoin, useCoins, useTrending } from './useCoins';
 beforeEach(() => vi.clearAllMocks());
 afterEach(() => vi.unstubAllGlobals());

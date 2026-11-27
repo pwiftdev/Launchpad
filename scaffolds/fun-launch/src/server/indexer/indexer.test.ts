@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Coin } from '@/lib/coin';
 import { Keypair } from '@solana/web3.js';
 import type { DisplayStore } from './store';
@@ -52,9 +52,11 @@ function fixture(coins: Coin[]) {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   scans.pool.mockReset().mockResolvedValue({ inserted: 0, more: false });
   scans.holders.mockReset().mockResolvedValue({ slot: 1, holders: new Map() });
 });
+afterEach(() => vi.useRealTimers());
 
 describe('display indexer', () => {
   it('watches every pool, and a pool change refreshes only that coin', async () => {
@@ -66,7 +68,10 @@ describe('display indexer', () => {
     await f.indexer.processDirty();
     expect(scans.pool).toHaveBeenCalledTimes(3);
     scans.pool.mockClear();
-    f.changes.get(address(`damm-${B}`))!();
+    for (let i = 0; i < 20; i++) f.changes.get(address(`damm-${B}`))!();
+    await f.indexer.processDirty();
+    expect(scans.pool).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(15_000);
     await f.indexer.processDirty();
     expect(f.deps.loadCoin).toHaveBeenLastCalledWith(B);
     expect(scans.pool.mock.calls.map(([args]) => args.pool)).toEqual([
@@ -82,6 +87,7 @@ describe('display indexer', () => {
     await f.indexer.discover();
     scans.pool.mockResolvedValueOnce({ inserted: 400, more: true });
     await f.indexer.processDirty();
+    vi.advanceTimersByTime(15_000);
     await f.indexer.processDirty();
     expect(scans.pool).toHaveBeenCalledTimes(2);
   });
@@ -95,28 +101,28 @@ describe('display indexer', () => {
     expect(scans.pool).toHaveBeenCalledTimes(1);
   });
 
-  it('scans holders at start and again shortly after trades, a couple of coins at a time', async () => {
-    vi.useFakeTimers();
-    try {
-      const f = fixture([coin(A), coin(B), coin('Stake11111111111111111111111111111111111111')]);
-      await f.indexer.discover();
-      await f.indexer.processDirty();
-      await f.indexer.processHolders();
-      expect(scans.holders).toHaveBeenCalledTimes(2);
-      await f.indexer.processHolders();
-      expect(scans.holders).toHaveBeenCalledTimes(3);
-      scans.pool.mockResolvedValue({ inserted: 1, more: false });
-      f.indexer.touch(A);
-      await f.indexer.processDirty();
-      await f.indexer.processHolders();
-      expect(scans.holders).toHaveBeenCalledTimes(3);
-      vi.advanceTimersByTime(16_000);
-      await f.indexer.processHolders();
-      expect(scans.holders).toHaveBeenCalledTimes(4);
-      expect(f.store.replaceHolders).toHaveBeenLastCalledWith(A, expect.anything());
-    } finally {
-      vi.useRealTimers();
-    }
+  it('refreshes public holders hourly and coalesces scans independently of trade volume', async () => {
+    const f = fixture([coin(A), coin(B), coin('Stake11111111111111111111111111111111111111')]);
+    await f.indexer.discover();
+    await f.indexer.processDirty();
+    await f.indexer.processHolders();
+    expect(scans.holders).toHaveBeenCalledTimes(2);
+    await f.indexer.processHolders();
+    expect(scans.holders).toHaveBeenCalledTimes(3);
+    scans.pool.mockResolvedValue({ inserted: 1, more: false });
+    f.indexer.touch(A);
+    await f.indexer.processDirty();
+    await f.indexer.processHolders();
+    expect(scans.holders).toHaveBeenCalledTimes(3);
+    vi.advanceTimersByTime(16_000);
+    await f.indexer.processDirty();
+    await f.indexer.processHolders();
+    expect(scans.holders).toHaveBeenCalledTimes(3);
+    vi.advanceTimersByTime(60 * 60_000 - 16_000);
+    await f.indexer.processHolders();
+    expect(scans.holders).toHaveBeenCalledTimes(5);
+    await f.indexer.processHolders();
+    expect(scans.holders).toHaveBeenCalledTimes(6);
   });
 
   it('drops subscriptions for coins that leave the board', async () => {
@@ -135,5 +141,17 @@ describe('display indexer', () => {
     expect(f.store.heartbeat).toHaveBeenCalledWith(
       expect.objectContaining({ slot: 50, chainTime: 1_800_000_000, tps: 10 })
     );
+  });
+  it('fetches network stats at most once per minute after startup', async () => {
+    const f = fixture([]);
+    await f.indexer.start();
+    try {
+      await vi.advanceTimersByTimeAsync(59_999);
+      expect(f.rpc.getRecentPerformanceSamples).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(f.rpc.getRecentPerformanceSamples).toHaveBeenCalledTimes(2);
+    } finally {
+      await f.indexer.stop();
+    }
   });
 });

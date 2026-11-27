@@ -31,12 +31,12 @@ export const BRAND = {
   longName: 'MASKED',
   wordmark: { main: 'MSKD', tld: '.fun' },
   ticker: 'MSKD',
-  tagline: 'Earn from every trade. Cash out in Monero.',
-  headline: { top: 'Earn from every trade.', bottom: 'Cash out in Monero.' },
+  tagline: 'Earn from every trade. Cash out in wXMR.',
+  headline: { top: 'Earn from every trade.', bottom: 'Cash out in wXMR.' },
   /** Three-beat promise used in heroes, splash and share cards */
-  promise: ['No KYC', 'Locked fee split', 'Claim in XMR or SOL'] as const,
+  promise: ['No KYC', 'Locked fee split', 'Claim in wXMR or SOL'] as const,
   description:
-    'MASKED is the Solana launchpad where every trade pays the people behind the coin. The creator splits 0.60% of every trade with holders, locked at launch, and anyone can cash out in native Monero or SOL. 1.25% flat. Powered by Meteora.',
+    'MASKED is the Solana launchpad where every trade pays the people behind the coin. The creator splits 0.60% of every trade with holders, locked at launch, and anyone can cash out in wrapped Monero (wXMR) on Solana or in SOL. 1.25% flat. Powered by Meteora.',
   url: (process.env.NEXT_PUBLIC_SITE_URL || 'https://mskd.fun').replace(/\/$/, ''),
   xHandle: '@mskdfun',
   telegramInvite: 'https://t.me/+4pNeyu06EkgzMTRk',

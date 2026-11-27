@@ -122,48 +122,37 @@ export async function verifyWalletRecovery(
       proved = false;
     for (const slot of slots.slice(0, 512)) {
       withinDeadline();
-      const [header, signatures] = await Promise.all([
-        rpc.getBlock(slot, {
-          commitment: 'finalized',
-          transactionDetails: 'none',
-          rewards: false,
-          maxSupportedTransactionVersion: 0,
-        }),
-        rpc.getBlockSignatures(slot, 'finalized'),
-      ]);
-      const height = (header as { blockHeight?: unknown } | null)?.blockHeight;
+      const block = await rpc.getBlockSignatures(slot, 'finalized');
+      // The getBlock signatures response includes blockHeight, which web3.js omits from its type.
+      const height = (block as { blockHeight?: unknown } | null)?.blockHeight;
       withinDeadline();
       if (
-        !header ||
+        !block ||
         !safe(height) ||
-        !signatures ||
-        header.blockhash !== signatures.blockhash ||
-        header.parentSlot !== signatures.parentSlot ||
-        header.previousBlockhash !== signatures.previousBlockhash ||
-        signatures.signatures.length > 10000 ||
-        new Set(signatures.signatures).size !== signatures.signatures.length ||
+        block.signatures.length > 10000 ||
+        new Set(block.signatures).size !== block.signatures.length ||
         (previous &&
           (height !== previous.height + 1 ||
-            header.parentSlot !== previous.slot ||
-            header.previousBlockhash !== previous.hash)) ||
+            block.parentSlot !== previous.slot ||
+            block.previousBlockhash !== previous.hash)) ||
         (!previous && height > lastValidBlockHeight)
       )
         throw new Error(
           'Missing or inconsistent finalized wallet block history; keep the reservation'
         );
-      if (signatures.signatures.includes(signature))
+      if (block.signatures.includes(signature))
         throw new Error('Wallet signature was found in retained history; reconcile it');
       coverage.push(
         Object.freeze({
           slot,
           blockHeight: height,
-          blockhash: header.blockhash,
+          blockhash: block.blockhash,
           signaturesDigest: createHash('sha256')
-            .update(JSON.stringify(signatures.signatures))
+            .update(JSON.stringify(block.signatures))
             .digest('hex'),
         })
       );
-      previous = { slot, height: height, hash: header.blockhash };
+      previous = { slot, height, hash: block.blockhash };
       if (height > lastValidBlockHeight) {
         proved = true;
         break;

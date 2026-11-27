@@ -16,58 +16,65 @@
 .dark {
   color-scheme: dark;
 
-  --background: 9 9 9;
-  --foreground: 245 245 245;
+  /* Warm graphite instead of pure black: the orange glow reads through every layer */
+  --background: 13 11 10;
+  --foreground: 248 245 242;
 
-  --neutral-50: 245 245 245;
-  --neutral-100: 230 230 230;
-  --neutral-200: 205 205 205;
-  --neutral-300: 170 170 170;
-  --neutral-400: 136 136 136;
-  --neutral-500: 102 102 102;
-  --neutral-600: 76 76 76;
-  --neutral-700: 52 52 52;
-  --neutral-750: 40 40 40;
-  --neutral-800: 32 32 32;
-  --neutral-850: 24 24 24;
-  --neutral-900: 17 17 17;
-  --neutral-925: 13 13 13;
-  --neutral-950: 9 9 9;
+  --neutral-50: 248 245 242;
+  --neutral-100: 236 232 228;
+  --neutral-200: 214 208 202;
+  --neutral-300: 184 177 170;
+  --neutral-400: 152 145 138;
+  --neutral-500: 120 113 107;
+  --neutral-600: 90 84 79;
+  --neutral-700: 64 59 55;
+  --neutral-750: 52 48 45;
+  --neutral-800: 42 39 36;
+  --neutral-850: 33 30 28;
+  --neutral-900: 25 23 21;
+  --neutral-925: 20 18 17;
+  --neutral-950: 15 13 12;
 
   --primary: 255 102 0;
-  --primary-200: 255 160 102;
-  --primary-300: 240 95 0;
-  --primary-400: 205 82 0;
-  --primary-500: 160 64 0;
-  --primary-600: 120 48 0;
-  --primary-700: 85 34 0;
-  --primary-800: 55 22 0;
-  --primary-900: 33 13 0;
-  --primary-950: 9 9 9;
+  --primary-200: 255 170 110;
+  --primary-300: 255 128 40;
+  --primary-400: 225 88 0;
+  --primary-500: 170 66 0;
+  --primary-600: 125 49 0;
+  --primary-700: 88 35 0;
+  --primary-800: 58 23 0;
+  --primary-900: 34 14 2;
+  --primary-950: 13 11 10;
 
   --accent: 255 102 0;
   --signal: 255 102 0;
-  --violet: 136 136 136;
-  --cyan: 245 245 245;
+  --violet: 152 145 138;
+  --cyan: 248 245 242;
   --cobalt: 255 102 0;
-  --lime: 255 102 0;
+  --lime: 255 128 40;
 
-  --emerald: 52 211 120;
-  --rose: 255 77 94;
-  --amber: 255 145 20;
+  --emerald: 62 222 140;
+  --rose: 255 92 108;
+  --amber: 255 160 40;
 
-  --panel: 11 11 13;
+  /* Glass panel tint; panels are translucent and blur what is behind them */
+  --panel: 24 21 19;
   --cta-bg: 255 102 0;
-  --cta-fg: 0 0 0;
+  --cta-fg: 20 8 0;
 
-  --bond-gradient: linear-gradient(90deg, #ff6600, #ff6600);
+  --glass-fill: linear-gradient(180deg, rgb(255 255 255 / 0.075), rgb(255 255 255 / 0.025));
+  --glass-edge: rgb(255 255 255 / 0.1);
+  --glass-blur: blur(18px) saturate(160%);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --bond-gradient: linear-gradient(90deg, #ff8a3d, #ff6600 55%, #ff4d00);
 
   --jupiter-plugin-primary: 255, 102, 0;
-  --jupiter-plugin-background: 9, 9, 9;
-  --jupiter-plugin-primaryText: 245, 245, 245;
-  --jupiter-plugin-warning: 255, 145, 20;
-  --jupiter-plugin-interactive: 32, 32, 32;
-  --jupiter-plugin-module: 13, 13, 13;
+  --jupiter-plugin-background: 13, 11, 10;
+  --jupiter-plugin-primaryText: 248, 245, 242;
+  --jupiter-plugin-warning: 255, 160, 40;
+  --jupiter-plugin-interactive: 42, 39, 36;
+  --jupiter-plugin-module: 20, 18, 17;
 }
 
 html {
@@ -90,61 +97,95 @@ body {
     Arial,
     sans-serif;
   font-feature-settings: 'ss01', 'cv11';
-  letter-spacing: -0.006em;
+  letter-spacing: -0.008em;
 }
 
 ::selection {
-  background-color: rgb(var(--signal));
-  color: #000;
+  background-color: rgb(var(--signal) / 0.85);
+  color: #140800;
 }
 
 ::-webkit-scrollbar {
-  height: 6px;
-  width: 6px;
+  height: 8px;
+  width: 8px;
 }
 ::-webkit-scrollbar-track-piece {
   background-color: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  border-radius: 0;
-  background-color: rgb(var(--neutral-800));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  background-color: rgb(255 255 255 / 0.12);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background-color: rgb(var(--neutral-700));
+  background-color: rgb(255 255 255 / 0.22);
 }
 ::-webkit-scrollbar-corner {
   background-color: transparent;
 }
 
-:focus-visible {
-  outline: 2px solid rgb(var(--signal));
-  outline-offset: 2px;
+@layer base {
+  /* In the base layer, so a component's own outline-none still wins */
+  :focus-visible {
+    outline: 2px solid rgb(var(--signal) / 0.9);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  /* Headings: tight, confident sans. The pixel face only survives in the brand's small accents. */
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
 }
 
 @layer components {
-  /* One soft light from above; the only atmosphere on the site */
   .bg-halo {
-    background: radial-gradient(
-      60rem 22rem at 70% -30%,
-      rgb(var(--foreground) / 0.05),
-      transparent 70%
-    );
+    background: radial-gradient(60rem 22rem at 70% -30%, rgb(255 102 0 / 0.1), transparent 70%);
   }
 
-  /* Emphasis in the accent color */
+  /* Emphasis: molten orange gradient text */
   .text-holo {
-    color: rgb(var(--signal));
+    background: linear-gradient(100deg, #ffb27a 0%, #ff7a1a 38%, #ff6600 62%, #ff9a4d 100%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
   .bg-holo {
-    background-color: rgb(var(--signal));
+    background: linear-gradient(180deg, #ff8a3d, #ff6600);
   }
 
-  /* Hero panels: a hairline whose top edge catches the light */
+  /*
+   * Liquid glass. A translucent warm fill that blurs what is behind it, a hairline edge that is
+   * brighter on top (light from above), an inner shade at the bottom and a soft cast shadow.
+   */
+  .surface,
+  .glass,
+  .board-surface,
   .holo-border {
     position: relative;
     isolation: isolate;
-    border: 1px solid rgb(255 255 255 / 0.09);
+    border-radius: 22px;
+    border: 1px solid var(--glass-edge);
+    background: var(--glass-fill), rgb(var(--panel) / 0.62);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.09),
+      inset 0 -1px 0 rgb(0 0 0 / 0.22),
+      0 1px 2px rgb(0 0 0 / 0.25),
+      0 24px 60px -28px rgb(0 0 0 / 0.8);
   }
+  /* The edge catches the light where the cursor is (AppShell sets --mx/--my) */
+  .surface::before,
+  .glass::before,
+  .board-surface::before,
   .holo-border::before {
     content: '';
     position: absolute;
@@ -155,48 +196,229 @@ body {
     padding: 1px;
     background:
       radial-gradient(
-        280px circle at var(--mx, -999px) var(--my, -999px),
-        rgb(255 102 0 / 0.55),
-        transparent 60%
+        320px circle at var(--mx, -999px) var(--my, -999px),
+        rgb(255 122 40 / 0.6),
+        transparent 62%
       ),
-      linear-gradient(180deg, rgb(255 255 255 / 0.14), transparent 45%);
+      linear-gradient(180deg, rgb(255 255 255 / 0.16), transparent 38%);
     -webkit-mask:
       linear-gradient(#000 0 0) content-box,
       linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
   }
+  /* A warm wash where the cursor rests, inside the hero panels */
+  .holo-border::after,
+  .board-surface::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background: radial-gradient(
+      520px circle at var(--mx, -999px) var(--my, -999px),
+      rgb(255 102 0 / 0.07),
+      transparent 60%
+    );
+  }
+  /* Deeper glass for overlays: dialogs, the coin panel, menus */
+  .glass-strong {
+    border: 1px solid rgb(255 255 255 / 0.12);
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.02)),
+      rgb(22 19 17 / 0.86);
+    -webkit-backdrop-filter: blur(24px) saturate(170%);
+    backdrop-filter: blur(24px) saturate(170%);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.12),
+      0 40px 100px -30px rgb(0 0 0 / 0.9),
+      0 0 0 1px rgb(0 0 0 / 0.3);
+  }
+  /* Recessed wells: inputs, stat tiles inside a panel, segmented controls */
+  .well {
+    border-radius: 14px;
+    border: 1px solid rgb(255 255 255 / 0.06);
+    background: rgb(0 0 0 / 0.22);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.35);
+  }
+  /* Small raised tile inside glass */
+  .tile {
+    border-radius: 16px;
+    border: 1px solid rgb(255 255 255 / 0.07);
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.055), rgb(255 255 255 / 0.015));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.07);
+    transition:
+      border-color 180ms var(--ease-out),
+      background-color 180ms var(--ease-out),
+      transform 240ms var(--ease-out),
+      box-shadow 240ms var(--ease-out);
+  }
+  .tile-hover:hover {
+    border-color: rgb(255 140 60 / 0.28);
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.1),
+      0 18px 40px -22px rgb(0 0 0 / 0.9),
+      0 0 0 1px rgb(255 102 0 / 0.08);
+  }
 
-  /* Primary action: solid signal slab, pixel caps, hard edge; flips to white on hover */
+  /*
+   * Primary action: a molten orange pill. Lit from above, glows softly, lifts on hover and
+   * presses in on click.
+   */
   .btn-holo {
     position: relative;
-    border-radius: 0;
-    background-color: rgb(var(--cta-bg));
+    isolation: isolate;
+    overflow: hidden;
+    border-radius: 12px;
     color: rgb(var(--cta-fg));
-    font-family: var(--font-pixel), ui-monospace, monospace;
-    font-weight: 400;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    box-shadow: inset 0 -2px 0 rgb(0 0 0 / 0.18);
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    background: linear-gradient(180deg, #ff8f45 0%, #ff6a0a 48%, #f25a00 100%);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.45),
+      inset 0 -2px 0 rgb(120 30 0 / 0.35),
+      0 8px 22px -8px rgb(255 102 0 / 0.7),
+      0 0 0 1px rgb(255 120 30 / 0.6);
     transition:
-      background-color 120ms ease,
-      color 120ms ease,
-      transform 120ms ease;
+      transform 160ms var(--ease-out),
+      box-shadow 200ms var(--ease-out),
+      filter 160ms var(--ease-out);
+  }
+  .btn-holo::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(
+      110deg,
+      transparent 30%,
+      rgb(255 255 255 / 0.35) 50%,
+      transparent 70%
+    );
+    background-size: 250% 100%;
+    background-position: 150% 0;
+    transition: background-position 550ms var(--ease-out);
   }
   .btn-holo:hover {
-    background-color: #fff;
-    color: #000;
+    transform: translateY(-1px);
+    filter: brightness(1.06) saturate(1.05);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      inset 0 -2px 0 rgb(120 30 0 / 0.35),
+      0 14px 34px -10px rgb(255 102 0 / 0.85),
+      0 0 0 1px rgb(255 140 60 / 0.75);
+  }
+  .btn-holo:hover::after {
+    background-position: -50% 0;
   }
   .btn-holo:active {
-    transform: translateY(1px);
+    transform: translateY(1px) scale(0.985);
+    filter: brightness(0.97);
+    transition-duration: 60ms;
+  }
+  .btn-holo:disabled {
+    transform: none;
+    filter: saturate(0.4) brightness(0.8);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2);
   }
 
-  /* Bonding progress: square segments, like a terminal meter */
+  /* Trade confirmations: the same liquid button in buy green and sell red */
+  .trade-buy {
+    color: #032112;
+    background: linear-gradient(180deg, #6ff0ae 0%, #3ede8c 50%, #23c574 100%);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      inset 0 -2px 0 rgb(0 70 35 / 0.35),
+      0 10px 26px -10px rgb(62 222 140 / 0.7),
+      0 0 0 1px rgb(80 230 150 / 0.6);
+  }
+  .trade-buy:hover {
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.55),
+      inset 0 -2px 0 rgb(0 70 35 / 0.35),
+      0 16px 36px -12px rgb(62 222 140 / 0.85),
+      0 0 0 1px rgb(110 240 170 / 0.75);
+  }
+  .trade-sell {
+    color: #fff;
+    background: linear-gradient(180deg, #ff8090 0%, #ff5c6c 50%, #e9414f 100%);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.45),
+      inset 0 -2px 0 rgb(100 0 15 / 0.35),
+      0 10px 26px -10px rgb(255 92 108 / 0.7),
+      0 0 0 1px rgb(255 110 125 / 0.6);
+  }
+  .trade-sell:hover {
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      inset 0 -2px 0 rgb(100 0 15 / 0.35),
+      0 16px 36px -12px rgb(255 92 108 / 0.85),
+      0 0 0 1px rgb(255 140 150 / 0.75);
+  }
+
+  /* Secondary action: a clear glass pill */
+  .btn-glass {
+    position: relative;
+    border-radius: 12px;
+    border: 1px solid rgb(255 255 255 / 0.1);
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.025));
+    color: rgb(var(--foreground));
+    font-weight: 550;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.1),
+      0 6px 18px -10px rgb(0 0 0 / 0.8);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    transition:
+      transform 160ms var(--ease-out),
+      border-color 160ms var(--ease-out),
+      background-color 160ms var(--ease-out);
+  }
+  .btn-glass:hover {
+    transform: translateY(-1px);
+    border-color: rgb(255 255 255 / 0.2);
+    background-color: rgb(255 255 255 / 0.05);
+  }
+  .btn-glass:active {
+    transform: translateY(1px) scale(0.985);
+    transition-duration: 60ms;
+  }
+
+  /* Pills for tags, filters and status */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    border: 1px solid rgb(255 255 255 / 0.08);
+    background: rgb(255 255 255 / 0.045);
+    padding: 0.15rem 0.6rem;
+    font-size: 11px;
+    font-weight: 550;
+    color: rgb(var(--neutral-300));
+  }
+
+  /* Bonding progress: a lit glass tube with a moving sheen */
   .bond-fill {
-    border-radius: 0;
+    position: relative;
+    border-radius: 999px;
     background-image: var(--bond-gradient);
-    -webkit-mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 5px);
-    mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 5px);
+    box-shadow:
+      0 0 12px rgb(255 102 0 / 0.45),
+      inset 0 1px 0 rgb(255 255 255 / 0.4);
+  }
+  .bond-fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.45), transparent);
+    background-size: 40% 100%;
+    background-repeat: no-repeat;
+    animation: bond-sheen 2.8s var(--ease-out) infinite;
   }
   .bond-hot {
     animation: bond-pulse 1.6s ease-in-out infinite;
@@ -205,53 +427,98 @@ body {
     box-shadow: 0 0 0 1px rgb(var(--signal) / 0.35);
   }
 
-  /* Panels are solid and plain: one dark fill, a hairline border, square corners */
-  .surface {
-    @apply border border-white/[0.09] bg-panel;
+  /* Sliders: a recessed track filled in molten orange, with a lit orb for a thumb */
+  .range-glass {
+    height: 22px;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
   }
-  .glass {
-    @apply border border-white/[0.09] bg-panel;
+  .range-glass::-webkit-slider-runnable-track {
+    height: 8px;
+    border-radius: 999px;
+    background:
+      linear-gradient(90deg, #ff8f45, #ff6600) 0 / var(--fill, 0%) 100% no-repeat,
+      rgb(0 0 0 / 0.4);
+    box-shadow:
+      inset 0 1px 2px rgb(0 0 0 / 0.6),
+      0 0 0 1px rgb(255 255 255 / 0.05);
   }
-  .surface,
-  .glass,
-  .board-surface,
-  .holo-border {
-    border-radius: 0;
-    box-shadow: 0 24px 60px -30px rgb(0 0 0 / 0.9);
+  .range-glass::-moz-range-track {
+    height: 8px;
+    border-radius: 999px;
+    background: rgb(0 0 0 / 0.4);
   }
-  /* Cipher corner brackets on the main panels (hero, board columns) */
-  .board-surface,
-  .holo-border {
-    --bk: rgb(var(--signal) / 0.85);
-    background-image:
-      linear-gradient(var(--bk), var(--bk)), linear-gradient(var(--bk), var(--bk)),
-      linear-gradient(var(--bk), var(--bk)), linear-gradient(var(--bk), var(--bk)),
-      linear-gradient(var(--bk), var(--bk)), linear-gradient(var(--bk), var(--bk)),
-      linear-gradient(var(--bk), var(--bk)), linear-gradient(var(--bk), var(--bk));
-    background-size:
-      10px 1px,
-      1px 10px,
-      10px 1px,
-      1px 10px,
-      10px 1px,
-      1px 10px,
-      10px 1px,
-      1px 10px;
-    background-position:
-      0 0,
-      0 0,
-      100% 0,
-      100% 0,
-      0 100%,
-      0 100%,
-      100% 100%,
-      100% 100%;
-    background-repeat: no-repeat;
+  .range-glass::-moz-range-progress {
+    height: 8px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #ff8f45, #ff6600);
+  }
+  .range-glass::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    margin-top: -7px;
+    height: 22px;
+    width: 22px;
+    border-radius: 999px;
+    background: radial-gradient(circle at 35% 30%, #fff 0%, #ffd7bd 30%, #ff7a1a 75%);
+    box-shadow:
+      0 0 0 3px rgb(255 102 0 / 0.25),
+      0 6px 14px -4px rgb(255 102 0 / 0.8);
+    transition:
+      transform 160ms var(--ease-out),
+      box-shadow 160ms var(--ease-out);
+  }
+  .range-glass:hover::-webkit-slider-thumb,
+  .range-glass:focus-visible::-webkit-slider-thumb {
+    transform: scale(1.12);
+    box-shadow:
+      0 0 0 6px rgb(255 102 0 / 0.22),
+      0 8px 18px -4px rgb(255 102 0 / 0.9);
+  }
+  .range-glass::-moz-range-thumb {
+    height: 22px;
+    width: 22px;
+    border: 0;
+    border-radius: 999px;
+    background: radial-gradient(circle at 35% 30%, #fff 0%, #ffd7bd 30%, #ff7a1a 75%);
+    box-shadow: 0 6px 14px -4px rgb(255 102 0 / 0.8);
   }
 
-  /* Small uppercase label in the mono face */
+  /* Small label: mono, spaced, quiet */
   .eyebrow {
-    @apply font-term text-[11px] font-medium uppercase tracking-[0.12em] text-neutral-500;
+    @apply font-term text-[10.5px] font-medium uppercase tracking-[0.16em] text-neutral-400;
+  }
+
+  /* Loading placeholder: a glass bar with light passing over it */
+  .skeleton {
+    border-radius: 10px;
+    background: linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0.04) 0%,
+      rgb(255 255 255 / 0.09) 50%,
+      rgb(255 255 255 / 0.04) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.3s linear infinite;
+  }
+
+  /* Page and panel entrances */
+  /* Short and blur-free: content is readable within a frame or two, then settles */
+  .enter {
+    animation: rise 0.42s var(--ease-out) both;
+  }
+  .enter-1 {
+    animation-delay: 35ms;
+  }
+  .enter-2 {
+    animation-delay: 70ms;
+  }
+  .enter-3 {
+    animation-delay: 105ms;
+  }
+  .enter-4 {
+    animation-delay: 140ms;
   }
 
   .marquee {
@@ -270,15 +537,43 @@ body {
   }
 }
 
-/* ---------- Moving grainy background (components/brand/GrainField.tsx) ---------- */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes bond-sheen {
+  from {
+    background-position: -60% 0;
+  }
+  to {
+    background-position: 160% 0;
+  }
+}
+
+/* ---------- Moving mist background (components/brand/GrainField.tsx) ---------- */
 .grain-field {
   position: fixed;
   inset: 0;
   z-index: -10;
   pointer-events: none;
   background:
-    radial-gradient(60rem 40rem at 70% -10%, rgb(255 102 0 / 0.16), transparent 60%),
-    radial-gradient(50rem 40rem at 10% 110%, rgb(150 60 0 / 0.18), transparent 60%), #090909;
+    radial-gradient(70rem 42rem at 78% -12%, rgb(255 110 20 / 0.26), transparent 62%),
+    radial-gradient(48rem 36rem at 4% 108%, rgb(200 70 0 / 0.22), transparent 62%),
+    radial-gradient(40rem 30rem at 45% 55%, rgb(255 140 60 / 0.05), transparent 70%), #0d0b0a;
 }
 .grain-field canvas {
   position: absolute;
@@ -286,7 +581,7 @@ body {
   width: 100%;
   height: 100%;
   opacity: 0;
-  transition: opacity 1.2s ease;
+  transition: opacity 0.8s ease;
   image-rendering: auto;
 }
 .grain-field canvas[data-ready] {
@@ -372,15 +667,15 @@ body {
 .splash-shade {
   position: absolute;
   inset: 0;
-  background: #090909;
-  transition: opacity 800ms cubic-bezier(0.35, 0, 0.2, 1);
+  background: #0d0b0a;
+  transition: opacity 600ms cubic-bezier(0.35, 0, 0.2, 1);
 }
 
 /* Same field as the page background (.grain-field above), just layered inside the splash */
 .grain-field.splash-mist {
   position: absolute;
   z-index: 0;
-  transition: opacity 590ms ease-out;
+  transition: opacity 440ms ease-out;
 }
 
 .splash-mist canvas {
@@ -574,16 +869,6 @@ body {
 }
 
 @layer utilities {
-  .board-surface {
-    box-shadow:
-      0 20px 50px -30px rgb(0 0 0 / 0.55),
-      inset 0 1px 0 rgb(255 255 255 / 0.035);
-  }
-
-  .coin-row:hover {
-    box-shadow: inset 2px 0 0 rgb(var(--primary) / 0.8);
-  }
-
   .tabular,
   .font-mono {
     font-variant-numeric: tabular-nums;

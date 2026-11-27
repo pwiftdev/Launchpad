@@ -1,7 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import bs58 from 'bs58';
 import { Transaction } from '@solana/web3.js';
-import { NATIVE_MINT } from '@solana/spl-token';
 import { useUnifiedWalletContext, useWallet } from '@jup-ag/wallet-adapter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -13,12 +12,13 @@ import { useUsd } from '@/hooks/useUsd';
 import { burstSparkles } from '@/lib/sparkles';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
+import { Segmented } from '../ui/Segmented';
 import { CoinAvatar } from '../coin/CoinAvatar';
 import { confirmTransaction } from '@/lib/confirmTransaction';
 import { readTradeReceipt, tradeReceiptKey, type TradeReceipt } from '@/lib/tradeReceipt';
 import { formatTokenUnits } from '@/lib/tokenUnits';
-import { TRADE_SLIPPAGE_BPS } from '@/lib/tradeQuote';
 import { quoteAsset } from '@/lib/feeModes';
+import { axiomLink } from '@/lib/axiom';
 import {
   migrationReceiptKey,
   readMigrationReceipt,
@@ -31,6 +31,7 @@ const BUY_PRESETS = [0.1, 0.5, 1, 2];
 const SELL_PRESETS = [25, 50, 75, 100];
 /** Left in the wallet on a max buy, for network fees and account rent. */
 const BUY_SOL_RESERVE = 0.01;
+const REVIEW_QUOTE_MS = 20_000;
 
 export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }) => {
   const amountId = useId();
@@ -39,6 +40,14 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
   const queryClient = useQueryClient();
   const [side, setSide] = useState<Side>('buy');
   const [amount, setAmount] = useState('');
+  const [reviewRevision, setReviewRevision] = useState(0);
+  const clearReview = () => setReviewRevision((revision) => revision + 1);
+  const changeAmount = (value: string) => {
+    if (value !== amount) {
+      setAmount(value);
+      clearReview();
+    }
+  };
   const [sending, setSending] = useState(false);
   const tradeKey = tradeReceiptKey(NETWORK, coin.mint, publicKey?.toBase58() ?? '');
   const [storedTrade, setStoredTrade] = useState<{
@@ -90,7 +99,13 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
       /* Receipt remains in memory when browser storage is unavailable. */
     }
   };
-  const { quote, error, loading, refetch } = useQuote(coin.mint, side, Number(amount));
+  const { quote, error, loading, refetch, expiresAt } = useQuote(
+    tradeKey,
+    coin.mint,
+    side,
+    Number(amount),
+    reviewRevision
+  );
   const balance = useBalance(coin.mint, publicKey?.toBase58(), !coin.isDemo);
   const { usd, price } = useUsd();
 
@@ -109,7 +124,10 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
         await recoverTrade(saved, false);
         return;
       }
-      if (!quote || quote.minimumAmountOut === '0') return;
+      if (!quote || quote.minimumAmountOut === '0' || Date.now() >= expiresAt) {
+        clearReview();
+        return;
+      }
       const res = await fetch('/api/swap-tx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,7 +141,7 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
         }),
       });
       const body = await res.json();
-      if (res.status === 409) void refetch();
+      if (res.status === 409) clearReview();
       if (!res.ok) throw new Error(body.error);
       const prepared = Transaction.from(Buffer.from(body.tx, 'base64'));
       const message = Buffer.from(prepared.serializeMessage());
@@ -178,6 +196,7 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
       if (status.finalized) {
         saveTrade(null);
         setAmount('');
+        clearReview();
         setTradeNotice(
           status.failed ? 'The trade failed on-chain. No swap settled.' : 'Your trade is finalized.'
         );
@@ -199,7 +218,7 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
         for (const key of [
           ['coin', coin.mint],
           ['holders', coin.mint],
-          ['trades', coin.mint],
+          ['coin-prices', coin.mint],
           ['balance', coin.mint],
         ])
           void queryClient.invalidateQueries({ queryKey: key });
@@ -306,7 +325,7 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
       ['coin', coin.mint],
       ['coins'],
       ['market-stats'],
-      ['trades', coin.mint],
+      ['coin-prices', coin.mint],
       ['holders', coin.mint],
     ])
       void queryClient.invalidateQueries({ queryKey: key });
@@ -358,34 +377,67 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
 
   if (coin.isDemo) {
     return (
-      <section className={cn('p-4', className)} aria-label="Preview trading unavailable">
-        <div className="grid grid-cols-2 gap-1 rounded-lg bg-neutral-900 p-1 opacity-50">
-          <span className="rounded-md bg-emerald py-2 text-center text-sm font-semibold text-ink">
-            Buy
-          </span>
-          <span className="py-2 text-center text-sm font-semibold text-neutral-400">Sell</span>
+      <section
+        className={cn('flex flex-col gap-3 p-4', className)}
+        aria-label="Preview trading unavailable"
+      >
+        <div className="pointer-events-none opacity-60">
+          <Segmented
+            label="Trade side"
+            value="buy"
+            onChange={() => {}}
+            disabled
+            stretch
+            size="lg"
+            toneFor={(id) => (id === 'buy' ? 'buy' : 'sell')}
+            options={[
+              { id: 'buy', label: 'Buy' },
+              { id: 'sell', label: 'Sell' },
+            ]}
+          />
+          <div className="well mt-3 rounded-2xl px-4 py-3.5">
+            <p className="text-[11.5px] font-medium text-neutral-500">You pay</p>
+            <p className="mt-1 font-mono text-[28px] font-medium tabular-nums text-neutral-700">
+              0.00
+            </p>
+          </div>
         </div>
-        <p className="mt-4 text-sm font-semibold">Here for the looks</p>
-        <p className="mt-1 text-xs leading-relaxed text-neutral-400">
-          This is a sample coin for exploring the design. Its price, trades and holders are
-          simulated.
-        </p>
-        <div className="mt-4 flex h-11 items-center justify-center rounded-lg bg-neutral-900 text-xs text-neutral-500">
+        <div className="tile flex items-start gap-3 p-3.5">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary ring-1 ring-inset ring-primary/25">
+            <span aria-hidden className="iconify h-4 w-4 ph--sparkle-fill" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold">Here for the looks</p>
+            <p className="mt-1 text-xs leading-relaxed text-neutral-400">
+              This is a sample coin for exploring the design. Its price, trades and holders are
+              simulated.
+            </p>
+          </div>
+        </div>
+        <div className="flex h-12 items-center justify-center rounded-2xl border border-dashed border-white/10 text-[12.5px] text-neutral-500">
           Trading unavailable for samples
         </div>
       </section>
     );
   }
 
-  if (!coin.isMigrated && coin.thresholdSol > 0 && coin.quoteReserveSol >= coin.thresholdSol) {
+  if (
+    !pendingTrade &&
+    !coin.isMigrated &&
+    coin.thresholdSol > 0 &&
+    coin.quoteReserveSol >= coin.thresholdSol
+  ) {
     return (
       <section className={cn('p-4 text-sm text-neutral-300', className)}>
-        <p className="font-semibold">Ready to graduate</p>
+        <span className="mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-primary/15 text-primary ring-1 ring-inset ring-primary/30">
+          <span aria-hidden className="iconify h-5 w-5 ph--graduation-cap-fill" />
+        </span>
+        <p className="text-[15px] font-semibold text-foreground">Ready to graduate</p>
         <p className="mt-1 text-xs leading-relaxed text-neutral-400">
           The curve reached its target. Complete the on-chain migration to resume trading on Meteora
           DAMM v2.
         </p>
-        <Button className="mt-4 h-11 w-full" disabled={sending} onClick={graduate}>
+        <Button className="mt-4 h-12 w-full rounded-2xl" disabled={sending} onClick={graduate}>
           {sending
             ? 'Confirming graduation…'
             : pendingMigration
@@ -395,6 +447,7 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
         <p className="mt-2 text-[11px] text-neutral-500">
           Your wallet shows network fees and any new-account rent before signing.
         </p>
+        <AxiomTradeLink />
       </section>
     );
   }
@@ -406,6 +459,7 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
   const available = side === 'buy' ? quoteBalance : balance?.tokens;
   const unit = side === 'buy' ? quoteUnit : coin.symbol;
   const short = available !== undefined && numericAmount > available;
+  const canReview = Number.isFinite(numericAmount) && numericAmount > 0 && !short;
   const setFraction = (fraction: number) => {
     if (!balance) return;
     const value =
@@ -417,14 +471,14 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
           )
         : balance.tokens * fraction;
     const rounded = Math.floor(value * 1e6) / 1e6;
-    setAmount(rounded > 0 ? String(rounded) : '');
+    changeAmount(rounded > 0 ? String(rounded) : '');
   };
 
   return (
     <section aria-label="Trade" className={cn('flex flex-col gap-3 p-4', className)}>
       {pendingTrade && (
         <div
-          className="rounded-lg border border-amber/30 bg-amber/5 p-3 text-xs text-neutral-300"
+          className="rounded-2xl border border-amber/25 bg-amber/[0.06] p-3.5 text-xs text-neutral-300"
           role="status"
         >
           <p>A saved trade needs confirmation.</p>
@@ -453,7 +507,7 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
               onClick={() => {
                 try {
                   saveTrade(null);
-                  setAmount('');
+                  changeAmount('');
                   setTradeNotice(null);
                 } catch {
                   setTradeNotice('Could not clear this browser receipt.');
@@ -472,7 +526,7 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
         </p>
       )}
       {coin.isMigrated && pendingMigration && (
-        <div className="rounded-lg border border-neutral-800 p-2.5 text-xs text-neutral-400">
+        <div className="tile p-3 text-xs text-neutral-400">
           Graduation is live. Its saved receipt still needs indexing.
           <button
             type="button"
@@ -493,46 +547,43 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
         </div>
       )}
 
-      <div role="tablist" className="grid h-10 grid-cols-2 gap-1 rounded-lg bg-neutral-900 p-1">
-        {(['buy', 'sell'] as const).map((s) => (
-          <button
-            key={s}
-            role="tab"
-            aria-selected={side === s}
-            onClick={() => {
-              setSide(s);
-              setAmount('');
-            }}
-            className={cn(
-              'rounded-md text-sm font-semibold capitalize transition-colors',
-              side === s
-                ? s === 'buy'
-                  ? 'bg-emerald text-ink shadow-sm'
-                  : 'bg-rose text-white shadow-sm'
-                : 'text-neutral-400 hover:text-neutral-100'
-            )}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        role="tablist"
+        label="Trade side"
+        value={side}
+        stretch
+        size="lg"
+        toneFor={(id) => (id === 'buy' ? 'buy' : 'sell')}
+        disabled={sending || loading}
+        className={cn((sending || loading) && 'opacity-70')}
+        onChange={(s) => {
+          if (sending || loading || s === side) return;
+          setSide(s);
+          setAmount('');
+          clearReview();
+        }}
+        options={[
+          { id: 'buy', label: 'Buy', icon: 'ph--arrow-down-left-bold' },
+          { id: 'sell', label: 'Sell', icon: 'ph--arrow-up-right-bold' },
+        ]}
+      />
 
       <div
         className={cn(
-          'rounded-lg border bg-neutral-925 px-3 pb-2 pt-2 transition-colors focus-within:border-primary/60',
-          short ? 'border-rose/50' : 'border-neutral-800'
+          'well rounded-2xl px-4 pb-2.5 pt-3 transition-all duration-200 ease-out focus-within:border-primary/50 focus-within:shadow-[inset_0_1px_2px_rgba(0,0,0,0.35),0_0_0_4px_rgba(255,102,0,0.12)]',
+          short && 'border-rose/50'
         )}
       >
         <div className="flex h-5 items-center justify-between text-[11px]">
-          <label htmlFor={amountId} className="font-medium text-neutral-500">
+          <label htmlFor={amountId} className="text-[11.5px] font-medium text-neutral-400">
             {side === 'buy' ? 'You pay' : 'You sell'}
           </label>
           {publicKey && (
             <button
               type="button"
               onClick={() => setFraction(1)}
-              disabled={!balance}
-              className="inline-flex items-center gap-1 font-mono text-neutral-500 hover:text-neutral-200 disabled:hover:text-neutral-500"
+              disabled={!balance || sending || loading}
+              className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-mono text-neutral-400 transition-colors hover:bg-white/[0.06] hover:text-neutral-100 disabled:hover:bg-transparent disabled:hover:text-neutral-400"
               title="Use your full balance"
             >
               <span className="iconify h-3 w-3 ph--wallet" />
@@ -544,28 +595,36 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
             </button>
           )}
         </div>
-        <div className="mt-1 flex items-center gap-2">
+        <div className="mt-1.5 flex items-center gap-2">
           <input
             id={amountId}
             inputMode="decimal"
             autoComplete="off"
             placeholder="0.00"
             value={amount}
-            onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-            className="min-w-0 flex-1 bg-transparent font-mono text-2xl font-medium tabular-nums text-foreground outline-none placeholder:text-neutral-700"
+            maxLength={24}
+            disabled={sending || loading}
+            onChange={(e) => {
+              if (/^\d*(?:\.\d*)?$/.test(e.target.value)) changeAmount(e.target.value);
+            }}
+            className="min-w-0 flex-1 bg-transparent font-mono text-[28px] font-medium tracking-tight tabular-nums text-foreground outline-none placeholder:text-neutral-700"
           />
-          <span className="flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-neutral-850 pl-1 pr-2.5 text-xs font-semibold">
+          <span className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-gradient-to-b from-white/[0.12] to-white/[0.04] pl-1 pr-3 text-[13px] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_4px_12px_-6px_rgba(0,0,0,0.9)] ring-1 ring-inset ring-white/10">
             {side === 'buy' ? (
-              <span className="grid h-5 w-5 place-items-center rounded-full bg-gradient-to-br from-[#9945FF] to-[#14F195] text-[9px] font-bold text-white">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-[#9945FF] to-[#14F195] text-[11px] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">
                 ◎
               </span>
             ) : (
-              <CoinAvatar image={coin.image} symbol={coin.symbol} className="h-5 w-5 text-[8px]" />
+              <CoinAvatar
+                image={coin.image}
+                symbol={coin.symbol}
+                className="h-7 w-7 rounded-full text-[10px]"
+              />
             )}
             <span className="max-w-20 truncate">{unit}</span>
           </span>
         </div>
-        <p className="mt-0.5 h-4 font-mono text-[11px] text-neutral-500">
+        <p className="mt-0.5 h-4 font-mono text-[11.5px] text-neutral-500">
           {short ? (
             <span className="text-rose">Insufficient balance</span>
           ) : side === 'buy' && price && numericAmount > 0 ? (
@@ -574,16 +633,18 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
         </p>
       </div>
 
-      <div className="grid grid-cols-4 gap-1.5">
+      <div className="grid grid-cols-4 gap-2">
         {side === 'buy'
           ? BUY_PRESETS.map((p) => (
               <button
                 key={p}
                 type="button"
-                onClick={() => setAmount(String(p))}
+                disabled={sending || loading}
+                onClick={() => changeAmount(String(p))}
                 className={cn(
                   presetClass,
-                  numericAmount === p && 'border-emerald/40 bg-emerald/10 text-emerald'
+                  numericAmount === p &&
+                    'border-emerald/40 bg-emerald/[0.12] text-emerald shadow-[0_0_16px_-6px_rgba(62,222,140,0.6)]'
                 )}
               >
                 {p} {quoteUnit}
@@ -593,7 +654,7 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
               <button
                 key={p}
                 type="button"
-                disabled={!balance?.tokens}
+                disabled={!balance?.tokens || sending || loading}
                 onClick={() => setFraction(p / 100)}
                 className={presetClass}
               >
@@ -602,106 +663,105 @@ export const TradeBox = ({ coin, className }: { coin: Coin; className?: string }
             ))}
       </div>
 
-      <dl
-        className={cn(
-          'space-y-1.5 rounded-lg px-3 py-2.5 text-xs',
-          taxed ? 'bg-rose/[0.08]' : 'bg-neutral-925'
-        )}
-        aria-live="polite"
-      >
-        {error ? (
-          <p className="text-rose">{error}</p>
-        ) : quote ? (
-          <>
-            <Row label="You receive">
-              <span className="font-semibold text-foreground">
-                {formatReadableNumber(quote.amountOut)} {side === 'buy' ? coin.symbol : quoteUnit}
-              </span>
-              {side === 'sell' && price && (
-                <span className="ml-1.5 text-neutral-500">{usd(quote.amountOut * quoteToSol)}</span>
-              )}
-            </Row>
-            <Row
-              label={taxed ? 'Snipe tax on this trade' : 'Fee on this trade'}
-              labelClass={taxed ? 'font-semibold text-rose' : undefined}
-              title={
-                quote.feeMint && quote.feeMint !== (coin.quoteMint ?? NATIVE_MINT.toBase58())
-                  ? `${formatReadableNumber(quote.feeAmount ?? 0)} ${coin.symbol} · SOL equivalent estimated`
-                  : `${formatReadableNumber(quote.feeAmount ?? quote.feeSol / quoteToSol)} ${quoteUnit}`
-              }
-            >
-              <span className={taxed ? 'font-semibold text-rose' : 'text-neutral-200'}>
-                {quote.feeSolIsEstimate ? '≈ ' : ''}
-                {quoteUnit === 'SOL'
-                  ? usd(quote.feeSol)
-                  : `${formatReadableNumber(quote.feeSol / quoteToSol)} ${quoteUnit}`}{' '}
-                · {quote.feePercent.toFixed(2)}%
-              </span>
-            </Row>
-            <Row label="Max slippage">
-              <span className="text-neutral-400">{TRADE_SLIPPAGE_BPS / 100}%</span>
-            </Row>
-            <Row label="Minimum received">
-              <span className="text-neutral-400">
-                {formatTokenUnits(
-                  quote.minimumAmountOut,
-                  side === 'buy' ? (coin.tokenDecimals ?? TOKEN_DECIMALS) : 9
-                )}{' '}
-                {side === 'buy' ? coin.symbol : quoteUnit}
-              </span>
-            </Row>
-            {taxed && (
-              <p className="pt-0.5 text-[11px] leading-relaxed text-rose/90">
-                {coin.feePolicyVersion === 'bond-v1'
-                  ? 'The 99% launch-slot guard drops to 1.25% from the next slot. Check the live quote before signing.'
-                  : `The launch fee reduces toward ${BASE_FEE_PERCENT}%. Check the live quote before signing.`}
-              </p>
-            )}
-          </>
-        ) : (
-          <p className="py-0.5 text-neutral-500">
-            {loading
-              ? 'Getting a quote…'
-              : 'Enter an amount to see the trading fee before you confirm.'}
-          </p>
-        )}
-      </dl>
+      {(loading || error || quote) && (
+        <dl
+          className={cn(
+            'animate-in fade-in slide-in-from-top-1 space-y-2 rounded-2xl border px-4 py-3 text-xs duration-200',
+            taxed ? 'border-rose/25 bg-rose/[0.08]' : 'border-white/[0.07] bg-white/[0.03]'
+          )}
+          aria-live="polite"
+        >
+          {error ? (
+            <p className="text-rose">{error}</p>
+          ) : quote ? (
+            <>
+              <Row label="You receive">
+                <span className="font-semibold text-foreground">
+                  {formatReadableNumber(quote.amountOut)} {side === 'buy' ? coin.symbol : quoteUnit}
+                </span>
+                {side === 'sell' && price && (
+                  <span className="ml-1.5 text-neutral-500">
+                    {usd(quote.amountOut * quoteToSol)}
+                  </span>
+                )}
+              </Row>
+              <Row
+                label={taxed ? 'High launch fee' : 'Trading fee'}
+                labelClass={taxed ? 'font-semibold text-rose' : undefined}
+              >
+                <span className={taxed ? 'font-semibold text-rose' : 'text-neutral-200'}>
+                  {quote.feeSolIsEstimate ? '≈ ' : ''}
+                  {quoteUnit === 'SOL'
+                    ? usd(quote.feeSol)
+                    : `${formatReadableNumber(quote.feeSol / quoteToSol)} ${quoteUnit}`}{' '}
+                  · {quote.feePercent.toFixed(2)}%
+                </span>
+              </Row>
+              <Row label="Minimum received">
+                <span className="text-neutral-400">
+                  {formatTokenUnits(
+                    quote.minimumAmountOut,
+                    side === 'buy' ? (coin.tokenDecimals ?? TOKEN_DECIMALS) : 9
+                  )}{' '}
+                  {side === 'buy' ? coin.symbol : quoteUnit}
+                </span>
+              </Row>
+            </>
+          ) : (
+            <div className="space-y-2 py-0.5" aria-label="Getting a quote">
+              <div className="skeleton h-3 w-3/4" />
+              <div className="skeleton h-3 w-1/2" />
+            </div>
+          )}
+        </dl>
+      )}
 
       <Button
         ref={submitRef}
         className={cn(
-          'h-11 w-full text-sm font-semibold',
-          side === 'buy'
-            ? 'bg-emerald text-ink hover:bg-emerald/90'
-            : 'bg-rose text-white hover:bg-rose/90'
+          'h-12 w-full rounded-2xl text-[15px] font-semibold',
+          !publicKey ? '' : side === 'buy' ? 'trade-buy' : 'trade-sell'
         )}
-        disabled={
-          !!publicKey &&
-          (!quote || quote.minimumAmountOut === '0' || sending || !!pendingTrade || short)
-        }
-        onClick={trade}
+        disabled={!!publicKey && (!canReview || sending || loading || !!pendingTrade)}
+        onClick={() => {
+          if (!publicKey || !signTransaction) setShowModal(true);
+          else if (quote) void trade();
+          else void refetch();
+        }}
       >
         {!publicKey
           ? 'Connect wallet'
-          : sending
-            ? 'Confirm in your wallet…'
-            : taxed
-              ? `${side === 'buy' ? 'Buy' : 'Sell'} anyway (${quote!.feePercent.toFixed(0)}% tax)`
-              : side === 'buy'
-                ? `Buy ${coin.symbol}`
-                : `Sell ${coin.symbol}`}
+          : loading
+            ? 'Getting a quote…'
+            : sending
+              ? 'Confirm in your wallet…'
+              : quote
+                ? `Confirm ${side}`
+                : `Review ${side}`}
       </Button>
-      {coin.isMigrated && (
-        <p className="text-center text-[11px] text-neutral-500">
-          Graduated · trades route to Meteora DAMM v2
-        </p>
-      )}
+      <AxiomTradeLink />
     </section>
   );
 };
 
+function AxiomTradeLink() {
+  if (NETWORK !== 'mainnet-beta') return null;
+  const affiliate = axiomLink();
+  return (
+    <a
+      href={affiliate.href}
+      target="_blank"
+      rel={affiliate.referral ? 'sponsored noopener noreferrer' : 'noopener noreferrer'}
+      className="block text-center text-xs text-neutral-400 transition-colors hover:text-primary"
+    >
+      Open Axiom ↗
+      {affiliate.referral && <span className="ml-1 text-neutral-500">· Referral link</span>}
+    </a>
+  );
+}
+
 const presetClass =
-  'h-8 rounded-md border border-neutral-850 font-mono text-[11px] text-neutral-400 transition-colors hover:border-neutral-700 hover:text-neutral-100 disabled:opacity-40 disabled:hover:border-neutral-850 disabled:hover:text-neutral-400';
+  'h-9 rounded-full border border-white/[0.08] bg-white/[0.035] font-mono text-[11.5px] text-neutral-300 transition-all duration-200 ease-out hover:-translate-y-px hover:border-white/20 hover:bg-white/[0.07] hover:text-neutral-50 active:translate-y-0 active:scale-95 disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:border-white/[0.08] disabled:hover:bg-white/[0.035]';
 
 const Row = ({
   label,
@@ -710,7 +770,7 @@ const Row = ({
   children,
 }: React.PropsWithChildren<{ label: string; labelClass?: string; title?: string }>) => (
   <div className="flex items-center justify-between gap-3" title={title}>
-    <dt className={labelClass ?? 'text-neutral-500'}>{label}</dt>
+    <dt className={labelClass ?? 'text-neutral-400'}>{label}</dt>
     <dd className="truncate text-right font-mono tabular-nums">{children}</dd>
   </div>
 );
@@ -728,16 +788,16 @@ function useBalance(mint: string, wallet: string | undefined, enabled: boolean) 
       if (!response.ok) throw new Error(body.error || 'Balance unavailable');
       return body;
     },
-    refetchInterval: 15_000,
+    staleTime: 60_000,
     retry: false,
   }).data;
 }
 
-function useQuote(mint: string, side: Side, amount: number) {
-  const enabled = Number.isFinite(amount) && amount > 0;
+function useQuote(tradeKey: string, mint: string, side: Side, amount: number, revision: number) {
+  const [expiredAt, setExpiredAt] = useState(0);
   const query = useQuery<QuoteResponse>({
-    queryKey: ['trade-quote', mint, side, amount],
-    enabled,
+    queryKey: ['trade-quote', tradeKey, side, amount, revision],
+    enabled: false,
     queryFn: async ({ signal }) => {
       const response = await fetch(
         `/api/quote?mint=${encodeURIComponent(mint)}&side=${side}&amount=${amount}`,
@@ -749,26 +809,32 @@ function useQuote(mint: string, side: Side, amount: number) {
       );
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || 'Quote unavailable. Try again shortly.');
+      if (body.minimumAmountOut === '0') throw new Error('Enter a larger amount to trade.');
       return body;
     },
-    refetchInterval: 3000,
     retry: false,
     cacheTime: 0,
   });
-  // A failed refresh must remove the previous quote and disable signing.
+  const expiresAt = query.dataUpdatedAt + REVIEW_QUOTE_MS;
+  useEffect(() => {
+    if (!query.dataUpdatedAt) return;
+    const timer = setTimeout(() => setExpiredAt(expiresAt), Math.max(0, expiresAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [query.dataUpdatedAt, expiresAt]);
   const quote =
-    enabled &&
     !query.isError &&
     query.data?.side === side &&
     query.data.amountIn === amount &&
     typeof query.data.minimumAmountOut === 'string' &&
-    Date.now() - query.dataUpdatedAt <= 5000
+    expiresAt !== expiredAt &&
+    Date.now() < expiresAt
       ? query.data
       : null;
   return {
     quote,
     error: query.error instanceof Error ? query.error.message : null,
-    loading: enabled && query.isFetching && !quote,
+    loading: query.isFetching,
+    expiresAt,
     refetch: query.refetch,
   };
 }

@@ -7,6 +7,7 @@ import { CoinCard } from './CoinCard';
 import { BoardPanel, SortControl } from './BoardPanel';
 import { BoardOverview } from './BoardOverview';
 import { LogoMark } from '../brand/Logo';
+import { Segmented } from '../ui/Segmented';
 
 type ColumnId = 'new' | 'close' | 'bonded';
 type Sort = 'age' | 'mcap' | 'progress';
@@ -52,7 +53,7 @@ const COLUMNS: {
     short: 'Bonding',
     subtitle: 'Past 25% and climbing',
     icon: 'ph--lightning-fill',
-    iconClassName: 'text-acid',
+    iconClassName: 'text-primary-200',
     empty: 'Nothing past 25% yet. Keep pushing.',
     filter: (c) => !c.isMigrated && c.progress >= CLOSE_TO_BOND_PROGRESS,
     sorts: [
@@ -66,7 +67,7 @@ const COLUMNS: {
     short: 'Bonded',
     subtitle: 'Made it to DAMM v2',
     icon: 'ph--seal-check-fill',
-    iconClassName: 'text-cyan',
+    iconClassName: 'text-emerald',
     empty: 'No coin has bonded yet. Be the first.',
     filter: (c) => c.isMigrated,
     sorts: [
@@ -113,83 +114,69 @@ export const Board = ({ coins, status, displayStale = false }: BoardProps) => {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <BoardOverview coins={coins} />
-      <div className="mb-2.5 flex shrink-0 items-center justify-between gap-3 px-1">
-        <div className="flex items-center gap-2">
-          <h2 className="font-display text-[14px] uppercase">The board</h2>
-          <span className="rounded-md bg-neutral-900 px-1.5 py-0.5 font-mono text-[11px] text-neutral-400">
+      <div className="mb-3 flex shrink-0 items-center justify-between gap-3 px-1">
+        <div className="flex min-w-0 items-baseline gap-2.5">
+          <h2 className="text-[20px] font-semibold tracking-[-0.03em]">The board</h2>
+          <span className="rounded-full bg-white/[0.06] px-2 py-0.5 font-mono text-[11px] text-neutral-300 ring-1 ring-inset ring-white/[0.08]">
             {coins?.length ?? '…'} coins
           </span>
-          <span className="hidden text-[11px] text-neutral-500 sm:inline">
+          <span className="hidden truncate text-[12px] text-neutral-500 sm:inline">
             Launched by anons. Owned by holders.
           </span>
         </div>
-        <div
-          role="group"
-          aria-label="Card density"
-          className="flex shrink-0 gap-0.5 border border-white/[0.09] bg-panel p-1"
-        >
-          {(['compact', 'comfortable'] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={density === value}
-              onClick={() => setDensity(value)}
-              className={cn(
-                'flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[10px] transition-colors',
-                density === value
-                  ? 'bg-neutral-800 text-foreground shadow-sm'
-                  : 'text-neutral-500 hover:text-neutral-200'
-              )}
-            >
-              <span
-                className={cn(
-                  'iconify h-3.5 w-3.5',
-                  value === 'compact' ? 'ph--rows-bold' : 'ph--squares-four-bold'
-                )}
-              />
-              <span className="hidden sm:inline">
-                {value === 'compact' ? 'Compact' : 'Comfortable'}
-              </span>
-              <span className="sr-only sm:hidden">{value}</span>
-            </button>
-          ))}
-        </div>
+        <Segmented
+          label="Card density"
+          value={density}
+          onChange={setDensity}
+          options={[
+            {
+              id: 'compact',
+              icon: 'ph--rows-bold',
+              ariaLabel: 'Compact',
+              label: <span className="hidden sm:inline">Compact</span>,
+            },
+            {
+              id: 'comfortable',
+              icon: 'ph--squares-four-bold',
+              ariaLabel: 'Comfortable',
+              label: <span className="hidden sm:inline">Comfortable</span>,
+            },
+          ]}
+        />
       </div>
       {displayStale && (
         <p
           role="status"
-          className="mb-2 shrink-0 rounded-lg border border-amber-400/15 bg-amber-400/5 px-3 py-2 text-[11px] text-amber-200"
+          className="mb-3 flex shrink-0 items-center gap-2 rounded-2xl border border-amber/20 bg-amber/[0.06] px-3.5 py-2.5 text-[12px] text-amber-200 backdrop-blur-xl"
         >
+          <span aria-hidden className="iconify h-4 w-4 shrink-0 text-amber ph--cloud-warning" />
           Live updates are delayed. Showing the last available data while we reconnect.
         </p>
       )}
-      <div
+      <Segmented
         role="tablist"
-        aria-label="Board"
-        className="mb-2 flex gap-1 border border-white/[0.09] bg-panel p-1 lg:hidden"
-      >
-        {COLUMNS.map((col) => (
-          <button
-            key={col.id}
-            role="tab"
-            aria-selected={tab === col.id}
-            onClick={() => setTab(col.id)}
-            className={cn(
-              'flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors',
-              tab === col.id
-                ? 'bg-neutral-850 text-foreground shadow-[inset_0_-2px_0_rgb(var(--primary))]'
-                : 'text-neutral-500 hover:text-neutral-200'
-            )}
-          >
-            {col.short}
-            {coins && (
-              <span className="ml-1 font-mono text-neutral-500">{grouped[col.id].length}</span>
-            )}
-          </button>
-        ))}
-      </div>
+        label="Board"
+        value={tab}
+        onChange={setTab}
+        stretch
+        size="md"
+        className="mb-3 lg:hidden"
+        options={COLUMNS.map((col) => ({
+          id: col.id,
+          label: (
+            <>
+              {col.short}
+              {coins && (
+                <span className="font-mono text-[11px] text-neutral-500">
+                  {grouped[col.id].length}
+                </span>
+              )}
+            </>
+          ),
+        }))}
+      />
 
-      <div className="grid min-h-0 flex-1 gap-2 md:gap-3 lg:grid-cols-3">
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-3">
         {COLUMNS.map((col) => (
           <BoardPanel
             key={col.id}
@@ -214,17 +201,23 @@ export const Board = ({ coins, status, displayStale = false }: BoardProps) => {
               Array.from({ length: 7 }, (_, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-3 border-b border-neutral-900 px-3.5 py-4"
+                  className="flex items-center gap-3.5 px-2.5 py-3"
+                  style={{ opacity: 1 - i * 0.11 }}
                 >
-                  <div className="h-14 w-14 animate-pulse rounded-xl bg-neutral-900" />
+                  <div className="skeleton h-[60px] w-[60px] rounded-2xl" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-3 w-1/3 animate-pulse rounded bg-neutral-900" />
-                    <div className="h-2.5 w-1/2 animate-pulse rounded bg-neutral-900" />
+                    <div className="skeleton h-3.5 w-1/3" />
+                    <div className="skeleton h-2.5 w-1/2" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="skeleton ml-auto h-3.5 w-16" />
+                    <div className="skeleton ml-auto h-2.5 w-10" />
                   </div>
                 </div>
               ))
             ) : status === 'error' && !coins ? (
-              <p className="p-6 text-center text-xs text-rose">
+              <p className="flex items-center justify-center gap-2 p-8 text-center text-xs text-rose">
+                <span aria-hidden className="iconify h-4 w-4 animate-pulse ph--wifi-slash" />
                 Couldn’t reach the chain. Retrying…
               </p>
             ) : grouped[col.id].length ? (
@@ -247,13 +240,19 @@ export const Board = ({ coins, status, displayStale = false }: BoardProps) => {
 };
 
 const EmptyColumn = ({ text, launch }: { text: string; launch: boolean }) => (
-  <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
-    <LogoMark small animated className="h-14 w-14 opacity-60 grayscale-[0.4]" />
-    <p className="max-w-[16rem] text-xs leading-relaxed text-neutral-500">{text}</p>
+  <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+    <span className="relative grid h-20 w-20 place-items-center">
+      <span
+        aria-hidden
+        className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(255,102,0,0.25),transparent_70%)] blur-md"
+      />
+      <LogoMark small animated className="relative h-14 w-14 opacity-80" />
+    </span>
+    <p className="max-w-[16rem] text-[12.5px] leading-relaxed text-neutral-400">{text}</p>
     {launch && (
       <Link
         href="/launch"
-        className="btn-holo mt-1 inline-flex h-8 items-center gap-1.5 rounded-lg px-3 font-display text-[11px] font-bold"
+        className="btn-holo mt-1 inline-flex h-9 items-center gap-1.5 px-4 text-[12.5px]"
       >
         <span className="iconify h-3.5 w-3.5 ph--plus-bold" />
         Launch the first one

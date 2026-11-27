@@ -65,6 +65,15 @@ export type CoinResponse = {
   coin: Coin;
 };
 
+export const COIN_CHART_SECONDS = 24 * 60 * 60;
+export const COIN_CHART_BUCKET_SECONDS = 15 * 60;
+export const TOP_HOLDER_LIMIT = 20;
+
+export type CoinPriceHistory = {
+  points: { time: number; priceSol: number }[];
+  stale?: boolean;
+};
+
 export type Holder = {
   owner: string;
   amount: number;

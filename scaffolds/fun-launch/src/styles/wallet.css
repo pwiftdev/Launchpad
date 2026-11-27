@@ -10,10 +10,10 @@ dialog:has([data-masked-wallet]) {
   padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
     max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   border: 0;
-  background: rgb(0 0 0 / 0.82);
+  background: rgb(10 8 7 / 0.6);
   color: rgb(var(--foreground));
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(14px);
 }
 
 dialog:has([data-masked-wallet])::backdrop {
@@ -24,25 +24,33 @@ dialog:has([data-masked-wallet]) > div {
   isolation: isolate;
   max-width: 420px;
   max-height: min(680px, calc(100dvh - 32px));
-  border: 1px solid rgb(var(--primary) / 0.22);
-  border-radius: 0;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 30px;
+  overflow: hidden;
   /* The adapter uses !important for its stock surface color. */
-  background-color: rgb(var(--neutral-950)) !important;
+  background-color: rgb(24 20 18 / 0.9) !important;
   background-image:
-    radial-gradient(ellipse at 5% 0%, rgb(var(--primary) / 0.12), transparent 55%),
-    radial-gradient(ellipse at 100% 100%, rgb(var(--accent) / 0.06), transparent 55%);
+    radial-gradient(ellipse at 5% 0%, rgb(var(--primary) / 0.18), transparent 55%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.01));
   color: rgb(var(--foreground));
+  -webkit-backdrop-filter: blur(30px) saturate(170%);
+  backdrop-filter: blur(30px) saturate(170%);
   box-shadow:
-    0 32px 100px rgb(0 0 0 / 0.45),
-    0 0 40px rgb(var(--primary) / 0.06);
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 40px 100px -30px rgb(0 0 0 / 0.9),
+    0 0 50px -10px rgb(var(--primary) / 0.15);
+  animation: wallet-in 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-dialog:has([data-masked-wallet]) > div::before {
-  position: absolute;
-  inset: 0 0 auto;
-  height: 2px;
-  background: var(--holo);
-  content: '';
+@keyframes wallet-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* Header and separator belong to the adapter; our brand sits above its title. */
@@ -52,9 +60,9 @@ dialog:has([data-masked-wallet]) > div > div:first-of-type {
 }
 
 dialog:has([data-masked-wallet]) > div > div:first-of-type > div > div:first-child {
-  font-family: var(--font-display), var(--font-sans), sans-serif;
+  font-family: var(--font-sans), sans-serif;
   font-size: 24px;
-  font-weight: 700;
+  font-weight: 650;
   letter-spacing: -0.035em;
   line-height: 1.2;
 }
@@ -68,7 +76,7 @@ dialog:has([data-masked-wallet]) > div > div:first-of-type > div > div:nth-child
 
 dialog:has([data-masked-wallet]) > div > div:nth-of-type(2) {
   flex-shrink: 0;
-  border-color: rgb(var(--neutral-800));
+  border-color: rgb(255 255 255 / 0.07);
 }
 
 dialog:has([data-masked-wallet]) .hideScrollbar {
@@ -88,21 +96,26 @@ dialog:has([data-masked-wallet]) .hideScrollbar > span {
 dialog:has([data-masked-wallet]) button {
   min-height: 44px;
   padding: 8px 12px;
-  border: 1px solid rgb(var(--neutral-750));
-  border-radius: 0;
-  background-color: rgb(var(--neutral-900));
+  border: 1px solid rgb(255 255 255 / 0.09);
+  border-radius: 16px;
+  background-color: rgb(255 255 255 / 0.04);
   color: rgb(var(--foreground));
   font-family: inherit;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
   transition:
-    background-color 150ms,
-    border-color 150ms,
-    box-shadow 150ms;
+    background-color 300ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 300ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 300ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 dialog:has([data-masked-wallet]) button:hover {
-  border-color: rgb(var(--primary) / 0.55);
-  background-color: rgb(var(--primary) / 0.1);
-  box-shadow: 0 0 18px rgb(var(--primary) / 0.06);
+  border-color: rgb(var(--primary) / 0.45);
+  background-color: rgb(var(--primary) / 0.08);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 12px 28px -14px rgb(var(--primary) / 0.55);
+  transform: translateY(-1px);
 }
 
 dialog:has([data-masked-wallet]) button:focus-visible,
@@ -120,6 +133,7 @@ dialog:has([data-masked-wallet]) > div > div:first-of-type > button {
   min-height: 36px;
   padding: 0;
   place-items: center;
+  border-radius: 999px;
   color: rgb(var(--neutral-300));
 }
 
@@ -170,15 +184,16 @@ dialog:has([data-masked-wallet])
 
 dialog:has([data-masked-wallet]) .hideScrollbar > div:has(> img) > div:last-of-type > button {
   min-height: 48px;
-  border-color: rgb(var(--primary));
-  background: rgb(var(--primary));
-  color: rgb(var(--primary-950));
+  border-color: rgb(255 120 30 / 0.6);
+  background: linear-gradient(180deg, #ff8f45 0%, #ff6a0a 48%, #f25a00 100%);
+  color: #140800;
+  font-weight: 650;
 }
 
 dialog:has([data-masked-wallet]) .hideScrollbar a:has(img) {
-  border: 1px solid rgb(var(--neutral-750));
-  border-radius: 0;
-  background-color: rgb(var(--neutral-900));
+  border: 1px solid rgb(255 255 255 / 0.09);
+  border-radius: 16px;
+  background-color: rgb(255 255 255 / 0.04);
   color: rgb(var(--foreground));
 }
 

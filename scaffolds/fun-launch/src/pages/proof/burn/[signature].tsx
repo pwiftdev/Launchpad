@@ -26,7 +26,7 @@ export const getServerSideProps: GetServerSideProps<{ receipt: BurnReceipt }> = 
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-neutral-850 py-3">
+    <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-white/[0.06] py-3">
       <dt className="text-xs text-neutral-500">{label}</dt>
       <dd className="font-mono text-sm">{children}</dd>
     </div>
@@ -49,7 +49,7 @@ export default function BurnReceiptPage({ receipt }: { receipt: BurnReceipt }) {
         <Link href="/proof" className="eyebrow hover:text-primary">
           ← Proof
         </Link>
-        <h1 className="mt-4 font-display text-[28px] uppercase leading-[1.05] md:text-[40px]">
+        <h1 className="mt-4 text-[28px] font-semibold leading-[1.02] tracking-[-0.045em] md:text-[40px]">
           Burn #{receipt.number}
         </h1>
         <p className="mt-3 text-[15px] text-neutral-400">
@@ -57,7 +57,7 @@ export default function BurnReceiptPage({ receipt }: { receipt: BurnReceipt }) {
           transaction.
         </p>
       </header>
-      <section className="surface p-6">
+      <section className="surface rounded-3xl p-6 sm:p-7">
         <dl>
           <Row label="When">{new Date(receipt.at).toUTCString()}</Row>
           <Row label="SOL spent">{formatSol(receipt.lamports)}</Row>

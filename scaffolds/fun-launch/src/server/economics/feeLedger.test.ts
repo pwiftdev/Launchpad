@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { allocateExecutedFee, allocateHolderSnapshot } from './feeLedger';
+import { CREATOR_SHARE_STEP_BPS } from '@/lib/feeModes';
 
 describe('upcoming executed-fee accounting', () => {
   it.each(['dev', 'cashback', 'mskd'] as const)(
@@ -237,6 +238,30 @@ describe('Masked executed-fee accounting', () => {
       whole.platform,
       whole.mskdBuyback,
     ]);
+  });
+  it('advances every locked split one lamport at a time without taking from any share', () => {
+    for (
+      let creatorShareBps = 0;
+      creatorShareBps <= 10_000;
+      creatorShareBps += CREATOR_SHARE_STEP_BPS
+    ) {
+      for (let previousPhaseNet = 0n; previousPhaseNet < 100n; previousPhaseNet++) {
+        const { creator, community, platform, mskdBuyback } = allocateExecutedFee({
+          ...common,
+          total: 1n,
+          protocol: 0n,
+          previousPhaseNet,
+          creatorShareBps,
+        });
+        if (
+          [creator, community, platform, mskdBuyback].some((share) => share < 0n) ||
+          creator + community + platform + mskdBuyback !== 1n
+        )
+          throw new Error(
+            `Invalid split after ${previousPhaseNet} lamports at ${creatorShareBps} bps`
+          );
+      }
+    }
   });
 });
 

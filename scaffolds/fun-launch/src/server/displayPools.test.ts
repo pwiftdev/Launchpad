@@ -56,6 +56,9 @@ it('refreshes pool state by address between discovery scans', async () => {
   expect(f.scan).toHaveBeenCalledTimes(1);
   now += 50_000;
   await f.reader.list([config]);
+  expect(f.scan).toHaveBeenCalledTimes(1);
+  now += 4 * 60_000;
+  await f.reader.list([config]);
   expect(f.scan).toHaveBeenCalledTimes(2);
 });
 

@@ -78,13 +78,22 @@ export function summarizeMarket(
 }
 
 /** Convert observations to a small SVG, including stable flat-line and invalid-input handling. */
-export function sparklinePaths(values: number[], width = 240, height = 90, padding = 6) {
-  const points = values.filter((value) => Number.isFinite(value) && value >= 0);
+export function sparklinePaths(
+  values: number[],
+  width = 240,
+  height = 90,
+  padding = 6,
+  offsets?: number[]
+) {
+  const points = values
+    .map((value, index) => ({ value, offset: offsets?.[index] }))
+    .filter(({ value }) => Number.isFinite(value) && value >= 0);
   if (points.length < 2) return null;
-  const min = Math.min(...points);
-  const range = Math.max(...points) - min;
-  const positions = points.map((value, i): [number, number] => [
-    padding + (i / (points.length - 1)) * (width - padding * 2),
+  const prices = points.map(({ value }) => value);
+  const min = Math.min(...prices);
+  const range = Math.max(...prices) - min;
+  const positions = points.map(({ value, offset }, i): [number, number] => [
+    padding + (offset ?? i / (points.length - 1)) * (width - padding * 2),
     range ? height - padding - ((value - min) / range) * (height - padding * 2) : height / 2,
   ]);
   const line = positions

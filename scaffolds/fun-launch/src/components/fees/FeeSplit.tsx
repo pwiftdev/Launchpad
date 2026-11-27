@@ -28,7 +28,7 @@ export const FeeSplit = ({
   return (
     <div className={className}>
       <div
-        className="flex h-1.5 w-full gap-[2px]"
+        className="flex h-2.5 w-full gap-[3px]"
         role="img"
         aria-label={`Every ${pct(SCHEDULE.endingFeeBps)} trade fee: ${rows
           .map((r) => `${pct(r.bps)} to ${r.label}`)
@@ -38,16 +38,19 @@ export const FeeSplit = ({
           r.bps > 0 ? (
             <span
               key={r.key}
-              className={cn('h-full', TONE[r.key])}
+              className={cn(
+                'h-full rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] first:rounded-l-full last:rounded-r-full',
+                TONE[r.key]
+              )}
               style={{ width: `${(r.bps / SCHEDULE.endingFeeBps) * 100}%` }}
             />
           ) : null
         )}
       </div>
-      <dl className={cn('mt-2.5 grid gap-1', compact ? 'text-[11px]' : 'text-xs')}>
+      <dl className={cn('mt-3 grid gap-1.5', compact ? 'text-[12px]' : 'text-[13px]')}>
         {rows.map((r) => (
           <div key={r.key} className="flex items-center gap-2">
-            <span className={cn('h-1.5 w-1.5 shrink-0', TONE[r.key])} aria-hidden />
+            <span className={cn('h-2 w-2 shrink-0 rounded-full', TONE[r.key])} aria-hidden />
             <dt className="text-neutral-400">
               {r.label}
               {r.key === 'holders' && <span className="text-neutral-600"> · pro rata</span>}

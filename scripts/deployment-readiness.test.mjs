@@ -62,6 +62,29 @@ test('accepts a private Dev mainnet staging config on the Heroku origin', () => 
   assert.equal(report.activationEnabled, false);
   assert.ok(report.unverified.includes('onChainConfigAndRegistry'));
 });
+test('checks the Masked origin, distinct configuration and wXMR payout settings together', () => {
+  const masked = {
+    ...staged,
+    LAUNCH_POLICY_VERSION: 'dev-v1',
+    NEXT_PUBLIC_SITE_URL: 'https://mskd.fun',
+    FEE_COLLECTOR_PUBLIC_KEY: devCompany.collector,
+    TREASURY_PUBLIC_KEY: devCompany.treasury,
+    MAINNET_MASKED_CONFIG_KEY: 'A'.repeat(43),
+    MAINNET_MSKD_CONFIG_KEY: 'C'.repeat(43),
+    MSKD_PAYOUT_POOL: 'B'.repeat(43),
+    MASKED_WXMR_PAYOUTS_ENABLED: 'true',
+  };
+  assert.equal(deploymentReadiness(masked).configurationChecksPassed, true);
+  for (const change of [
+    { MAINNET_MASKED_CONFIG_KEY: '' },
+    { MAINNET_MASKED_CONFIG_KEY: masked.POOL_CONFIG_KEY },
+    { MAINNET_MSKD_CONFIG_KEY: '' },
+    { MAINNET_MSKD_CONFIG_KEY: masked.MAINNET_MASKED_CONFIG_KEY },
+    { MSKD_PAYOUT_POOL: masked.MAINNET_MASKED_CONFIG_KEY },
+    { MASKED_WXMR_PAYOUTS_ENABLED: 'false' },
+  ])
+    assert.equal(deploymentReadiness({ ...masked, ...change }).configurationChecksPassed, false);
+});
 test('a retired wallet is not deployment-ready even when a closed web release can still boot', () => {
   assert.equal(
     deploymentReadiness({

@@ -16,7 +16,7 @@ export const MobileTabBar = () => {
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-30 grid h-16 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] place-items-center border-t border-white/[0.08] bg-panel pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="glass-strong fixed inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-30 grid h-16 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] place-items-center rounded-[26px] md:hidden"
     >
       <div className="grid w-full grid-flow-col auto-cols-fr">
         {left.map((item) => (
@@ -27,7 +27,7 @@ export const MobileTabBar = () => {
           aria-haspopup="dialog"
           aria-expanded={open}
           onClick={() => setOpen(true)}
-          className={cn(tabClass, open ? 'text-foreground' : 'text-neutral-500')}
+          className={cn(tabClass, open ? 'text-foreground' : 'text-neutral-400')}
         >
           <span
             aria-hidden="true"
@@ -39,7 +39,7 @@ export const MobileTabBar = () => {
       <Link
         href="/launch"
         aria-label="Launch a coin"
-        className="btn-holo -mt-6 flex h-14 w-14 items-center justify-center rounded-2xl ring-4 ring-background active:scale-95"
+        className="btn-holo -mt-7 flex h-14 w-14 items-center justify-center rounded-[20px] ring-[5px] ring-[rgb(16_13_12)] active:scale-95"
       >
         <span className="iconify h-7 w-7 ph--plus-bold" />
       </Link>
@@ -64,9 +64,20 @@ const Tab = ({
     <Link
       href={href}
       aria-current={active ? 'page' : undefined}
-      className={cn(tabClass, active ? 'text-foreground' : 'text-neutral-500')}
+      className={cn(
+        tabClass,
+        'transition-colors duration-200',
+        active ? 'text-foreground' : 'text-neutral-400'
+      )}
     >
-      <span className={cn('iconify h-5 w-5', active ? `${activeIcon} text-primary` : icon)} />
+      <span
+        className={cn(
+          'iconify h-5 w-5 transition-transform duration-200 ease-spring',
+          active
+            ? `${activeIcon} scale-110 text-primary drop-shadow-[0_0_8px_rgba(255,102,0,0.6)]`
+            : icon
+        )}
+      />
       {label}
     </Link>
   );

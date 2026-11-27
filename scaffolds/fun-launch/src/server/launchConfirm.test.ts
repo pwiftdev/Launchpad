@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   tx: vi.fn(),
   account: vi.fn(),
   pool: vi.fn(),
+  derivePool: vi.fn(),
   registered: vi.fn(),
   intent: vi.fn(),
   save: vi.fn(),
@@ -37,8 +38,9 @@ vi.mock('@/server/launchConfig', () => ({
 vi.mock('@/server/launchProof', () => ({ proveLaunchCreation: mocks.proof }));
 vi.mock('@/lib/vault/state', () => ({ decodeVaultCoin: mocks.coin }));
 vi.mock('@meteora-ag/dynamic-bonding-curve-sdk', () => ({
+  deriveDbcPoolAddress: mocks.derivePool,
   DynamicBondingCurveClient: class {
-    state = { getPoolByBaseMint: mocks.pool };
+    state = { getPool: mocks.pool };
   },
 }));
 import handler from '@/pages/api/launch/confirm';
@@ -86,9 +88,9 @@ beforeEach(() => {
     prepared_slot: 50,
   });
   mocks.tx.mockResolvedValue({});
+  mocks.derivePool.mockReturnValue(pool);
   mocks.pool.mockResolvedValue({
-    publicKey: pool,
-    account: { poolState: { config, activationPoint: { toString: () => '100' } } },
+    poolState: { config, baseMint: mint, activationPoint: { toString: () => '100' } },
   });
   mocks.config.mockResolvedValue({
     quoteMint: new PublicKey('So11111111111111111111111111111111111111112'),
@@ -117,6 +119,8 @@ it('requires a fresh matching network immediately before immutable registry pers
   });
   expect(mocks.network).toHaveBeenNthCalledWith(1, true);
   expect(mocks.network).toHaveBeenNthCalledWith(2, true);
+  expect(mocks.derivePool).toHaveBeenCalledWith(expect.any(PublicKey), mint, config);
+  expect(mocks.pool).toHaveBeenCalledWith(pool);
   expect(mocks.save).toHaveBeenCalledWith(
     expect.objectContaining({
       network_genesis: genesis,

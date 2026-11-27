@@ -8,7 +8,7 @@ import {
 type State = Pick<DynamicBondingCurveClient['state'], 'getProgram' | 'getPoolsByConfig'>;
 type Pool = { publicKey: PublicKey; account: VirtualPool };
 type PoolIdentity = { publicKey: PublicKey; mint: PublicKey; config: PublicKey };
-const DISCOVERY_MS = 60_000;
+const DISCOVERY_MS = 5 * 60_000;
 const ACCOUNT_BATCH = 100;
 
 export function createDisplayPoolReader(

@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PublicKey } from '@solana/web3.js';
-import { buildCandles } from './candles';
 import { getDemoCoins, getDemoHolders, getDemoTrades } from './demo';
 import { swapSchema } from '@/server/validation';
 
@@ -44,9 +43,8 @@ describe('design preview', () => {
           (trade) => trade.ts >= coin.launchedAt && trade.sol > 0 && Number.isFinite(trade.tokens)
         )
       ).toBe(true);
-      const candles = buildCandles(history.trades, coin.launchedAt, history.launchPriceSol, 60);
       expect(
-        candles.every((candle, i) => i === 0 || candle.time > (candles[i - 1]?.time ?? Infinity))
+        history.trades.every((trade, i) => i === 0 || trade.ts <= history.trades[i - 1]!.ts)
       ).toBe(true);
       expect(
         getDemoHolders(coin).holders.every(

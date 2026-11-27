@@ -2,7 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { PublicKey } from '@solana/web3.js';
 import { companyWallets } from '../../../../../scripts/company-wallets.cjs';
-import { expectedNetworkGenesis, NETWORK_GENESIS } from '../../../../../scripts/network-policy.cjs';
+import {
+  expectedNetworkGenesis,
+  MAINNET_REWARD_PINS,
+  NETWORK_GENESIS,
+} from '../../../../../scripts/network-policy.cjs';
 import type { WalletSigningLimits } from './walletSigner';
 
 export const WALLET_SIGNER_ENVIRONMENT = [
@@ -14,11 +18,7 @@ export const WALLET_SIGNER_ENVIRONMENT = [
   'TREASURY_PUBLIC_KEY',
   'LAUNCH_POLICY_VERSION',
   'POOL_CONFIG_KEY',
-  'MAINNET_CASHBACK_CONFIG_KEY',
-  'MAINNET_MSKD_CONFIG_KEY',
-  'MAINNET_HSOL_CONFIG_KEY',
-  'MAINNET_CASHBACK_HSOL_CONFIG_KEY',
-  'MAINNET_MSKD_HSOL_CONFIG_KEY',
+  ...Object.values(MAINNET_REWARD_PINS),
   'WALLET_WORKER_ENABLED',
   'MAINNET_TRADING_ENABLED',
   'LOCAL_VALIDATOR_ENABLED',

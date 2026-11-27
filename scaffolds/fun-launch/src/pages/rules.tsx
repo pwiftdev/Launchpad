@@ -37,8 +37,8 @@ const RULES: [string, string][] = [
     'Masked claims fees every hour and credits the creator share and each holder share. Holder shares are pro rata to balances; pools, burn and Masked wallets are excluded. Extra liquidity providers keep their own fees.',
   ],
   [
-    'Claim in Monero or SOL',
-    'Claim everything on My earnings, in native XMR sent to the Monero address you enter, or in SOL to your wallet. XMR claims are paid once a day at that day’s market rate minus a stated fee. If XMR payouts are delayed, your claim waits and is paid when they resume.',
+    'Claim in wXMR or SOL',
+    'Claim your earnings on My earnings in wrapped Monero (wXMR) or SOL. Both pay to your connected Solana wallet. wXMR is bought at payout using the market rate, so the amount you receive can vary. Direct payouts to Monero wallets are in development.',
   ],
   [
     'No accounts, no KYC',
@@ -55,7 +55,7 @@ export default function Rules() {
 
       <header className="relative pb-10 pt-4 md:pb-14 md:pt-8">
         <p className="eyebrow">How fees work</p>
-        <h1 className="mt-4 max-w-3xl font-display text-[32px] uppercase leading-[1.05] md:text-[54px]">
+        <h1 className="mt-4 max-w-3xl text-[32px] font-semibold leading-[1.02] tracking-[-0.045em] md:text-[54px]">
           <Decrypt text={`${pct(SCHEDULE.endingFeeBps)} flat.`} />
           <br />
           <span className="text-neutral-500">Before and after bonding.</span>
@@ -68,21 +68,24 @@ export default function Rules() {
       </header>
 
       {/* Split */}
-      <section aria-labelledby="split" className="border-t border-neutral-850 pt-8">
+      <section aria-labelledby="split" className="enter enter-1">
         <h2 id="split" className="eyebrow">
           The creator&rsquo;s split
         </h2>
         <div className="mt-5 grid gap-3 md:grid-cols-3">
           {EXAMPLES.map((creatorShareBps) => (
-            <article key={creatorShareBps} className="surface flex flex-col p-6">
-              <h3 className="font-display text-[15px] uppercase">
+            <article
+              key={creatorShareBps}
+              className="surface group flex flex-col rounded-3xl p-6 transition-transform duration-300 ease-out hover:-translate-y-1"
+            >
+              <h3 className="text-[17px] font-semibold tracking-tight">
                 {creatorShareBps === 0
                   ? 'All to holders'
                   : creatorShareBps === 10_000
                     ? 'All to the creator'
                     : 'Even split'}
               </h3>
-              <p className="mt-6 font-pixel text-[32px] leading-none">
+              <p className="mt-6 font-mono text-[40px] font-semibold leading-none tracking-[-0.04em] transition-colors duration-300 group-hover:text-primary">
                 {pct((split.beneficiaryBps * (10_000 - creatorShareBps)) / 10_000)}
               </p>
               <p className="mt-1.5 text-[13px] text-neutral-500">of every trade to holders</p>
@@ -92,37 +95,48 @@ export default function Rules() {
         </div>
         <p className="mt-4 max-w-3xl text-[12px] leading-relaxed text-neutral-500">
           Any {CREATOR_SHARE_STEP_BPS / 100}% step from 0 to 100% is allowed. Every coin card shows
-          its split. Trades on Solana are public; a Monero claim keeps where your earnings go
-          private.
+          its split. Trades and payout transfers are public on Solana.
         </p>
       </section>
 
       {/* Rules */}
-      <section aria-labelledby="rules" className="mt-14 border-t border-neutral-850 pt-8">
+      <section aria-labelledby="rules" className="enter enter-2 mt-14">
         <h2 id="rules" className="eyebrow">
           The rules
         </h2>
-        <dl className="mt-2 grid md:grid-cols-2 md:gap-x-12">
-          {RULES.map(([title, copy]) => (
-            <div key={title} className="border-b border-neutral-850 py-6">
-              <dt className="font-display text-[13px] uppercase">{title}</dt>
-              <dd className="mt-2 text-[14px] leading-relaxed text-neutral-400">{copy}</dd>
+        <dl className="mt-5 grid gap-3 md:grid-cols-2">
+          {RULES.map(([title, copy], index) => (
+            <div key={title} className="tile tile-hover flex gap-4 p-5">
+              <span
+                aria-hidden
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 font-mono text-[12px] font-semibold text-primary ring-1 ring-inset ring-primary/20"
+              >
+                {String(index + 1).padStart(2, '0')}
+              </span>
+              <div>
+                <dt className="text-[15.5px] font-semibold tracking-tight">{title}</dt>
+                <dd className="mt-1.5 text-[14px] leading-relaxed text-neutral-400">{copy}</dd>
+              </div>
             </div>
           ))}
         </dl>
       </section>
 
-      <div className="mt-12 flex flex-col items-start justify-between gap-6 rounded-3xl border border-neutral-850 p-6 sm:flex-row sm:items-center md:p-8">
+      <div className="holo-border enter enter-3 mt-12 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-3xl p-6 sm:flex-row sm:items-center md:p-8">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-20 -top-24 -z-10 h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(255,110,20,0.28),transparent_65%)] blur-2xl"
+        />
         <div>
-          <p className="font-display text-[18px] uppercase">Ready when you are.</p>
+          <p className="text-[26px] font-semibold tracking-[-0.03em]">Ready when you are.</p>
           <p className="mt-1 text-[14px] text-neutral-500">Connect a wallet. Nothing else.</p>
         </div>
         <Link
           href="/launch"
-          className="btn-holo inline-flex h-11 shrink-0 items-center gap-2 rounded-lg px-5 text-sm"
+          className="btn-holo group inline-flex h-12 shrink-0 items-center gap-2 px-6 text-[14px]"
         >
           Launch a coin
-          <span className="iconify h-4 w-4 ph--arrow-right" />
+          <span className="iconify h-4 w-4 transition-transform duration-200 ease-spring group-hover:translate-x-0.5 ph--arrow-right-bold" />
         </Link>
       </div>
 

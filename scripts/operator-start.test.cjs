@@ -143,6 +143,38 @@ test('runtime accepts only private DB/RPC files and never passes vault, checkpoi
     /PERMISSIONS/
   );
 });
+test('forwards the reviewed Masked config pin and wXMR market to the mainnet operator', () => {
+  const cfg = fixture();
+  const pins = require('../docs/mskd-mainnet-dev-wallets.public.json');
+  const maskedConfigKey = Keypair.generate().publicKey.toBase58();
+  const market = Keypair.generate().publicKey.toBase58();
+  assert.throws(
+    () => core.validateOperatorConfig({ ...cfg, maskedConfigKey }),
+    /MASKED_CONFIG_PIN/
+  );
+  Object.assign(cfg, {
+    network: 'mainnet-beta',
+    genesis: '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d',
+    mainnetTradingEnabled: true,
+    poolPolicyVersion: 'dev-v1',
+    collectorPublicKey: pins.collector,
+    treasuryPublicKey: pins.treasury,
+    mskdPayout: { pool: market, devnetMint: null },
+    maskedConfigKey,
+  });
+  const { io } = filesystem(cfg);
+  const env = core.loadOperatorEnvironment(core.validateOperatorConfig(cfg), {
+    io,
+    uid: 1000,
+    inherited: { MAINNET_MASKED_CONFIG_KEY: 'ignored' },
+  });
+  assert.equal(env.MAINNET_MASKED_CONFIG_KEY, maskedConfigKey);
+  assert.equal(env.MSKD_PAYOUT_POOL, market);
+  assert.throws(
+    () => core.validateOperatorConfig({ ...cfg, maskedConfigKey: cfg.poolConfigKey }),
+    /MASKED_CONFIG_PIN/
+  );
+});
 test('bounded fd reads reject FIFO, replaced paths, growing input and changed permissions', () => {
   const cfg = fixture(),
     { io } = filesystem(cfg),

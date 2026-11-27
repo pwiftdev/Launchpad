@@ -19,7 +19,7 @@ export const TopBar = () => {
   useEffect(() => setIsMac(/Mac|iPhone|iPad/.test(navigator.userAgent)), []);
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-white/[0.08] bg-panel px-3 md:px-4">
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-white/[0.08] bg-[rgb(18_15_14/0.72)] px-3 backdrop-blur-2xl md:glass md:h-[60px] md:rounded-2xl md:border md:px-3.5">
       <Link
         href="/"
         aria-label={BRAND.name}
@@ -39,16 +39,16 @@ export const TopBar = () => {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="group flex h-9 min-w-9 max-w-md flex-1 items-center gap-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 text-sm text-neutral-500 transition-colors hover:border-neutral-700 hover:text-neutral-300 sm:px-3"
+        className="well group flex h-10 min-w-10 max-w-md flex-1 items-center gap-2.5 rounded-xl px-3 text-sm text-neutral-400 transition-all duration-200 ease-out hover:border-white/15 hover:bg-black/30 hover:text-neutral-200 sm:px-3.5"
         aria-label="Search coins"
       >
-        <span className="iconify h-4 w-4 shrink-0 ph--magnifying-glass" />
+        <span className="iconify h-4 w-4 shrink-0 transition-transform duration-200 ease-spring group-hover:scale-110 ph--magnifying-glass" />
         <span className="min-w-0 flex-1 truncate text-left text-[13px] sm:hidden">Search</span>
         <span className="hidden min-w-0 flex-1 truncate text-left text-[13px] sm:inline">
           Search coins, tickers, mints
         </span>
         <kbd
-          className="hidden rounded border border-neutral-800 px-1.5 font-mono text-[10px] text-neutral-500 sm:inline"
+          className="hidden rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-term text-[10px] text-neutral-400 shadow-[inset_0_-1px_0_rgba(0,0,0,0.4)] sm:inline"
           suppressHydrationWarning
         >
           {isMac ? '⌘K' : 'Ctrl K'}
@@ -63,9 +63,12 @@ export const TopBar = () => {
             type="button"
             onClick={() => disconnect()}
             title="Disconnect"
-            className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 text-sm transition-colors hover:border-neutral-700 sm:px-3"
+            className="btn-glass group flex h-10 min-w-0 items-center gap-2 px-2.5 text-sm sm:px-3.5"
           >
-            <span className="h-2 w-2 rounded-full bg-emerald" />
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inset-0 animate-ping rounded-full bg-emerald/60" />
+              <span className="relative h-2 w-2 rounded-full bg-emerald" />
+            </span>
             <span className="max-w-24 text-xs sm:max-w-40">
               <WalletIdentity wallet={address} compact />
             </span>
@@ -74,7 +77,7 @@ export const TopBar = () => {
           <button
             type="button"
             onClick={() => setShowModal(true)}
-            className="btn-holo flex h-9 items-center gap-2 rounded-lg px-4 text-[13px]"
+            className="btn-holo flex h-10 items-center gap-2 px-4 text-[13.5px]"
           >
             <span className="iconify h-4 w-4 ph--wallet" />
             Connect

@@ -59,11 +59,11 @@ export default function Admin({
         <title>Admin | MSKD.fun</title>
         <meta name="robots" content="noindex, nofollow" />
       </Head>
-      <LogoMark className="h-20 w-24" />
+      <LogoMark className="mark-float h-20 w-24 drop-shadow-[0_16px_34px_rgba(255,102,0,0.45)]" />
       <Wordmark className="mt-5 text-2xl" />
-      <section className="mt-8 w-full max-w-sm rounded-2xl border border-primary/20 bg-neutral-950 p-6 text-left">
+      <section className="holo-border enter mt-8 w-full max-w-sm rounded-3xl p-6 text-left">
         <p className="eyebrow text-primary">Administration</p>
-        <h1 className="mt-2 font-display text-2xl font-bold">Admin entrance</h1>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Admin entrance</h1>
         <p className="mt-2 text-sm leading-relaxed text-neutral-400">
           Sign in to manage the launchpad. Browsing, launching and trading are open to everyone.
         </p>
@@ -75,7 +75,7 @@ export default function Admin({
             </div>
             <Link
               href="/"
-              className="mt-4 flex h-12 items-center justify-center rounded-xl bg-primary font-semibold text-primary-950"
+              className="btn-holo mt-4 flex h-12 items-center justify-center rounded-2xl text-[15px]"
             >
               Enter launchpad
             </Link>
@@ -98,12 +98,12 @@ export default function Admin({
               value={key}
               onChange={(event) => setKey(event.target.value)}
               disabled={busy}
-              className="mt-2 h-12 w-full rounded-xl border border-neutral-750 bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              className="well mt-2 h-12 w-full rounded-xl px-3.5 text-sm outline-none transition-all duration-200 ease-out focus:border-primary/50 focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.35),0_0_0_4px_rgba(255,102,0,0.12)]"
             />
             <button
               type="submit"
               disabled={busy}
-              className="mt-3 h-12 w-full rounded-xl bg-primary font-semibold text-primary-950 disabled:opacity-60"
+              className="btn-holo mt-3 h-12 w-full rounded-2xl text-[15px] disabled:opacity-60"
             >
               {busy ? 'Checking key…' : 'Sign in as admin'}
             </button>
@@ -114,10 +114,7 @@ export default function Admin({
             )}
           </form>
         ) : (
-          <p
-            role="status"
-            className="mt-6 rounded-xl border border-neutral-800 bg-background p-4 text-sm text-neutral-400"
-          >
+          <p role="status" className="well mt-6 rounded-2xl p-4 text-sm text-neutral-400">
             Admin access is locked until private setup is complete.
           </p>
         )}

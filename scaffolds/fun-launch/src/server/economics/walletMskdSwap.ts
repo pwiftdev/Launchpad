@@ -199,7 +199,7 @@ export async function buildMskdSwap(
     ),
     usesHsol ? buildHsolBridge(rpc, collector, source, budget, existing) : null,
   ]);
-  if (await rpc.getAccountInfo(source, 'finalized'))
+  if (job.kind !== 'wxmr_claim' && (await rpc.getAccountInfo(source, 'finalized')))
     throw new Error('The collector WSOL account must be empty and closed before conversion');
   const { dlmm, swapForY, inputVault } = market;
   const inputAmount = bridge?.amount ?? budget;

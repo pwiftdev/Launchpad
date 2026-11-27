@@ -188,6 +188,7 @@ function verifyWxmrClaim(
       throw new Error('Expected a direct wXMR payout');
   const companyRent = lamportDelta(evidence, companyAta.toBase58());
   const recipientRent = lamportDelta(evidence, recipientAta.toBase58());
+  const existingWrappedSol = balance(evidence, source);
   const kept = tokenDelta(evidence, companyAta.toBase58(), payoutMint);
   const paid = tokenDelta(evidence, recipientAta.toBase58(), payoutMint);
   if (
@@ -208,9 +209,8 @@ function verifyWxmrClaim(
     recipientRent < 0n ||
     fee + companyRent + recipientRent > BigInt(requiredString(job, 'operatingCostLamports')) ||
     instructionCount !== 10 ||
-    balance(evidence, source) !== 0n ||
     balance(evidence, source, true) !== 0n ||
-    delta !== -spend - fee - companyRent - recipientRent
+    delta - existingWrappedSol !== -spend - fee - companyRent - recipientRent
   )
     throw new Error('wXMR claim payment does not match the finalized SOL and token balances');
   return {

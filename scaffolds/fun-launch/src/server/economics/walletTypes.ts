@@ -109,7 +109,10 @@ export type WalletChainAdapter = {
     job: WalletJob,
     existing?: WalletExpectations
   ): Promise<PreparedWalletExecution>;
-  prepareWxmrClaim?(job: WalletJob, existing?: WalletExpectations): Promise<PreparedWalletExecution>;
+  prepareWxmrClaim?(
+    job: WalletJob,
+    existing?: WalletExpectations
+  ): Promise<PreparedWalletExecution>;
   prepareSetup(input: { coin: RegisteredCoin }): Promise<PreparedWalletExecution>;
   verifyFinalized(job: WalletJob, evidence: FinalizedEvidence): Promise<WalletEffectFacts>;
 };

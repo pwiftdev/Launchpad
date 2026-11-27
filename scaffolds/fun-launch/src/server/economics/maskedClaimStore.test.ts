@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 import type { Pool, PoolClient } from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fixtureGenesis, fixtureWallet } from './financialFixtures';
 import { MaskedClaimStore } from './maskedClaimStore';
 import { openMoneroAddress } from './moneroSeal';
@@ -11,6 +11,12 @@ const env = { MONERO_ADDRESS_KEY: 'ab'.repeat(32) } as unknown as NodeJS.Process
 const ADDRESS =
   '44AFFq5kSiGBoZ4NMDwYtN18obc8AemS33DBLWs3H7otXft3XjrpDtQGv7SqSsaBYBb98uNbr2VBBEt7f2wfn3RVGQBEP3A';
 const key = () => fixtureWallet().publicKey.toBase58();
+const wxmrEnv = {
+  ...env,
+  MASKED_WXMR_PAYOUTS_ENABLED: 'true',
+  MSKD_PAYOUT_POOL: key(),
+  MSKD_DEVNET_PAYOUT_MINT: key(),
+};
 const creator = key(),
   holder = key(),
   collector = key(),
@@ -41,6 +47,7 @@ beforeAll(async () => {
   } as unknown as Pick<Pool, 'query' | 'connect'>);
 }, 60_000);
 afterAll(async () => db.close());
+afterEach(() => vi.unstubAllEnvs());
 
 beforeEach(async () => {
   await db.exec('DROP SCHEMA public CASCADE;CREATE SCHEMA public;');
@@ -92,7 +99,6 @@ const claim = (extra: Partial<Parameters<MaskedClaimStore['requestClaim']>[0]> =
     requestId: randomUUID(),
     authorizationDigest: 'c'.repeat(64),
     moneroAddress: ADDRESS,
-    xmrAvailable: true,
     env,
     ...extra,
   });
@@ -130,26 +136,56 @@ describe('Masked earnings and claims', () => {
     await expect(claim({ lamports: 1n })).rejects.toThrow();
   });
 
-  it('refuses a stale amount, a small XMR claim and the wrong payout route', async () => {
+  it('refuses a stale amount and a wXMR claim below the minimum', async () => {
     await expect(claim({ lamports: 1n })).rejects.toThrow('changed');
-    await expect(
-      claim({ env: { ...env, MASKED_MINIMUM_XMR_CLAIM_LAMPORTS: '400000000' } })
-    ).rejects.toThrow('a little more');
-    await expect(claim({ currency: 'wxmr', moneroAddress: undefined })).rejects.toThrow(
-      'only while native XMR payouts are down'
-    );
-    // wXMR stays off until its payout job exists, even while XMR is down.
-    await expect(
-      claim({ currency: 'wxmr', moneroAddress: undefined, xmrAvailable: false })
-    ).rejects.toThrow('only while native XMR payouts are down');
     await expect(
       claim({
         currency: 'wxmr',
-        moneroAddress: undefined,
-        xmrAvailable: false,
-        env: { ...env, MASKED_WXMR_PAYOUTS_ENABLED: 'true' },
+        env: { ...wxmrEnv, MASKED_MINIMUM_XMR_CLAIM_LAMPORTS: '400000000' },
       })
-    ).resolves.toMatchObject({ currency: 'wxmr' });
+    ).rejects.toThrow('Earn a little more before claiming in wXMR');
+  });
+
+  it.each([
+    { MASKED_WXMR_PAYOUTS_ENABLED: 'false' },
+    { MSKD_PAYOUT_POOL: '' },
+    { MSKD_PAYOUT_POOL: 'invalid' },
+    { MSKD_DEVNET_PAYOUT_MINT: '' },
+  ])('keeps wXMR disabled with incomplete configuration %o', async (overrides) => {
+    const settings = { ...wxmrEnv, ...overrides };
+    for (const [name, value] of Object.entries(settings)) vi.stubEnv(name, value);
+    expect(await store.earnings(fixtureGenesis, creator)).toMatchObject({ wxmrAvailable: false });
+    await expect(claim({ currency: 'wxmr', env: settings })).rejects.toMatchObject({ status: 503 });
+    expect((await db.query('SELECT id FROM masked_claims')).rows).toEqual([]);
+  });
+
+  it.each([null, true, false])(
+    'accepts configured wXMR with native heartbeat %s',
+    async (heartbeat) => {
+      if (heartbeat !== null)
+        await db.query(
+          'INSERT INTO masked_payout_status(network_genesis,monero_ok) VALUES($1,$2)',
+          [fixtureGenesis, heartbeat]
+        );
+      for (const [name, value] of Object.entries(wxmrEnv)) vi.stubEnv(name, value);
+      expect(await store.earnings(fixtureGenesis, creator)).toMatchObject({ wxmrAvailable: true });
+      await expect(
+        claim({ currency: 'wxmr', moneroAddress: undefined, env: wxmrEnv })
+      ).resolves.toMatchObject({ currency: 'wxmr', status: 'queued' });
+      expect((await db.query('SELECT address_sealed,batch_id FROM masked_claims')).rows).toEqual([
+        { address_sealed: null, batch_id: null },
+      ]);
+    }
+  );
+
+  it('returns the original wXMR claim after a lost acknowledgement, even if new claims are paused', async () => {
+    const requestId = randomUUID();
+    const original = await claim({ currency: 'wxmr', requestId, env: wxmrEnv });
+    expect(await claim({ currency: 'wxmr', requestId, env })).toEqual(original);
+    await expect(
+      claim({ currency: 'wxmr', requestId, authorizationDigest: 'f'.repeat(64), env: wxmrEnv })
+    ).rejects.toThrow('conflicts');
+    expect((await db.query('SELECT id FROM masked_claims')).rows).toEqual([{ id: original.id }]);
   });
 
   it('pays SOL as one creator and one holder payout job per coin, even for a creator who holds', async () => {
@@ -170,10 +206,51 @@ describe('Masked earnings and claims', () => {
     expect((await store.earnings(fixtureGenesis, creator)).totalLamports).toBe('0');
   });
 
-  it('queues an XMR claim while the payout wallet is down', async () => {
-    await expect(claim({ xmrAvailable: false })).resolves.toMatchObject({
-      currency: 'xmr',
-      status: 'queued',
+  it.each(['paid', 'failed'] as const)(
+    'allows a wXMR claim after a legacy SOL claim is %s',
+    async (status) => {
+      const original = await claim({ currency: 'sol', moneroAddress: undefined });
+      if (status === 'paid') {
+        await db.query(`UPDATE wallet_jobs SET status='finalized',transaction_base64='test',
+        message_digest=repeat('d',64),prepared_slot=1,last_valid_block_height=2,
+        signature=id::text,finalized_slot=2`);
+        await db.query('UPDATE wallet_balances SET spent=reserved,reserved=0 WHERE mint=$1', [
+          mintA,
+        ]);
+      } else {
+        await db.query("UPDATE wallet_jobs SET status='failed'");
+        await db.query("UPDATE wallet_balances SET reserved=0 WHERE bucket='creator'");
+      }
+      await db.query(
+        "UPDATE wallet_balances SET funded=funded+100000000 WHERE mint=$1 AND bucket='creator'",
+        [mintA]
+      );
+      const view = await store.earnings(fixtureGenesis, creator);
+      expect(view).toMatchObject({ openClaim: null, history: [{ id: original.id, status }] });
+      await expect(
+        claim({
+          currency: 'wxmr',
+          moneroAddress: undefined,
+          lamports: BigInt(view.totalLamports),
+          env: wxmrEnv,
+        })
+      ).resolves.toMatchObject({ currency: 'wxmr', status: 'queued' });
+      expect(
+        (await db.query('SELECT status FROM masked_claims WHERE id=$1', [original.id])).rows
+      ).toEqual([{ status }]);
+    }
+  );
+
+  it('keeps a SOL claim open while even one payout job is unresolved', async () => {
+    await claim({ currency: 'sol', moneroAddress: undefined });
+    await db.query("UPDATE wallet_jobs SET status='failed' WHERE kind='creator_claim'");
+    await db.query("UPDATE wallet_balances SET reserved=0 WHERE bucket='creator'");
+    const view = await store.earnings(fixtureGenesis, creator);
+    expect(view.openClaim).toMatchObject({ status: 'sent' });
+    await expect(
+      claim({ currency: 'wxmr', lamports: BigInt(view.totalLamports), env: wxmrEnv })
+    ).rejects.toMatchObject({
+      message: 'Your previous claim is still being paid',
     });
   });
 

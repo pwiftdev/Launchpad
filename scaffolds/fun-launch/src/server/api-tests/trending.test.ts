@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Coin, TrendingResponse } from '@/lib/coin';
 const mocks = vi.hoisted(() => ({ guard: vi.fn(), store: vi.fn(), clock: vi.fn() }));
 vi.mock('@/server/apiGuard', () => ({ apiGuard: mocks.guard }));
-vi.mock('@/server/display', () => ({ displayStore: mocks.store, displayClock: mocks.clock }));
+vi.mock('@/server/display', async (load) => ({
+  ...(await load<typeof import('@/server/display')>()),
+  displayStore: mocks.store,
+  sharedClock: mocks.clock,
+}));
 import handler from '@/pages/api/trending';
 
 const coin = (mint: string, marketCapSol: number, isMigrated = false) =>
@@ -32,8 +36,15 @@ describe('trending API', () => {
       ['b', 1],
       ['bonded', 50],
     ]);
-    mocks.store.mockReturnValue({ coins: async () => coins, recentSwapCounts: async () => counts });
-    const { data } = await read();
+    const store = {
+      genesis: 'ranked',
+      coins: vi.fn(async () => coins),
+      recentSwapCounts: vi.fn(async () => counts),
+    };
+    mocks.store.mockReturnValue(store);
+    const [{ data }] = await Promise.all([read(), read()]);
+    expect(store.coins).toHaveBeenCalledOnce();
+    expect(store.recentSwapCounts).toHaveBeenCalledOnce();
     expect(data.runners.map((c) => c.mint)).toEqual(['bonded', 'b', 'c', 'a']);
     expect(data.trending.map((c) => [c.mint, c.txLastHour])).toEqual([
       ['a', 5],
@@ -44,6 +55,7 @@ describe('trending API', () => {
 
   it('returns temporary unavailability when the database fails', async () => {
     mocks.store.mockReturnValue({
+      genesis: 'unavailable',
       coins: async () => Promise.reject(new Error('db down')),
       recentSwapCounts: async () => new Map(),
     });

@@ -604,6 +604,18 @@ describe('actual collected income only', () => {
     );
     await store.settle(job.id, effect(job, { receivedLamports: 1_000_000n }));
     const epoch = 500_000;
+    await seedEvent('after-masked-cutoff', 1, '1000000');
+    const late = await signGeneric(
+      await store.queueCollection(
+        fixtureGenesis,
+        mint,
+        await store.pendingFeeEvents(fixtureGenesis, mint)
+      )
+    );
+    await store.settle(
+      late.id,
+      effect(late, { receivedLamports: 1_000_000n, slot: 100_000 + (epoch + 1) * 12 + 1 })
+    );
     const sample = async (window: number, rows: [string, string][]) =>
       db.query(
         `INSERT INTO masked_holder_samples(network_genesis,mint,sample_window,slot,block_time,digest,supply,balances,excluded)
@@ -622,7 +634,7 @@ describe('actual collected income only', () => {
     const first = epoch * 12;
     // Too few samples: nothing is allocated and the income waits for a later hour.
     await sample(first, [['alice', '100']]);
-    await sample(first + 12, [['alice', '100']]);
+    await sample(first + 12, [['next-hour-buyer', '1000000']]);
     expect(await store.createMaskedEpoch(fixtureGenesis, mint, epoch)).toMatchObject({
       status: 'insufficient_samples',
       samples: 1,
@@ -640,7 +652,7 @@ describe('actual collected income only', () => {
     const result = await store.createMaskedEpoch(fixtureGenesis, mint, epoch);
     expect(result).toMatchObject({
       status: 'created',
-      epoch: { sample_count: 13, budget: '420000' },
+      epoch: { sample_count: 12, budget: '420000' },
     });
     const allocations = (
       await db.query<{ wallet: string; lamports: string }>(
@@ -648,10 +660,10 @@ describe('actual collected income only', () => {
         [mint]
       )
     ).rows;
-    // Alice held 100 in all 13 samples; the sniper held 1200 in one: 1200/13 = 92.
+    // Alice averaged 100 tokens, as did the sniper with 1200 tokens in one of 12 windows.
     expect(allocations).toEqual([
-      { wallet: 'alice', lamports: String((420_000n * 100n) / 192n) },
-      { wallet: 'sniper', lamports: String((420_000n * 92n) / 192n) },
+      { wallet: 'alice', lamports: '210000' },
+      { wallet: 'sniper', lamports: '210000' },
     ]);
     const community = (await store.balances(fixtureGenesis, mint)).find(
       (b) => b.bucket === 'community'
@@ -659,6 +671,7 @@ describe('actual collected income only', () => {
     expect(BigInt(community.reserved)).toBe(
       allocations.reduce((sum, row) => sum + BigInt(row.lamports), 0n)
     );
+    expect(community.available).toBe('420000');
     expect(
       (
         await db.query('SELECT sample_window::text FROM masked_holder_samples WHERE mint=$1', [
@@ -669,6 +682,23 @@ describe('actual collected income only', () => {
     expect(await store.createMaskedEpoch(fixtureGenesis, mint, epoch)).toMatchObject({
       status: 'existing',
     });
+  });
+  it('settles a one-lamport Masked receipt when fee shares round across the same boundary', async () => {
+    await registerMaskedCoin();
+    for (const amount of [9n, 1n]) {
+      await seedEvent(`masked-${amount}`, 1, String(amount));
+      const queued = await store.queueCollection(
+        fixtureGenesis,
+        mint,
+        await store.pendingFeeEvents(fixtureGenesis, mint)
+      );
+      const signed = await signGeneric(queued);
+      await store.settle(signed.id, effect(signed, { receivedLamports: amount }));
+      expect((await store.job(signed.id))?.status).toBe('finalized');
+    }
+    const amounts = await store.balances(fixtureGenesis, mint);
+    expect(amounts.reduce((sum, row) => sum + BigInt(row.funded), 0n)).toBe(10n);
+    expect(amounts.find((row) => row.bucket === 'platform')?.funded).toBe('3');
   });
   it('does not fund on raw events, mismatched receipts or operating rent/fees', async () => {
     await seedEvent('raw', 0, '10');

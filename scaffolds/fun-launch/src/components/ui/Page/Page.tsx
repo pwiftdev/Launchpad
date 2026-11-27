@@ -14,7 +14,7 @@ const Page: React.FC<React.PropsWithChildren<IProps>> = ({ containerClassName, c
     ) : (
       <div
         className={cn(
-          'mx-auto w-full max-w-6xl px-4 pb-16 pt-6 md:px-8 md:pt-8',
+          'enter mx-auto w-full max-w-6xl px-4 pb-16 pt-6 md:px-6 md:pt-8',
           containerClassName
         )}
       >

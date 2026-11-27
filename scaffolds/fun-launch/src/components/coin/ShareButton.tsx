@@ -20,7 +20,7 @@ export const ShareButton = ({ mint, symbol, className }: ShareButtonProps) => {
         aria-label="Share"
         title="Share"
         className={cn(
-          'inline-flex h-9 w-9 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-900 hover:text-neutral-100 data-[state=open]:bg-neutral-900 data-[state=open]:text-neutral-100',
+          'inline-flex h-9 w-9 items-center justify-center rounded-full text-neutral-400 transition-all duration-200 ease-out hover:bg-white/[0.08] hover:text-neutral-100 data-[state=open]:bg-white/[0.05] data-[state=open]:text-neutral-100',
           className
         )}
       >
@@ -30,7 +30,7 @@ export const ShareButton = ({ mint, symbol, className }: ShareButtonProps) => {
         <DropdownMenu.Content
           align="end"
           sideOffset={6}
-          className="z-[60] min-w-44 rounded-lg border border-neutral-800 bg-neutral-950 p-1 text-sm shadow-xl data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+          className="glass-strong z-[60] min-w-48 rounded-2xl p-1.5 text-sm duration-200 ease-out data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-top-1"
         >
           <DropdownMenu.Item
             onSelect={() => {
@@ -39,7 +39,7 @@ export const ShareButton = ({ mint, symbol, className }: ShareButtonProps) => {
                 .then(() => toast.success('Link copied. It unfurls into a share card on X.'))
                 .catch(() => toast.error('Could not copy the link'));
             }}
-            className="flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-neutral-200 outline-none data-[highlighted]:bg-neutral-900"
+            className="flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-neutral-200 outline-none transition-colors duration-200 data-[highlighted]:bg-white/[0.08] data-[highlighted]:text-foreground"
           >
             <span className="iconify h-4 w-4 ph--link" />
             Copy link
@@ -49,7 +49,7 @@ export const ShareButton = ({ mint, symbol, className }: ShareButtonProps) => {
               const intent = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url())}`;
               window.open(intent, '_blank', 'noopener,noreferrer');
             }}
-            className="flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-neutral-200 outline-none data-[highlighted]:bg-neutral-900"
+            className="flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-neutral-200 outline-none transition-colors duration-200 data-[highlighted]:bg-white/[0.08] data-[highlighted]:text-foreground"
           >
             <span className="iconify h-4 w-4 ph--x-logo" />
             Post on X

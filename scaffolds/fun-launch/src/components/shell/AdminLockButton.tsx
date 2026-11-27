@@ -26,7 +26,7 @@ export const AdminLockButton = () => {
       disabled={busy}
       aria-label="Sign out of admin"
       title="Sign out of admin"
-      className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/5 text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+      className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-primary/25 bg-primary/[0.08] text-primary transition-all duration-200 ease-out hover:bg-primary/15 disabled:opacity-50"
     >
       <span className="iconify h-4 w-4 ph--sign-out" aria-hidden="true" />
     </button>

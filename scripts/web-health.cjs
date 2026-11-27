@@ -57,6 +57,7 @@ async function collectWebHealth({
   origin,
   allowLocal = false,
   publicExpected = false,
+  displayExpected = false,
   timeoutMs = 5000,
   slowMs = 1500,
   fetchImpl = fetch,
@@ -118,6 +119,14 @@ async function collectWebHealth({
       valid: (r) => r.status === 410 && /no-store/i.test(r.headers.get('cache-control') ?? ''),
     },
   ];
+  if (displayExpected)
+    specs.push({
+      name: 'display_index',
+      path: '/api/health?check=display',
+      maximum: 16384,
+      valid: (r, body) =>
+        r.status === 200 && hardened(r.headers) && JSON.parse(body).status === 'ok',
+    });
   const checks = await Promise.all(
     specs.map(async (spec) => {
       const start = now();
@@ -235,6 +244,9 @@ async function main() {
     origin: process.env.NEXT_PUBLIC_SITE_URL,
     allowLocal,
     publicExpected: process.env.LAUNCHPAD_PUBLIC === 'true',
+    displayExpected:
+      process.env.DISPLAY_INDEXER === 'true' ||
+      process.env.NEXT_PUBLIC_SITE_URL === 'https://mskd.fun',
     slowMs: Number(process.env.WEB_HEALTH_SLOW_MS || 1500),
   });
   let database = null,

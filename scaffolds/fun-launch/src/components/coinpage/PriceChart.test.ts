@@ -2,58 +2,50 @@ import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PriceChart } from './PriceChart';
-import type { Coin, TradesResponse } from '@/lib/coin';
 
-vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'dark' }) }));
-vi.mock('@/hooks/useUsd', () => ({ useSolPrice: () => ({ data: 150, isError: false }) }));
 beforeEach(() => vi.stubGlobal('React', React));
 afterEach(() => vi.unstubAllGlobals());
-const coin = { mint: 'real-mint', symbol: 'REAL', tokenSupply: 1_000_000, launchedAt: 100 } as Coin;
-const history = { trades: [], complete: true, launchPriceSol: 0.1 } as unknown as TradesResponse;
-const render = (props: Partial<Parameters<typeof PriceChart>[0]> = {}) =>
-  renderToStaticMarkup(createElement(PriceChart, { coin, trades: history, ...props }));
 
-describe('market chart states', () => {
-  it('shows honest loading, empty and failure states instead of a generated launch candle', () => {
-    expect(render({ trades: undefined, isLoading: true })).toContain('Loading recorded trades');
-    const empty = render();
-    expect(empty).toContain('No recorded trades yet');
-    expect(empty).toContain('0 recorded intervals');
-    expect(empty).not.toContain('Sample');
-    expect(
-      render({ trades: undefined, error: new Error('provider secret'), onRetry: () => {} })
-    ).toContain('Retry market history');
-    expect(render({ trades: undefined, error: new Error('provider secret') })).not.toContain(
-      'provider secret'
+const render = (props: Parameters<typeof PriceChart>[0] = {}) =>
+  renderToStaticMarkup(createElement(PriceChart, props));
+
+describe('24-hour token price chart', () => {
+  it('shows loading and empty states without making up price movement', () => {
+    expect(render({ isLoading: true })).toContain('Loading price history');
+    expect(render({ history: { points: [] } })).toContain('Waiting for more trades');
+    expect(render({ history: { points: [{ time: 100, priceSol: 1 }] } })).not.toContain(
+      'role="img"'
     );
   });
-  it('retains cached data and warns when refresh fails or indexing is pending', () => {
+  it('offers retry without exposing provider errors', () => {
+    const html = render({ error: new Error('provider secret'), onRetry: () => {} });
+    expect(html).toContain('Price history unavailable');
+    expect(html).toContain('Retry');
+    expect(html).not.toContain('provider secret');
+  });
+  it('keeps available prices visible when the display index is stale', () => {
     const html = render({
-      trades: { ...history, stale: true, pendingCount: 2 },
-      error: new Error('offline'),
+      history: {
+        stale: true,
+        points: [
+          { time: 100, priceSol: 1 },
+          { time: 200, priceSol: 2 },
+        ],
+      },
     });
-    expect(html).toContain('Updates delayed. Showing the last available trades.');
-    expect(html).toContain('Waiting for 2 recent transaction');
+    expect(html).toContain('Price updates delayed');
+    expect(html).toContain('Recorded token prices in SOL');
   });
-  it('does not assume a token supply when a real mint has not been verified', () => {
-    expect(render({ coin: { ...coin, tokenSupply: undefined } })).toContain(
-      'Verified token supply is unavailable. Select token price'
-    );
-    expect(render()).toContain('current verified supply');
-  });
-  it('exposes subminute controls, keyboard zoom controls and an explicitly marked demo only for fixtures', () => {
-    const html = render({ coin: { ...coin, isDemo: true } });
-    for (const label of [
-      '1s',
-      '5s',
-      '15s',
-      '1m',
-      'Zoom in chart',
-      'Zoom out chart',
-      'Chart currency',
-      'Chart style',
-      'Sample',
-    ])
-      expect(html).toContain(label);
+  it('positions prices using real elapsed time between trades', () => {
+    const html = render({
+      history: {
+        points: [
+          { time: 100, priceSol: 1 },
+          { time: 110, priceSol: 2 },
+          { time: 200, priceSol: 3 },
+        ],
+      },
+    });
+    expect(html).toContain('M6.00,194.00 L64.80,100.00 L594.00,6.00');
   });
 });

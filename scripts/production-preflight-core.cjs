@@ -8,9 +8,15 @@ const { PublicKey } = app('@solana/web3.js'),
   { BorshCoder } = app('@coral-xyz/anchor');
 const { convertIdlToCamelCase } = app('@coral-xyz/anchor/dist/cjs/idl.js');
 const sdk = app('@meteora-ag/dynamic-bonding-curve-sdk');
-const { inspectLaunchConfig } = require('./launch-policy.cjs');
-const { NETWORK_GENESIS, localValidatorPolicy } = require('./network-policy.cjs');
-const { canonical, readSchemaCatalog, compareSchema, sha } = require('./production-schema.cjs');
+const { inspectLaunchConfig, modeForPolicy } = require('./launch-policy.cjs');
+const { NETWORK_GENESIS, localValidatorPolicy, mainnetConfigPin } = require('./network-policy.cjs');
+const {
+  canonical,
+  setCatalogFormatting,
+  readSchemaCatalog,
+  compareSchema,
+  sha,
+} = require('./production-schema.cjs');
 const ROLES = ['dbc', 'damm', 'metadata'];
 const { companyWallets } = require('./company-wallets.cjs');
 const UPGRADEABLE = new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111');
@@ -112,11 +118,25 @@ function validateExpectations(input, { rehearsal = false } = {}) {
     invalid.push('programs.uniqueAddresses');
   keys(
     input.config,
-    ['address', 'digest', 'feeClaimer', 'leftoverReceiver', 'registryEnabled', 'migrationConfig'],
+    [
+      'address',
+      'digest',
+      'feeClaimer',
+      'leftoverReceiver',
+      'registryEnabled',
+      'migrationConfig',
+      'policyVersion',
+    ],
     'config'
   );
   for (const field of ['address', 'feeClaimer', 'leftoverReceiver'])
     required(input.config?.[field], `config.${field}`, pub);
+  if (
+    input.config?.policyVersion !== undefined &&
+    !['wallet-v1', 'bond-v1'].includes(input.config.policyVersion) &&
+    !modeForPolicy(input.config.policyVersion)
+  )
+    invalid.push('config.policyVersion');
   required(
     input.config?.digest,
     'config.digest',
@@ -147,6 +167,7 @@ function validateExpectations(input, { rehearsal = false } = {}) {
         {
           FEE_COLLECTOR_PUBLIC_KEY: input.company.collector,
           TREASURY_PUBLIC_KEY: input.company.treasury,
+          LAUNCH_POLICY_VERSION: input.config?.policyVersion,
         },
         input.networkGenesis
       );
@@ -374,6 +395,7 @@ async function collectDatabasePreflight({
       .rows[0]?.ssl;
     check(checks, 'database.tls', tls === true);
     if (tls !== true) return;
+    await setCatalogFormatting(client);
     const actual = await readSchemaCatalog(client, {
         tables: contract.catalog.tables,
         functions: contract.catalog.functions.map((row) => row.name),
@@ -471,12 +493,27 @@ async function collectProductionPreflight({
   report.inputs = { missing: validation.missing, invalid: validation.invalid };
   if (validation.missing.length || validation.invalid.length) return report;
   const bindings = [
-    ['POOL_CONFIG_KEY', expected.config.address],
-    ['NEXT_PUBLIC_POOL_CONFIG_KEY', expected.config.address],
     ['FEE_COLLECTOR_PUBLIC_KEY', expected.company.collector],
     ['TREASURY_PUBLIC_KEY', expected.company.treasury],
     ['NEXT_PUBLIC_SITE_URL', expected.siteOrigin],
   ];
+  if (!rehearsal && expected.config.policyVersion === 'masked-v1') {
+    bindings.push(
+      ['MAINNET_MASKED_CONFIG_KEY', expected.config.address],
+      ['LAUNCH_POLICY_VERSION', 'dev-v1']
+    );
+    check(
+      checks,
+      'config.mainnetModePin',
+      mainnetConfigPin('masked-v1', env) === expected.config.address &&
+        env.POOL_CONFIG_KEY !== expected.config.address
+    );
+  } else {
+    bindings.push(
+      ['POOL_CONFIG_KEY', expected.config.address],
+      ['NEXT_PUBLIC_POOL_CONFIG_KEY', expected.config.address]
+    );
+  }
   report.inputs.missingEnvironment = [
     ...bindings.map(([name]) => name),
     'NODE_ENV',
@@ -603,7 +640,9 @@ async function collectProductionPreflight({
     if (configValid) {
       try {
         const decoded = configDecoder(configAccount.data),
-          economicPolicy = decoded.activationType === 0 ? 'bond-v1' : 'wallet-v1',
+          economicPolicy =
+            expected.config.policyVersion ??
+            (decoded.activationType === 0 ? 'bond-v1' : 'wallet-v1'),
           issues = inspectLaunchConfig(decoded, {
             feeClaimer: expected.config.feeClaimer,
             leftoverReceiver: expected.config.leftoverReceiver,

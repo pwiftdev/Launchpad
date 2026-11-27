@@ -113,7 +113,6 @@ beforeEach(async () => {
     requestId: randomUUID(),
     authorizationDigest: 'c'.repeat(64),
     moneroAddress: ADDRESS,
-    xmrAvailable: true,
   });
 });
 
@@ -134,7 +133,9 @@ describe('daily XMR payouts', () => {
     expect(await payouts.runOnce(true)).toEqual({ status: 'confirming' });
     expect(mock.signTransfers).toHaveBeenCalledWith([{ address: ADDRESS, amount: RATE }]);
     expect(state.relayed).toEqual(['signed-tx-1']);
-    expect(await new MaskedClaimStore(db).xmrAvailable(fixtureGenesis)).toBe(true);
+    expect((await pg.query('SELECT monero_ok FROM masked_payout_status')).rows).toEqual([
+      { monero_ok: true },
+    ]);
     state.confirmations = 10;
     expect(await payouts.runOnce(false)).toEqual({ status: 'paid' });
     const claim = (
@@ -205,11 +206,13 @@ describe('daily XMR payouts', () => {
     expect(earnings.history[0]).toMatchObject({ status: 'failed' });
   });
 
-  it('reports an unreachable wallet so the claim screen offers wXMR instead', async () => {
+  it('records an unreachable native wallet in the treasury heartbeat', async () => {
     const { wallet, mock } = fakeWallet();
     mock.height.mockRejectedValueOnce(new Error('ECONNREFUSED'));
     const payouts = new MaskedXmrPayouts(wallet, price, fixtureGenesis, { db, alert: () => {} });
     expect(await payouts.runOnce(true)).toEqual({ status: 'wallet_unavailable' });
-    expect(await new MaskedClaimStore(db).xmrAvailable(fixtureGenesis)).toBe(false);
+    expect((await pg.query('SELECT monero_ok FROM masked_payout_status')).rows).toEqual([
+      { monero_ok: false },
+    ]);
   });
 });

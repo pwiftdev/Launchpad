@@ -23,7 +23,7 @@ const fontSans = localFont({
   weight: '100 900',
   display: 'swap',
 });
-// Pixel face: headlines, labels, buttons and big numbers. Body copy stays in the sans.
+// Pixel face: kept for small brand accents (the splash counter). Headlines use the sans.
 const fontPixel = localFont({
   src: [
     { path: '../assets/fonts/Silkscreen-Regular.woff2', weight: '400' },
@@ -31,7 +31,7 @@ const fontPixel = localFont({
   ],
   display: 'swap',
 });
-// True monospace for code, addresses and the ASCII renderer's character grid
+// Monospace: labels, code, addresses and the ASCII renderer's character grid
 const fontTerm = localFont({
   src: '../assets/fonts/GeistMono.woff2',
   weight: '100 900',
@@ -41,8 +41,8 @@ const fontTerm = localFont({
 // Defined on :root so portals (wallet modal, toasts) get the brand fonts too
 const fontRootStyle = `:root {
   --font-sans: ${fontSans.style.fontFamily};
-  --font-display: ${fontPixel.style.fontFamily};
-  --font-term: ${fontPixel.style.fontFamily};
+  --font-display: ${fontSans.style.fontFamily};
+  --font-term: ${fontTerm.style.fontFamily};
   --font-pixel: ${fontPixel.style.fontFamily};
   --font-code: ${fontTerm.style.fontFamily};
   --brand-mark-image: url("${BRAND.logo}");
@@ -57,11 +57,18 @@ function AppProviders({ Component, pageProps, router }: AppProps) {
     ) as Adapter[];
   }, []);
 
-  const queryClient = useMemo(() => new QueryClient(), []);
+  // A short default freshness window: moving between pages shows cached data at once instead
+  // of refetching everything on every mount. Queries that need more set their own.
+  const queryClient = useMemo(
+    () => new QueryClient({ defaultOptions: { queries: { staleTime: 5_000 } } }),
+    []
+  );
 
   useWindowWidthListener();
 
   const walletTheme = resolvedTheme === 'light' ? 'light' : 'dark';
+  const tokenLink =
+    router.pathname === '/token/[tokenId]' || (router.pathname === '/' && !!router.query.coin);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -121,17 +128,16 @@ function AppProviders({ Component, pageProps, router }: AppProps) {
           }}
           toastOptions={{
             classNames: {
-              toast:
-                '!rounded-md !border !border-neutral-800 !bg-neutral-950 !text-foreground !shadow-2xl !font-sans',
-              title: '!font-term !text-[13px] !font-semibold !uppercase !tracking-wide',
+              toast: '!glass-strong !rounded-2xl !text-foreground !font-sans !gap-3 !px-4 !py-3.5',
+              title: '!text-[13.5px] !font-semibold !tracking-tight',
               description: '!text-xs !text-neutral-400',
-              actionButton: '!bg-primary !text-primary-950 !font-semibold',
-              closeButton: '!border-neutral-800 !bg-neutral-900 !text-neutral-400',
+              actionButton: '!btn-holo !rounded-lg !px-3',
+              closeButton: '!border-white/10 !bg-neutral-900/90 !text-neutral-400',
             },
           }}
         />
         <GrainField />
-        <Splash afterSplash={router.pathname !== '/admin' && <CommunityInvite />} />
+        {!tokenLink && <Splash afterSplash={router.pathname !== '/admin' && <CommunityInvite />} />}
         <Component {...pageProps} />
       </UnifiedWalletProvider>
     </QueryClientProvider>

@@ -12,8 +12,8 @@ export default function Privacy() {
       <Link href="/" className="mb-8 block w-fit" aria-label="MSKD.fun launchpad">
         <Wordmark className="text-xl" />
       </Link>
-      <h1 className="mt-6 text-3xl font-semibold">Privacy</h1>
-      <div className="mt-6 space-y-5 text-sm leading-relaxed text-neutral-400">
+      <h1 className="mt-6 text-[40px] font-semibold leading-none tracking-[-0.045em]">Privacy</h1>
+      <div className="surface mt-8 space-y-5 rounded-3xl p-6 text-[14.5px] leading-relaxed text-neutral-400 sm:p-8">
         <p>
           If you previously registered for early access, those records may include your public
           Solana wallet address, registration details, referral attribution, and the message and

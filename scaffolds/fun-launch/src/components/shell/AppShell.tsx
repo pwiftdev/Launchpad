@@ -26,8 +26,16 @@ export const AppShell = ({ fill, mainClassName, children }: AppShellProps) => {
 
   // A soft light follows the cursor across glass panels (and lights their top edge)
   useEffect(() => {
+    // Pointer events can fire several times a frame: keep the latest and paint once per frame
+    if (!window.matchMedia('(hover: hover)').matches) return;
     let lit: HTMLElement | null = null;
-    const onMove = (e: PointerEvent) => {
+    let pending: PointerEvent | null = null;
+    let frame = 0;
+    const paint = () => {
+      frame = 0;
+      const e = pending;
+      pending = null;
+      if (!e) return;
       const el = (e.target as Element | null)?.closest?.(LIT) as HTMLElement | null;
       if (lit && lit !== el) {
         lit.style.removeProperty('--mx');
@@ -36,11 +44,18 @@ export const AppShell = ({ fill, mainClassName, children }: AppShellProps) => {
       lit = el;
       if (!el) return;
       const r = el.getBoundingClientRect();
-      el.style.setProperty('--mx', `${e.clientX - r.left}px`);
-      el.style.setProperty('--my', `${e.clientY - r.top}px`);
+      el.style.setProperty('--mx', `${Math.round(e.clientX - r.left)}px`);
+      el.style.setProperty('--my', `${Math.round(e.clientY - r.top)}px`);
+    };
+    const onMove = (e: PointerEvent) => {
+      pending = e;
+      frame ||= requestAnimationFrame(paint);
     };
     window.addEventListener('pointermove', onMove, { passive: true });
-    return () => window.removeEventListener('pointermove', onMove);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('pointermove', onMove);
+    };
   }, []);
 
   // Ctrl/Cmd+K anywhere, or "/" outside text fields, opens the palette
@@ -61,16 +76,16 @@ export const AppShell = ({ fill, mainClassName, children }: AppShellProps) => {
   return (
     <PaletteContext.Provider value={{ open: paletteOpen, setOpen: setPaletteOpen }}>
       <Tooltip.Provider>
-        {/* Fixed frame: the bars never move, only <main> scrolls */}
-        <div className="flex h-dvh overflow-hidden text-foreground">
+        {/* Floating frame: glass rail and bars hover over the warm field; only <main> scrolls */}
+        <div className="flex h-dvh overflow-hidden text-foreground md:gap-3 md:p-3">
           <SideRail />
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col md:gap-2.5">
             <TopBar />
             <TickerStrip />
             <main
               className={cn(
-                'flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain pb-28 md:pb-0',
-                fill && 'p-2 pb-28 md:overflow-hidden md:p-3',
+                'flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain pb-32 md:-mx-1 md:px-1 md:pb-1',
+                fill && 'p-2 pb-32 md:overflow-hidden md:p-0 md:pb-0',
                 mainClassName
               )}
             >

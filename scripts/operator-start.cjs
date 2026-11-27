@@ -4,10 +4,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
-const { NETWORK_GENESIS } = require('./network-policy.cjs');
+const { MAINNET_REWARD_PINS, NETWORK_GENESIS } = require('./network-policy.cjs');
 const { companyWallets } = require('./company-wallets.cjs');
 const { decodeLaunchConfig, inspectLaunchConfig } = require('./launch-policy.cjs');
-const { canonical, readSchemaCatalog, compareSchema } = require('./production-schema.cjs');
+const {
+  canonical,
+  setCatalogFormatting,
+  readSchemaCatalog,
+  compareSchema,
+} = require('./production-schema.cjs');
 const contract = require('./production-schema-contract.json');
 const sha = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const fail = (code) => {
@@ -72,6 +77,7 @@ function validateOperatorConfig(value) {
     'scheduler',
     ...(value && Object.hasOwn(value, 'poolPolicyVersion') ? ['poolPolicyVersion'] : []),
     ...(value && Object.hasOwn(value, 'mskdPayout') ? ['mskdPayout'] : []),
+    ...(value && Object.hasOwn(value, 'maskedConfigKey') ? ['maskedConfigKey'] : []),
   ]);
   if (
     value.version !== 2 ||
@@ -108,6 +114,15 @@ function validateOperatorConfig(value) {
     publicKey(value.mskdPayout.pool);
     if (value.network === 'devnet') publicKey(value.mskdPayout.devnetMint);
     else if (value.mskdPayout.devnetMint !== null) fail('OPERATOR_MAINNET_FLAG_NETWORK');
+  }
+  if (value.maskedConfigKey !== undefined) {
+    publicKey(value.maskedConfigKey);
+    if (
+      value.network !== 'mainnet-beta' ||
+      value.poolPolicyVersion !== 'dev-v1' ||
+      value.maskedConfigKey === value.poolConfigKey
+    )
+      fail('OPERATOR_MASKED_CONFIG_PIN');
   }
   for (const field of ['poolConfigKey', 'collectorPublicKey', 'treasuryPublicKey'])
     publicKey(value[field]);
@@ -405,6 +420,9 @@ function loadOperatorEnvironment(
     WALLET_WORKER_ENABLED: 'true',
     MAINNET_TRADING_ENABLED: config.mainnetTradingEnabled ? 'true' : 'false',
     ...(config.poolPolicyVersion ? { LAUNCH_POLICY_VERSION: config.poolPolicyVersion } : {}),
+    ...(config.maskedConfigKey
+      ? { [MAINNET_REWARD_PINS['masked-v1']]: config.maskedConfigKey }
+      : {}),
     ...(config.mskdPayout
       ? {
           MSKD_PAYOUT_POOL: config.mskdPayout.pool,
@@ -477,6 +495,7 @@ async function probeOperatorDeployment(
         ?.ssl !== true
     )
       fail('OPERATOR_DATABASE_TLS_REQUIRED');
+    await setCatalogFormatting(client);
     if (compareSchema(contract.catalog, await readCatalog(client)).length)
       fail('OPERATOR_DATABASE_SCHEMA_MISMATCH');
     const row = (
@@ -526,6 +545,7 @@ function schedulerArguments(config) {
       ? [
           '--max-spend-lamports',
           s.buyback.maximumSpendLamports,
+          ...(config.maskedConfigKey ? ['--masked-buyback-only'] : []),
           '--slippage-bps',
           String(s.buyback.maximumSlippageBps),
         ]

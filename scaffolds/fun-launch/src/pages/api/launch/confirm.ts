@@ -1,6 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { PublicKey } from '@solana/web3.js';
-import { DynamicBondingCurveClient } from '@meteora-ag/dynamic-bonding-curve-sdk';
+import {
+  deriveDbcPoolAddress,
+  DynamicBondingCurveClient,
+} from '@meteora-ag/dynamic-bonding-curve-sdk';
 import { paysThroughCollector, usesLaunchSlot } from '@/lib/launchModes';
 import { z } from 'zod';
 import { apiGuard } from '@/server/apiGuard';
@@ -57,14 +60,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       maxSupportedTransactionVersion: 0,
     });
     if (!tx) return res.status(202).json({ status: 'pending', retryAfterMs: 2000 });
-    const finalizedClient = new DynamicBondingCurveClient(connection, 'finalized');
-    const pool = await finalizedClient.state.getPoolByBaseMint(mint);
-    if (!pool) return res.status(202).json({ status: 'pending', retryAfterMs: 2000 });
-    const state = pool.account.poolState;
-    if (state.config.toBase58() !== intent.config_key)
-      throw new Error('Pool config differs from its signed intent');
     const key = new PublicKey(intent.config_key),
       config = await getConfig(key, true);
+    const pool = deriveDbcPoolAddress(config.quoteMint, mint, key);
+    const finalizedClient = new DynamicBondingCurveClient(connection, 'finalized');
+    const account = await finalizedClient.state.getPool(pool);
+    if (!account) return res.status(202).json({ status: 'pending', retryAfterMs: 2000 });
+    const state = account.poolState;
+    if (!state.config.equals(key) || !state.baseMint.equals(mint))
+      throw new Error('Pool identity differs from its signed intent');
     const digest = await verifyConfigAccount(connection, key);
     const reviewed = await verifyLaunchConfig(genesis, key, config, digest, intent.mode, {
       allowDisabled: true,
@@ -74,7 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const proof = proveLaunchCreation(tx, {
       mint: mint.toBase58(),
       config: intent.config_key,
-      pool: pool.publicKey.toBase58(),
+      pool: pool.toBase58(),
       deployer: intent.deployer,
       intentCreatedAt: new Date(intent.created_at).getTime(),
       intentExpiresAt: new Date(intent.expires_at).getTime(),
@@ -100,7 +104,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         custody.mode !== intent.mode ||
         custody.creator.toBase58() !== intent.deployer ||
         !custody.mint.equals(mint) ||
-        !custody.pool.equals(pool.publicKey) ||
+        !custody.pool.equals(pool) ||
         !custody.config.equals(key) ||
         custody.configHash !== digest
       )
@@ -114,7 +118,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const saved = await recordFinalizedLaunch({
       network_genesis: genesis,
       mint: mint.toBase58(),
-      dbc_pool: pool.publicKey.toBase58(),
+      dbc_pool: pool.toBase58(),
       config_key: intent.config_key,
       original_deployer: intent.deployer,
       mode: intent.mode,

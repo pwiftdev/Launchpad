@@ -13,6 +13,30 @@ export type WxmrAlert = { level: 'warning' | 'critical'; claimId: string; messag
 /** Failed payments in a row before a claim stops retrying. */
 export const MAXIMUM_WXMR_ATTEMPTS = 5;
 const ACTIVE = ['queued', 'prepared', 'signed', 'submitted', 'manual_review'];
+const PARTIAL_REVIEW = 'A partially paid claim needs review';
+
+/** The reviewed failed job identifies exactly one round of retries. */
+export async function resumeWxmrClaim(
+  client: Queryable,
+  network: string,
+  collector: string,
+  reviewedJob: string
+) {
+  const result = await client.query<{ id: string }>(
+    `UPDATE masked_claims c SET failure=NULL,wxmr_retry_after=clock_timestamp()
+     FROM wallet_jobs reviewed
+     WHERE c.network_genesis=$1 AND c.currency='wxmr' AND c.status='sent' AND c.failure=$2
+       AND reviewed.id=$3 AND reviewed.network_genesis=c.network_genesis AND reviewed.kind='wxmr_claim'
+       AND reviewed.status='failed' AND reviewed.details->>'collector'=$4 AND reviewed.details->>'maskedClaim'=c.id::text
+       AND EXISTS (SELECT 1 FROM masked_wxmr_payments p WHERE p.claim_id=c.id)
+       AND NOT EXISTS (SELECT 1 FROM wallet_jobs j WHERE j.network_genesis=c.network_genesis AND j.kind='wxmr_claim'
+         AND j.details->>'maskedClaim'=c.id::text AND (j.status=ANY($5::text[]) OR
+           (j.status='failed' AND (j.created_at,j.id)>(reviewed.created_at,reviewed.id))))
+     RETURNING c.id`,
+    [network, PARTIAL_REVIEW, reviewedJob, collector, ACTIVE]
+  );
+  return result.rows[0]?.id ?? null;
+}
 
 /**
  * The next payment's size: the whole rest when it fits one swap, otherwise one full swap, or two
@@ -33,7 +57,9 @@ type ClaimRow = {
   paid: string;
   failures: number;
   attempts: number;
-  active: boolean;
+  mint: string;
+  treasury: string;
+  controlled: boolean;
 };
 
 /**
@@ -54,24 +80,52 @@ export async function queueWxmrPayments(
   const alert = input.alert ?? (() => {});
   const claims = (
     await client.query<ClaimRow>(
-      `SELECT c.id,c.wallet,c.lamports::text,c.status,
+      `SELECT c.id,c.wallet,c.lamports::text,c.status,ownership.mint,ownership.treasury,ownership.controlled,
          (SELECT coalesce(sum(p.lamports),0) FROM masked_wxmr_payments p WHERE p.claim_id=c.id)::text AS paid,
-         (SELECT count(*) FROM wallet_jobs j WHERE j.kind='wxmr_claim' AND j.details->>'maskedClaim'=c.id::text
-            AND j.status='failed' AND j.created_at>coalesce(
-              (SELECT max(p.created_at) FROM masked_wxmr_payments p WHERE p.claim_id=c.id),'-infinity'))::int AS failures,
-         (SELECT count(*) FROM wallet_jobs j WHERE j.kind='wxmr_claim' AND j.details->>'maskedClaim'=c.id::text)::int AS attempts,
-         EXISTS(SELECT 1 FROM wallet_jobs j WHERE j.kind='wxmr_claim' AND j.details->>'maskedClaim'=c.id::text
-            AND j.status=ANY($2::text[])) AS active
-       FROM masked_claims c WHERE c.network_genesis=$1 AND c.currency='wxmr' AND c.status IN('queued','sent')
+         (SELECT count(*) FROM wallet_jobs j WHERE j.network_genesis=c.network_genesis AND j.kind='wxmr_claim'
+            AND j.details->>'maskedClaim'=c.id::text AND j.status='failed' AND j.created_at>greatest(
+              (SELECT max(p.created_at) FROM masked_wxmr_payments p WHERE p.claim_id=c.id),c.wxmr_retry_after,'-infinity'))::int AS failures,
+         (SELECT count(*) FROM wallet_jobs j WHERE j.network_genesis=c.network_genesis AND j.kind='wxmr_claim' AND j.details->>'maskedClaim'=c.id::text)::int AS attempts
+       FROM masked_claims c
+       JOIN LATERAL (
+         SELECT min(i.mint) AS mint,min(cfg.expected_leftover_receiver) AS treasury,
+           bool_and(cfg.expected_fee_claimer=$3) AND count(DISTINCT cfg.expected_leftover_receiver)=1 AS controlled
+         FROM masked_claim_items i JOIN launch_coins coin USING(network_genesis,mint)
+         JOIN launch_configs cfg USING(network_genesis,config_key)
+         WHERE i.claim_id=c.id HAVING bool_or(cfg.expected_fee_claimer=$3)
+       ) ownership ON true
+       WHERE c.network_genesis=$1 AND c.currency='wxmr' AND c.status IN('queued','sent')
+         AND c.failure IS NULL
+         AND NOT EXISTS (SELECT 1 FROM wallet_jobs j WHERE j.network_genesis=c.network_genesis AND j.kind='wxmr_claim'
+           AND j.details->>'maskedClaim'=c.id::text AND j.status=ANY($2::text[]))
        ORDER BY c.created_at,c.id LIMIT 50 FOR UPDATE OF c`,
-      [network, ACTIVE]
+      [network, ACTIVE, input.collector]
     )
   ).rows;
   const queued: string[] = [];
   for (const claim of claims) {
-    if (claim.active) continue;
     const remaining = BigInt(claim.lamports) - BigInt(claim.paid);
     if (remaining <= 0n) continue;
+    if (!claim.controlled || claim.wallet === input.collector) {
+      if (BigInt(claim.paid) === 0n)
+        await releaseClaim(
+          client,
+          network,
+          claim.id,
+          'wXMR payout is unavailable for these earnings'
+        );
+      else
+        await client.query('UPDATE masked_claims SET failure=$2 WHERE id=$1', [
+          claim.id,
+          PARTIAL_REVIEW,
+        ]);
+      alert({
+        level: 'critical',
+        claimId: claim.id,
+        message: 'wXMR claim does not match this company wallet; review it',
+      });
+      continue;
+    }
     if (claim.failures >= MAXIMUM_WXMR_ATTEMPTS) {
       if (BigInt(claim.paid) === 0n) {
         // Nothing was paid, so the earnings go back to the wallet to claim again.
@@ -81,46 +135,33 @@ export async function queueWxmrPayments(
           claimId: claim.id,
           message: 'wXMR claim returned after repeated failed payments',
         });
-      } else
+      } else {
+        await client.query('UPDATE masked_claims SET failure=$2 WHERE id=$1', [
+          claim.id,
+          PARTIAL_REVIEW,
+        ]);
         alert({
           level: 'critical',
           claimId: claim.id,
           message: `wXMR claim partly paid and stopped after ${claim.failures} failed payments; review it`,
         });
-      continue;
-    }
-    const coins = (
-      await client.query<{ mint: string; collector: string; treasury: string }>(
-        `SELECT DISTINCT i.mint,cfg.expected_fee_claimer AS collector,cfg.expected_leftover_receiver AS treasury
-         FROM masked_claim_items i
-         JOIN launch_coins c ON(c.network_genesis=i.network_genesis AND c.mint=i.mint)
-         JOIN launch_configs cfg ON(cfg.network_genesis=c.network_genesis AND cfg.config_key=c.config_key)
-         WHERE i.claim_id=$1 ORDER BY i.mint`,
-        [claim.id]
-      )
-    ).rows;
-    if (!coins.length || coins.some((coin) => coin.collector !== input.collector)) {
-      alert({
-        level: 'critical',
-        claimId: claim.id,
-        message: 'wXMR claim spans coins outside this company wallet; review it',
-      });
+      }
       continue;
     }
     const job = randomUUID();
     await client.query(
-      `INSERT INTO wallet_jobs(id,network_genesis,mint,kind,intent_key,bucket,recipient,epoch,lamports,details)
-       VALUES($1,$2,$3,'wxmr_claim',$4,NULL,$5,NULL,$6,$7)`,
+      `INSERT INTO wallet_jobs(id,network_genesis,mint,kind,intent_key,bucket,recipient,epoch,lamports,details,created_at)
+       VALUES($1,$2,$3,'wxmr_claim',$4,NULL,$5,NULL,$6,$7,clock_timestamp())`,
       [
         job,
         network,
-        coins[0]!.mint,
+        claim.mint,
         `masked-wxmr:${claim.id}:${claim.attempts}`,
         claim.wallet,
         nextWxmrPayment(remaining).toString(),
         JSON.stringify({
           collector: input.collector,
-          treasury: coins[0]!.treasury,
+          treasury: claim.treasury,
           maskedClaim: claim.id,
           assetMint: input.assetMint,
           market: input.market,

@@ -175,7 +175,7 @@ it('proves a Masked wXMR payment: the exact swap, then exactly the minimum to th
       ],
       payer
     );
-  const run = async (paid: bigint, credited = paid) => {
+  const run = async (paid: bigint, credited = paid, existingWrappedSol = 0) => {
     const t = build(paid);
     const job = jobFor(t, 'wxmr_claim', {
       lamports: spend.toString(),
@@ -199,8 +199,12 @@ it('proves a Masked wXMR payment: the exact swap, then exactly the minimum to th
       },
     });
     // The company wXMR account already exists; the claimant's is created by this payment.
-    t.balance(owner.toBase58(), 1_000_000_000, 1_000_000_000 - Number(spend) - rent - 5000);
-    t.balance(source.toBase58(), 0, 0);
+    t.balance(
+      owner.toBase58(),
+      1_000_000_000,
+      1_000_000_000 - Number(spend) - rent - 5000 + existingWrappedSol
+    );
+    t.balance(source.toBase58(), existingWrappedSol, 0);
     const kept = t.balance(company.toBase58(), rent, rent);
     const sent = t.balance(destination.toBase58(), 0, rent);
     const token = (accountIndex: number, owned: PublicKey, amount: bigint) => ({
@@ -219,6 +223,11 @@ it('proves a Masked wXMR payment: the exact swap, then exactly the minimum to th
   expect(await run(minimum)).toMatchObject({
     recipient: claimant.toBase58(),
     paidLamports: spend,
+    collectorDebitLamports: spend,
+    receivedPayoutUnits: minimum,
+    operatingCostLamports: BigInt(rent + 5000),
+  });
+  expect(await run(minimum, minimum, rent + 123)).toMatchObject({
     collectorDebitLamports: spend,
     receivedPayoutUnits: minimum,
     operatingCostLamports: BigInt(rent + 5000),

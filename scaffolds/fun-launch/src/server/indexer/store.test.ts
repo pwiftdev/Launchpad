@@ -60,6 +60,12 @@ beforeEach(async () => {
       'utf8'
     )
   );
+  await db.exec(
+    readFileSync(
+      new URL('../../../../../scripts/migrations/044-display-forward-catchup.sql', import.meta.url),
+      'utf8'
+    )
+  );
   store = new DisplayStore(db, genesis);
   notifications.length = 0;
 });
@@ -83,7 +89,13 @@ describe('display index store', () => {
     await store.upsertCoins([hsol]);
     expect(await store.insertTrades(MINT, [trade(1), trade(2)])).toBe(2);
     expect(await store.insertTrades(MINT, [trade(2)])).toBe(0);
-    await store.saveCursor(POOL, MINT, { newest: 'sig-2', backfillBefore: null, complete: true });
+    await store.saveCursor(POOL, MINT, {
+      newest: 'sig-2',
+      backfillBefore: null,
+      complete: true,
+      forwardHead: null,
+      forwardBefore: null,
+    });
     const { trades, complete } = await store.trades(hsol, 10);
     expect(trades.map((t) => t.id)).toEqual(['sig-2:0:1', 'sig-1:0:1']);
     expect(trades[0]).toMatchObject({ sol: 1.1, priceSol: 0.0000022 });
@@ -94,8 +106,28 @@ describe('display index store', () => {
 
   it('reports partial history until every pool of the coin is backfilled', async () => {
     const migrated = coin({ migratedPool: 'Migrated1111111111111111111111111' });
-    await store.saveCursor(POOL, MINT, { newest: null, backfillBefore: null, complete: true });
+    await store.saveCursor(POOL, MINT, {
+      newest: null,
+      backfillBefore: null,
+      complete: true,
+      forwardHead: null,
+      forwardBefore: null,
+    });
     expect((await store.trades(migrated, 10)).complete).toBe(false);
+  });
+
+  it('reads the last actual price in each quarter hour of the past day', async () => {
+    await store.insertTrades(MINT, [
+      trade(1, { ts: 1, priceSol: 2 }),
+      trade(2, { ts: 99_010, priceSol: 3 }),
+      trade(3, { ts: 99_030, priceSol: 4 }),
+      trade(4, { ts: 99_920, priceSol: 7 }),
+      trade(5, { ts: 100_100, priceSol: 10 }),
+    ]);
+    expect(await store.prices(coin({ quoteToSol: 2 }), 100_000)).toEqual([
+      { time: 99_030, priceSol: 8 },
+      { time: 99_920, priceSol: 14 },
+    ]);
   });
 
   it('sums every fee but counts launch tax only inside the launch window', async () => {
@@ -136,6 +168,11 @@ describe('display index store', () => {
       ['creator-wallet', 200_000, true],
     ]);
     expect(holders.holders[0]!.shareOfCirculating).toBeCloseTo(0.5);
+    expect(await store.holders(c, 1)).toMatchObject({
+      holderCount: 2,
+      partial: true,
+      holders: [holders.holders[0]],
+    });
   });
 
   it('summarizes 24-hour markets and hourly swap counts from indexed trades', async () => {
@@ -159,6 +196,10 @@ describe('display index store', () => {
       chainTime: 1_800_000_000,
       network: { slot: 5, tps: 2500, rpcMs: 40 },
     });
+    await db.query("UPDATE display_indexer_status SET heartbeat_at=now()-interval '60 seconds'");
+    expect(await store.status()).toMatchObject({ stale: false });
+    await db.query("UPDATE display_indexer_status SET heartbeat_at=now()-interval '151 seconds'");
+    expect(await store.status()).toMatchObject({ stale: true, chainTime: 0 });
   });
 });
 

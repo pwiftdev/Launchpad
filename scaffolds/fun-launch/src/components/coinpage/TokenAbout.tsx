@@ -20,7 +20,7 @@ export function TokenAbout({ coin }: { coin: Coin }) {
       label="About this token"
       aside={
         coin.mode && (
-          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold text-primary">
+          <span className="chip border-primary/25 bg-primary/10 text-primary">
             {isFeeModeId(coin.mode)
               ? feeMode(coin.mode).label
               : coin.mode === 'bond'
@@ -65,7 +65,7 @@ export function TokenAbout({ coin }: { coin: Coin }) {
         </div>
       )}
 
-      <dl className="mt-3 divide-y divide-neutral-850 border-t border-neutral-850 text-[11px]">
+      <dl className="mt-3 divide-y divide-white/[0.05] border-t border-white/[0.06] text-[12px]">
         <Row label="Created by">
           <a
             href={coin.isDemo ? undefined : explorerUrl(`address/${coin.creator}`)}
@@ -107,7 +107,7 @@ const LinkChip = ({
     href={href}
     target="_blank"
     rel="noopener noreferrer nofollow"
-    className="inline-flex h-7 items-center gap-1.5 rounded-md bg-neutral-900 px-2.5 text-[11px] font-medium text-neutral-300 transition-colors hover:bg-neutral-850 hover:text-foreground"
+    className="inline-flex h-8 items-center gap-1.5 rounded-full bg-white/[0.05] px-3 text-[11.5px] font-medium text-neutral-300 ring-1 ring-inset ring-white/[0.08] transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white/[0.09] hover:text-foreground"
   >
     <span className={cn('iconify h-3.5 w-3.5', icon)} />
     {children}

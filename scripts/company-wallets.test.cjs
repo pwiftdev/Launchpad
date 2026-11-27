@@ -42,6 +42,23 @@ test('mainnet Dev requires its own recorded collector and treasury', () => {
     TREASURY_PUBLIC_KEY: devCompany.treasury,
   };
   assert.equal(companyWallets(env, genesis).collector.toBase58(), devCompany.collector);
+  assert.equal(
+    companyWallets({ ...env, LAUNCH_POLICY_VERSION: 'masked-v1' }, genesis).collector.toBase58(),
+    devCompany.collector
+  );
+  assert.throws(
+    () =>
+      companyWallets(
+        {
+          ...env,
+          LAUNCH_POLICY_VERSION: 'masked-v1',
+          FEE_COLLECTOR_PUBLIC_KEY: owner.company.collector,
+          TREASURY_PUBLIC_KEY: owner.vault.treasury,
+        },
+        genesis
+      ),
+    /owner-provided/
+  );
   assert.throws(
     () => companyWallets({ ...env, LAUNCH_POLICY_VERSION: 'bond-v1' }, genesis),
     /owner-provided/

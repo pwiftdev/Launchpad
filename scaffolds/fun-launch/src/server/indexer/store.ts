@@ -1,6 +1,14 @@
 // Display index storage. One indexer writes; every web request reads. Display data only:
 // payouts and claims keep their own finalized ledger and never read these tables.
-import type { Coin, Holder, HoldersResponse, Trade } from '@/lib/coin';
+import {
+  COIN_CHART_BUCKET_SECONDS,
+  COIN_CHART_SECONDS,
+  type Coin,
+  type CoinPriceHistory,
+  type Holder,
+  type HoldersResponse,
+  type Trade,
+} from '@/lib/coin';
 import { computePot, type PotSummary } from '@/lib/pot';
 import { summarizeMarket, type TokenMarket } from '@/lib/market';
 import { LAUNCH_TAX_WINDOW_SECONDS, TOTAL_SUPPLY } from '@/constants/launch';
@@ -52,7 +60,7 @@ type TradeRow = {
   route: 'dbc' | 'damm-v2';
 };
 
-const STALE_AFTER_MS = 30_000;
+const STALE_AFTER_MS = 150_000;
 
 export class DisplayStore {
   constructor(
@@ -125,8 +133,10 @@ export class DisplayStore {
         newest_signature: string | null;
         backfill_before: string | null;
         backfill_complete: boolean;
+        forward_head: string | null;
+        forward_before: string | null;
       }>(
-        'SELECT newest_signature,backfill_before,backfill_complete FROM display_pool_cursors WHERE network_genesis=$1 AND pool=$2',
+        'SELECT newest_signature,backfill_before,backfill_complete,forward_head,forward_before FROM display_pool_cursors WHERE network_genesis=$1 AND pool=$2',
         [this.genesis, pool]
       )
     ).rows[0];
@@ -135,14 +145,30 @@ export class DisplayStore {
   async saveCursor(
     pool: string,
     mint: string,
-    cursor: { newest: string | null; backfillBefore: string | null; complete: boolean }
+    cursor: {
+      newest: string | null;
+      backfillBefore: string | null;
+      complete: boolean;
+      forwardHead: string | null;
+      forwardBefore: string | null;
+    }
   ) {
     await this.db.query(
-      `INSERT INTO display_pool_cursors(network_genesis,pool,mint,newest_signature,backfill_before,backfill_complete,updated_at)
-       VALUES($1,$2,$3,$4,$5,$6,now())
+      `INSERT INTO display_pool_cursors(network_genesis,pool,mint,newest_signature,backfill_before,backfill_complete,forward_head,forward_before,updated_at)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,now())
        ON CONFLICT(network_genesis,pool) DO UPDATE SET newest_signature=EXCLUDED.newest_signature,
-         backfill_before=EXCLUDED.backfill_before,backfill_complete=EXCLUDED.backfill_complete,updated_at=now()`,
-      [this.genesis, pool, mint, cursor.newest, cursor.backfillBefore, cursor.complete]
+         backfill_before=EXCLUDED.backfill_before,backfill_complete=EXCLUDED.backfill_complete,
+         forward_head=EXCLUDED.forward_head,forward_before=EXCLUDED.forward_before,updated_at=now()`,
+      [
+        this.genesis,
+        pool,
+        mint,
+        cursor.newest,
+        cursor.backfillBefore,
+        cursor.complete,
+        cursor.forwardHead,
+        cursor.forwardBefore,
+      ]
     );
   }
 
@@ -160,8 +186,8 @@ export class DisplayStore {
     const owners = [...scan.holders].filter(([, amount]) => amount > 0n);
     const client = this.db.connect ? await this.db.connect() : null,
       tx: Queryable = client ?? this.db;
-    await tx.query('BEGIN');
     try {
+      await tx.query('BEGIN');
       const previous = (
         await tx.query<{ slot: string }>(
           'SELECT slot::text FROM display_holder_scans WHERE network_genesis=$1 AND mint=$2 FOR UPDATE',
@@ -296,7 +322,7 @@ export class DisplayStore {
         [this.genesis, coin.mint, limit + 1]
       ),
       this.db.query<{ complete: boolean }>(
-        'SELECT backfill_complete AS complete FROM display_pool_cursors WHERE network_genesis=$1 AND mint=$2',
+        'SELECT backfill_complete AND forward_head IS NULL AS complete FROM display_pool_cursors WHERE network_genesis=$1 AND mint=$2',
         [this.genesis, coin.mint]
       ),
     ]);
@@ -308,6 +334,22 @@ export class DisplayStore {
         cursors.rows.length >= pools &&
         cursors.rows.every((row) => row.complete),
     };
+  }
+
+  async prices(
+    coin: Coin,
+    now = Math.floor(Date.now() / 1000)
+  ): Promise<CoinPriceHistory['points']> {
+    const { rows } = await this.db.query<{ time: string; price_quote: number }>(
+      `SELECT DISTINCT ON (ts/$5::bigint) ts::text AS time,price_quote FROM display_trades
+       WHERE network_genesis=$1 AND mint=$2 AND ts BETWEEN $3 AND $4
+       ORDER BY ts/$5::bigint,ts DESC,slot DESC,signature DESC,instruction_index DESC,event_index DESC`,
+      [this.genesis, coin.mint, now - COIN_CHART_SECONDS, now, COIN_CHART_BUCKET_SECONDS]
+    );
+    return rows.map((row) => ({
+      time: Number(row.time),
+      priceSol: row.price_quote * (coin.quoteToSol ?? 1),
+    }));
   }
 
   /** Fees over the whole history plus launch-window tax, without loading every trade. */
@@ -330,7 +372,7 @@ export class DisplayStore {
     return { ...launch, feesSol: Number(totals.rows[0]?.fees ?? 0) * (coin.quoteToSol ?? 1) };
   }
 
-  async holders(coin: Coin): Promise<HoldersResponse | null> {
+  async holders(coin: Coin, limit = 1000): Promise<HoldersResponse | null> {
     const scan = (
       await this.db.query<{
         slot: string;
@@ -348,8 +390,8 @@ export class DisplayStore {
     if (!scan) return null;
     const rows = await this.db.query<{ owner: string; amount: string }>(
       `SELECT owner,amount::text FROM display_holders WHERE network_genesis=$1 AND mint=$2
-       ORDER BY amount DESC,owner LIMIT 1000`,
-      [this.genesis, coin.mint]
+       ORDER BY amount DESC,owner LIMIT $3`,
+      [this.genesis, coin.mint, limit]
     );
     const scale = 10 ** scan.decimals,
       supply = BigInt(scan.supply),
@@ -373,7 +415,7 @@ export class DisplayStore {
       partial: scan.holder_count > holders.length,
       snapshotSlot: Number(scan.slot),
       updatedAt: Number(scan.at),
-      stale: false,
+      stale: Date.now() / 1000 - Number(scan.at) > 2 * 3600,
     };
   }
 
@@ -385,7 +427,11 @@ export class DisplayStore {
       [this.genesis, now - 86_400]
     );
     const byMint = new Map<string, TradeRow[]>();
-    for (const row of rows.rows) byMint.set(row.mint, [...(byMint.get(row.mint) ?? []), row]);
+    for (const row of rows.rows) {
+      const market = byMint.get(row.mint);
+      if (market) market.push(row);
+      else byMint.set(row.mint, [row]);
+    }
     const tokens: Record<string, TokenMarket> = {};
     for (const coin of coins)
       tokens[coin.mint] = summarizeMarket(

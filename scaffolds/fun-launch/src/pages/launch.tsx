@@ -307,7 +307,7 @@ export default function Launch() {
       {!receipt && (
         <header className="relative mb-8 pt-2 md:mb-10 md:pt-6">
           <p className="eyebrow">Launch</p>
-          <h1 className="mt-4 font-display text-[30px] uppercase leading-[1.05] md:text-[46px]">
+          <h1 className="mt-4 text-[30px] font-semibold leading-[1.02] tracking-[-0.045em] md:text-[46px]">
             <Decrypt text="Launch a coin." />
             <br />
             <Decrypt text="Pay your holders." delay={160} className="text-holo" />
@@ -436,7 +436,7 @@ export default function Launch() {
               <p className="mt-3 text-xs leading-relaxed text-neutral-500">
                 Masked collects fees every hour and credits your share and each holder&rsquo;s
                 share. Holder shares are pro rata to balances; pools, burn and Masked wallets are
-                excluded. Everyone claims in native XMR or in SOL. Bonding is not guaranteed.
+                excluded. Everyone claims in wXMR or SOL. Bonding is not guaranteed.
               </p>
             </Step>
 
@@ -454,7 +454,11 @@ export default function Launch() {
               />
             </Step>
 
-            <div className="holo-border flex flex-col gap-4 rounded-2xl bg-panel p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="holo-border sticky bottom-3 z-10 flex flex-col gap-4 overflow-hidden rounded-3xl bg-[rgb(26_22_20/0.9)] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute -left-16 -top-20 -z-10 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(255,110,20,0.22),transparent_65%)] blur-2xl"
+              />
               <dl className="text-sm">
                 <div className="flex gap-2">
                   <dt className="text-neutral-400">Pool creation fee</dt>
@@ -472,7 +476,7 @@ export default function Launch() {
                     </dd>
                   </div>
                 )}
-                <div className="mt-1 flex gap-2 text-base font-bold">
+                <div className="mt-1.5 flex items-baseline gap-2 text-[19px] font-semibold tracking-tight">
                   <dt>Total</dt>
                   <dd className="font-mono">
                     {`≈ ${totalCost.toFixed(4)} SOL`}
@@ -489,6 +493,7 @@ export default function Launch() {
                 type="submit"
                 size="lg"
                 variant="holo"
+                className="h-12 rounded-2xl px-7 text-[15px]"
                 disabled={
                   submitting || (!!publicKey && (!isValid || !availability.data?.canLaunch))
                 }
@@ -511,7 +516,7 @@ export default function Launch() {
             {availability.notice && (
               <p
                 role="status"
-                className="rounded-xl border border-amber/20 bg-amber/5 p-3 text-xs leading-relaxed text-neutral-400"
+                className="flex items-start gap-2 rounded-2xl border border-amber/20 bg-amber/[0.06] p-3.5 text-xs leading-relaxed text-neutral-300"
               >
                 {availability.notice}
               </p>
@@ -573,7 +578,7 @@ function useLaunchAvailability(mode: FeeModeId) {
 }
 
 const inputClass =
-  'w-full rounded-xl border border-neutral-800 bg-neutral-950 px-3.5 py-2.5 text-sm text-foreground placeholder:text-neutral-600 transition-colors focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30';
+  'well w-full rounded-xl px-3.5 py-2.5 text-sm text-foreground placeholder:text-neutral-600 transition-all duration-200 ease-out hover:border-white/[0.12] focus:border-primary/50 focus:outline-none focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.35),0_0_0_4px_rgba(255,102,0,0.12)]';
 
 const Step = ({
   n,
@@ -587,20 +592,21 @@ const Step = ({
   subtitle?: string;
   optional?: boolean;
 }>) => (
-  <section className="surface p-5 md:p-6" aria-labelledby={`step-${n}`}>
-    <div className="mb-4 flex items-start gap-3">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-neutral-700 bg-neutral-950 font-term text-xs font-bold text-acid">
+  <section className="surface enter rounded-3xl p-5 md:p-6" aria-labelledby={`step-${n}`}>
+    <div className="mb-5 flex items-start gap-3.5">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-[#ff8f45] to-[#f25a00] font-mono text-[13px] font-bold text-[#1a0900] shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_8px_18px_-8px_rgba(255,102,0,0.7)]">
         {n}
       </span>
       <div>
-        <h2
-          id={`step-${n}`}
-          className="font-display text-[15px] font-bold leading-8 tracking-tight"
-        >
+        <h2 id={`step-${n}`} className="text-[18px] font-semibold leading-9 tracking-tight">
           {title}{' '}
-          {optional && <span className="text-xs font-normal text-neutral-500">(optional)</span>}
+          {optional && (
+            <span className="chip ml-1 align-middle text-[10px] font-medium text-neutral-400">
+              Optional
+            </span>
+          )}
         </h2>
-        {subtitle && <p className="text-sm text-neutral-400">{subtitle}</p>}
+        {subtitle && <p className="text-[13.5px] leading-relaxed text-neutral-400">{subtitle}</p>}
       </div>
     </div>
     {children}
@@ -668,10 +674,10 @@ const ImageDrop = ({ preview, onFile }: { preview: string | null; onFile: (f: Fi
           accept(e.dataTransfer.files?.[0]);
         }}
         className={cn(
-          'group relative flex aspect-square w-full flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed text-center transition-colors',
+          'group relative flex aspect-square w-full flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed text-center transition-all duration-200 ease-out',
           dragging
-            ? 'border-primary bg-primary/10'
-            : 'border-neutral-800 bg-neutral-950 hover:border-primary/50'
+            ? 'scale-[1.02] border-primary bg-primary/10 shadow-[0_0_30px_-8px_rgba(255,102,0,0.6)]'
+            : 'border-white/[0.12] bg-black/20 hover:border-primary/50 hover:bg-primary/[0.04]'
         )}
       >
         {preview ? (
@@ -682,14 +688,16 @@ const ImageDrop = ({ preview, onFile }: { preview: string | null; onFile: (f: Fi
               alt="Coin image preview"
               className="absolute inset-0 h-full w-full object-cover"
             />
-            <span className="absolute inset-x-2 bottom-2 rounded-full bg-ink/80 py-1 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">
+            <span className="glass-strong absolute inset-x-2 bottom-2 translate-y-1 rounded-full py-1.5 text-xs font-semibold text-white opacity-0 transition-all duration-200 ease-out group-hover:translate-y-0 group-hover:opacity-100">
               Change image
             </span>
           </>
         ) : (
           <>
-            <span className="iconify h-8 w-8 text-neutral-500 ph--image-square-bold" />
-            <span className="mt-2 px-3 text-xs text-neutral-400">Drop or click</span>
+            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/[0.05] ring-1 ring-inset ring-white/10 transition-transform duration-300 ease-spring group-hover:-translate-y-1 group-hover:scale-110">
+              <span className="iconify h-6 w-6 text-neutral-400 transition-colors group-hover:text-primary ph--image-square-bold" />
+            </span>
+            <span className="mt-3 px-3 text-xs font-medium text-neutral-300">Drop or click</span>
             <span className="text-2xs text-neutral-600">
               PNG, JPG, GIF, WebP · {LAUNCH_IMAGE_MAX_MB} MB
             </span>
@@ -731,7 +739,12 @@ const DevBuyPicker = ({
           value={percent}
           onChange={(e) => onChange(Number(e.target.value))}
           aria-label="Dev buy, percent of supply"
-          className="h-2 flex-1 cursor-pointer appearance-none rounded-full bg-neutral-850 accent-primary"
+          className="range-glass flex-1"
+          style={
+            {
+              '--fill': `${(percent / DEV_BUY_MAX_PERCENT_OF_SUPPLY) * 100}%`,
+            } as React.CSSProperties
+          }
         />
         <div className="relative w-24">
           <input
@@ -753,7 +766,7 @@ const DevBuyPicker = ({
           </span>
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-3 gap-3 rounded-xl bg-neutral-950 p-3 text-center">
+      <div className="well mt-4 grid grid-cols-3 gap-3 rounded-2xl p-3.5 text-center">
         <Stat
           label="Tokens"
           value={percent > 0 ? formatReadableNumber((TOTAL_SUPPLY * percent) / 100) : '0'}
@@ -796,8 +809,8 @@ const DevBuyPicker = ({
 
 const Stat = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
   <div>
-    <p className="text-2xs uppercase tracking-wider text-neutral-500">{label}</p>
-    <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums">{value}</p>
+    <p className="text-[11px] text-neutral-500">{label}</p>
+    <p className="mt-1 font-mono text-[15px] font-semibold tabular-nums">{value}</p>
     {sub && <p className="font-mono text-[11px] text-neutral-500">{sub}</p>}
   </div>
 );
@@ -851,7 +864,7 @@ const ScheduleCard = ({
   mode: FeeMode;
   creatorShareBps: number;
 }) => (
-  <div className="surface p-5">
+  <div className="surface rounded-3xl p-5">
     <p className="eyebrow">Trading fees</p>
     <ol className="mt-3 grid grid-cols-3 gap-1.5 text-center">
       {[
@@ -862,12 +875,14 @@ const ScheduleCard = ({
         <li
           key={label}
           className={cn(
-            'rounded-lg px-1 py-2',
-            i === 0 ? 'bg-rose/10 text-rose' : 'bg-neutral-900 text-foreground'
+            'rounded-2xl px-1 py-2.5 ring-1 ring-inset',
+            i === 0
+              ? 'bg-rose/10 text-rose ring-rose/20'
+              : 'bg-white/[0.04] text-foreground ring-white/[0.07]'
           )}
         >
-          <span className="block font-mono text-sm font-bold">{percent}</span>
-          <span className="block text-2xs opacity-80">{label}</span>
+          <span className="block font-mono text-[16px] font-semibold">{percent}</span>
+          <span className="mt-0.5 block text-[10.5px] opacity-80">{label}</span>
         </li>
       ))}
     </ol>

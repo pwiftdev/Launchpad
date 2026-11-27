@@ -1,6 +1,6 @@
 {
   "name": "masked",
-  "description": "Masked (mskd.fun): a Meteora-powered Solana launchpad. One launch type; the creator splits 0.60% of every trade with holders, claimable in XMR or SOL.",
+  "description": "Masked (mskd.fun) is a Meteora-powered Solana launchpad. Creators split 0.60% of every trade with holders, with payouts in wXMR on Solana.",
   "stack": "heroku-24",
   "buildpacks": [
     {
@@ -55,10 +55,21 @@
     },
     "ADMIN_SESSION_SECRET": {
       "generator": "secret",
-      "description": "Independent secret for launch receipt recovery and optional admin sessions; required for Bond it. launches"
+      "description": "Independent secret for launch receipt recovery and optional admin sessions"
     },
     "LAUNCH_POLICY_VERSION": {
-      "value": "bond-v1"
+      "value": "dev-v1"
+    },
+    "MAINNET_MASKED_CONFIG_KEY": {
+      "required": false,
+      "description": "Reviewed masked-v1 DBC configuration. Required for Masked launches on mainnet."
+    },
+    "MSKD_PAYOUT_POOL": {
+      "required": false,
+      "description": "Reviewed SOL/wXMR Meteora DLMM pool."
+    },
+    "MASKED_WXMR_PAYOUTS_ENABLED": {
+      "value": "false"
     },
     "NEXT_PUBLIC_DEMO_LAUNCHES": {
       "value": "false"

@@ -34,17 +34,16 @@ export type IndexerDeps = {
 
 const TIMING = {
   /** How often new or changed coins are processed. */
-  dirtyMs: 500,
+  dirtyMs: 2000,
+  minimumRefreshMs: 15_000,
   /** Rediscovery of coins and a state comparison for every one. */
-  discoverMs: 30_000,
+  discoverMs: 60_000,
   /** Every coin's history is re-read this often in case a notification was lost. */
   sweepMs: 5 * 60_000,
-  /** A coin's holders are rescanned this long after its last trade... */
-  holdersAfterTradeMs: 15_000,
-  /** ...and at least this often while it is listed. */
-  holdersEveryMs: 15 * 60_000,
+  holdersEveryMs: 60 * 60_000,
+  holderTickMs: 5000,
   holderScansPerTick: 2,
-  heartbeatMs: 10_000,
+  heartbeatMs: 60_000,
   concurrency: 4,
 };
 
@@ -53,6 +52,7 @@ export class DisplayIndexer {
   private subscriptions = new Map<string, number>();
   private dirty = new Set<string>();
   private busy = new Set<string>();
+  private lastRefresh = new Map<string, number>();
   /** Backoff for coins whose refresh failed, so an outage never becomes a hot loop. */
   private failures = new Map<string, { count: number; retryAt: number }>();
   private holdersDue = new Map<string, number>();
@@ -69,15 +69,14 @@ export class DisplayIndexer {
 
   async start() {
     await this.discover();
+    if (this.stopped) return;
     const every = (ms: number, task: () => Promise<unknown>) => {
       let running = false;
       const timer = setInterval(() => {
         if (running || this.stopped) return;
         running = true;
         task()
-          .catch((error: unknown) =>
-            this.log(`task failed: ${error instanceof Error ? error.message : 'unknown error'}`)
-          )
+          .catch(() => this.log('task failed; retrying on the next interval'))
           .finally(() => {
             running = false;
           });
@@ -87,7 +86,7 @@ export class DisplayIndexer {
     };
     every(this.t.dirtyMs, () => this.processDirty());
     every(this.t.discoverMs, () => this.discover());
-    every(this.t.dirtyMs * 10, () => this.processHolders());
+    every(this.t.holderTickMs, () => this.processHolders());
     every(this.t.heartbeatMs, () => this.heartbeat());
     await this.heartbeat().catch(() => {});
   }
@@ -111,7 +110,9 @@ export class DisplayIndexer {
 
   /** Coins come and go here; state changes found by comparison mark coins dirty. */
   async discover() {
+    if (this.stopped) return;
     const coins = await this.deps.listCoins();
+    if (this.stopped) return;
     const sweep = Date.now() - this.lastSweep >= this.t.sweepMs;
     if (sweep) this.lastSweep = Date.now();
     const changed = new Set(await this.deps.store.upsertCoins(coins));
@@ -129,6 +130,9 @@ export class DisplayIndexer {
         const coin = this.coins.get(mint)!;
         this.coins.delete(mint);
         this.holdersDue.delete(mint);
+        this.lastRefresh.delete(mint);
+        this.dirty.delete(mint);
+        this.failures.delete(mint);
         for (const pool of pools(coin)) this.unwatch(pool);
       }
   }
@@ -155,50 +159,43 @@ export class DisplayIndexer {
   async processDirty() {
     const now = Date.now();
     const ready = [...this.dirty].filter(
-      (mint) => !this.busy.has(mint) && (this.failures.get(mint)?.retryAt ?? 0) <= now
+      (mint) =>
+        !this.busy.has(mint) &&
+        (this.lastRefresh.get(mint) ?? -Infinity) + this.t.minimumRefreshMs <= now &&
+        (this.failures.get(mint)?.retryAt ?? 0) <= now
     );
     if (!ready.length) return;
     const batch = ready.slice(0, this.t.concurrency * 4);
     for (const mint of batch) this.dirty.delete(mint);
     let next = 0;
-    let failed = 0,
-      reason = '';
+    let failed = 0;
     const worker = async () => {
-      for (let i = next++; i < batch.length; i = next++)
-        await this.refresh(batch[i]!).catch((error: unknown) => {
+      for (let i = next++; i < batch.length && !this.stopped; i = next++)
+        await this.refresh(batch[i]!).catch(() => {
           failed++;
-          reason ||= error instanceof Error ? error.message : 'unknown error';
         });
     };
     await Promise.all(Array.from({ length: Math.min(this.t.concurrency, batch.length) }, worker));
     if (failed)
-      this.log(
-        `${failed} of ${batch.length} coin refreshes failed (${reason}); retrying with backoff`
-      );
+      this.log(`${failed} of ${batch.length} coin refreshes failed; retrying with backoff`);
   }
 
   private async refresh(mint: string) {
     this.busy.add(mint);
     try {
       const coin = await this.deps.loadCoin(mint);
-      if (!coin) return;
+      if (!coin || this.stopped) return;
       const previous = this.coins.get(mint);
       this.coins.set(mint, coin);
       await this.deps.store.upsertCoins([coin]);
       if (!previous) this.holdersDue.set(mint, Date.now());
       for (const pool of pools(coin)) this.watch(pool, mint);
-      let traded = false,
-        more = false;
+      let more = false;
       for (const pool of pools(coin)) {
         const result = await scanPool({ rpc: this.deps.rpc, store: this.deps.store, pool, coin });
-        traded ||= result.inserted > 0;
         more ||= result.more;
       }
-      if (traded)
-        this.holdersDue.set(
-          mint,
-          Math.min(this.holdersDue.get(mint) ?? Infinity, Date.now() + this.t.holdersAfterTradeMs)
-        );
+      this.lastRefresh.set(mint, Date.now());
       if (more) this.dirty.add(mint);
       this.failures.delete(mint);
     } catch (error) {
@@ -218,6 +215,7 @@ export class DisplayIndexer {
       .sort((a, b) => a[1] - b[1])
       .slice(0, this.t.holderScansPerTick);
     for (const [mint] of due) {
+      if (this.stopped) break;
       const coin = this.coins.get(mint);
       this.holdersDue.set(mint, now + this.t.holdersEveryMs);
       if (!coin) continue;
@@ -226,7 +224,7 @@ export class DisplayIndexer {
           mint,
           excludedAccounts: await this.deps.holderExclusions(coin),
         });
-        await this.deps.store.replaceHolders(mint, scan);
+        if (!this.stopped) await this.deps.store.replaceHolders(mint, scan);
       } catch (error) {
         // Try again soon rather than waiting for the next full period.
         this.holdersDue.set(mint, now + 60_000);
@@ -244,6 +242,7 @@ export class DisplayIndexer {
     const sample = (
       await this.deps.rpc.getRecentPerformanceSamples(1).catch((): PerfSample[] => [])
     )[0];
+    if (this.stopped) return;
     await this.deps.store.heartbeat({
       slot,
       chainTime,

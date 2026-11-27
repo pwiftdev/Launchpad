@@ -49,7 +49,11 @@ export const LogoMark = ({ className, animated, halo, small, forceWhite }: LogoM
   );
   return (
     <span
-      className={cn('brand-mark relative inline-block shrink-0', forceWhite && 'mk-force-white', className)}
+      className={cn(
+        'brand-mark relative inline-block shrink-0',
+        forceWhite && 'mk-force-white',
+        className
+      )}
       aria-hidden
     >
       {halo && <span className="mark-halo" />}
@@ -103,7 +107,7 @@ export const NetworkBadge = ({ className }: { className?: string }) => {
   return (
     <span
       className={cn(
-        'border border-amber/50 bg-amber/10 px-2 py-0.5 font-term text-2xs font-semibold uppercase tracking-wider text-amber',
+        'rounded-full border border-amber/35 bg-amber/10 px-2.5 py-1 font-term text-[10px] font-semibold uppercase tracking-[0.12em] text-amber shadow-[0_0_14px_-4px_rgba(255,160,40,0.5)]',
         className
       )}
     >

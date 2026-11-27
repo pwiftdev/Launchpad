@@ -1,5 +1,6 @@
 import { PublicKey, type Transaction } from '@solana/web3.js';
 import bs58 from 'bs58';
+import { isFeeModeId } from './feeModes';
 import type { LaunchPreparationContext } from './launchPreparation';
 export type PendingLaunch = {
   mint: string;
@@ -66,17 +67,10 @@ function parse(raw: string | null, wallet: string): PendingLaunch | null {
       row.signature.length < 64 ||
       row.signature.length > 88 ||
       bs58.decode(row.signature).length !== 64 ||
-      ![
-        'bond',
-        'creator',
-        'community',
-        'mskd',
-        'dev',
-        'cashback',
-        'hsol',
-        'cashback-hsol',
-        'mskd-hsol',
-      ].includes(String(row.mode)) ||
+      (row.mode !== 'bond' &&
+        row.mode !== 'creator' &&
+        row.mode !== 'community' &&
+        !isFeeModeId(row.mode)) ||
       typeof row.name !== 'string' ||
       row.name.length > 64 ||
       typeof row.symbol !== 'string' ||
@@ -91,7 +85,7 @@ function parse(raw: string | null, wallet: string): PendingLaunch | null {
           !/^https:\/\//.test(row.image)))
     )
       return null;
-    const receipt = {
+    const receipt: PendingLaunch = {
       mint: row.mint as string,
       signature: row.signature,
       wallet,
@@ -99,7 +93,7 @@ function parse(raw: string | null, wallet: string): PendingLaunch | null {
       symbol: row.symbol,
       image: row.image as string | null,
       devBuyPercent: row.devBuyPercent,
-      mode: row.mode as PendingLaunch['mode'],
+      mode: row.mode,
       ...(pub(row.genesis) ? { genesis: row.genesis as string } : {}),
     };
     // Legacy receipts stay recoverable but cannot authorize an expiry-based clear.

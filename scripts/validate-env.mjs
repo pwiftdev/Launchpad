@@ -12,6 +12,7 @@ const publicBuildKeys = [
   'NEXT_PUBLIC_POOL_CONFIG_KEY',
   'NEXT_PUBLIC_SITE_URL',
   'NEXT_PUBLIC_DEMO_LAUNCHES',
+  'NEXT_PUBLIC_AXIOM_REFERRAL_URL',
 ];
 export function publicBuildEnvironment(env = process.env) {
   return Object.fromEntries(publicBuildKeys.map((key) => [key, env[key] ?? null]));
@@ -86,11 +87,17 @@ export function validateEnv(env = process.env) {
       );
   if (env.FINANCIAL_WORKER_ENABLED === 'true')
     throw new Error('Legacy native worker settings cannot configure the wallet-v1 deployment');
+  if (
+    env.NEXT_PUBLIC_AXIOM_REFERRAL_URL &&
+    !/^https:\/\/axiom\.trade\/@[a-zA-Z0-9_-]{1,64}\/?$/.test(env.NEXT_PUBLIC_AXIOM_REFERRAL_URL)
+  )
+    throw new Error('NEXT_PUBLIC_AXIOM_REFERRAL_URL must be an official Axiom referral URL');
   for (const key of [
     'WALLET_WORKER_ENABLED',
     'MAINNET_TRADING_ENABLED',
     'LAUNCHPAD_PUBLIC',
     'DISPLAY_INDEXER',
+    'MASKED_WXMR_PAYOUTS_ENABLED',
   ])
     if (env[key] !== undefined && !['true', 'false'].includes(env[key]))
       throw new Error(`Invalid ${key}`);
@@ -151,7 +158,11 @@ export function validateEnv(env = process.env) {
     throw new Error('Demo launches must be disabled on mainnet');
   if (env.DISPLAY_INDEXER === 'true' && !/^postgres(?:ql)?:\/\//.test(env.DATABASE_URL || ''))
     throw new Error('The display indexer requires a Postgres database');
-  if (env.RPC_FALLBACK_URL && new URL(env.RPC_FALLBACK_URL).protocol !== 'https:' && !localValidator)
+  if (
+    env.RPC_FALLBACK_URL &&
+    new URL(env.RPC_FALLBACK_URL).protocol !== 'https:' &&
+    !localValidator
+  )
     throw new Error('RPC_FALLBACK_URL must use HTTPS');
   if (env.MAINNET_TRADING_ENABLED === 'true' && env.NEXT_PUBLIC_NETWORK !== 'mainnet-beta')
     throw new Error('MAINNET_TRADING_ENABLED requires the explicitly selected mainnet network');

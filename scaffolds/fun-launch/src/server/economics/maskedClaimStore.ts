@@ -1,6 +1,6 @@
 // Masked claims: one request takes everything a wallet has earned across Masked coins.
-// SOL claims become ordinary per-coin payout jobs the operator executes; XMR claims wait for the
-// daily batch, and wXMR claims are paid by swap-and-send wallet jobs. Every amount is reserved under the same locks the payout ledger uses.
+// SOL claims use per-coin payout jobs. wXMR claims use swap-and-send jobs.
+// Native XMR claims are reserved for the separate daily batch workflow.
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { database } from '../database';
@@ -13,20 +13,15 @@ import type {
 } from '@/lib/maskedEarnings';
 import { attachHolderAllocations, MASKED_UNCLAIMED } from './walletHolderClaims';
 import { sealMoneroAddress } from './moneroSeal';
+import { wxmrClaimsEnabled } from './walletMskdPolicy';
 
-/** Until a minimum is decided, an XMR claim needs at least 0.05 SOL of earnings. */
-export const DEFAULT_MINIMUM_XMR_LAMPORTS = 50_000_000n;
-export function minimumXmrLamports(env = process.env) {
+const DEFAULT_MINIMUM_CONVERSION_LAMPORTS = 50_000_000n;
+function minimumConversionLamports(env = process.env) {
   const value = env.MASKED_MINIMUM_XMR_CLAIM_LAMPORTS;
-  return value && /^[1-9]\d{0,17}$/.test(value) ? BigInt(value) : DEFAULT_MINIMUM_XMR_LAMPORTS;
+  return value && /^[1-9]\d{0,17}$/.test(value)
+    ? BigInt(value)
+    : DEFAULT_MINIMUM_CONVERSION_LAMPORTS;
 }
-/**
- * wXMR stands in for XMR while native payouts are down. Switch it on only once the operator has
- * the wXMR market configured (MSKD_PAYOUT_POOL and the payout mint), since that is what pays it.
- */
-export const wxmrPayoutsEnabled = (env = process.env) => env.MASKED_WXMR_PAYOUTS_ENABLED === 'true';
-/** The operator's Monero heartbeat counts as current for this long. */
-const PAYOUT_STATUS_FRESH_SECONDS = 15 * 60;
 
 type CreatorRow = { mint: string; available: string; collector: string; treasury: string };
 type HolderRow = {
@@ -46,6 +41,15 @@ const UNCLAIMED_HOLDER = `FROM wallet_allocations a
    WHERE (ca.network_genesis,ca.mint,ca.wallet,ca.epoch)=(a.network_genesis,a.mint,a.wallet,a.epoch)
    AND j.status<>'failed'
  ) ${MASKED_UNCLAIMED}`;
+
+const SOL_CLAIM_STATUS = `(
+ SELECT CASE
+   WHEN count(*) FILTER (WHERE j.status IN('finalized','failed'))=cardinality(m.sol_jobs)
+     AND cardinality(m.sol_jobs)>0
+   THEN CASE WHEN bool_or(j.status='failed') THEN 'failed' ELSE 'paid' END
+   ELSE m.status END
+ FROM wallet_jobs j WHERE j.id=ANY(m.sol_jobs)
+)`;
 
 export class MaskedClaimError extends Error {
   constructor(
@@ -120,22 +124,11 @@ export class MaskedClaimStore {
     return { coins, total, sol };
   }
 
-  async xmrAvailable(network: string) {
-    const row = (
-      await this.db.query<{ monero_ok: boolean; age: number }>(
-        `SELECT monero_ok,extract(epoch FROM now()-heartbeat_at) AS age FROM masked_payout_status WHERE network_genesis=$1`,
-        [network]
-      )
-    ).rows[0];
-    return !!row && row.monero_ok && Number(row.age) <= PAYOUT_STATUS_FRESH_SECONDS;
-  }
-
   async earnings(network: string, wallet: string): Promise<EarningsView> {
-    const [creators, holders, claims, xmrAvailable] = await Promise.all([
+    const [creators, holders, claims] = await Promise.all([
       this.creatorRows(this.db, network, wallet),
       this.holderRows(this.db, network, wallet),
-      this.claims(network, wallet),
-      this.xmrAvailable(network),
+      this.claims(this.db, network, wallet),
     ]);
     const { coins, total, sol } = this.summarize(creators, holders);
     const list: CoinEarnings[] = [...coins].map(([mint, value]) => ({
@@ -152,17 +145,21 @@ export class MaskedClaimStore {
       coins: list,
       totalLamports: total.toString(),
       solClaimableLamports: sol.toString(),
-      minimumXmrLamports: minimumXmrLamports().toString(),
-      xmrAvailable,
-      wxmrAvailable: !xmrAvailable && wxmrPayoutsEnabled(),
+      minimumWxmrLamports: minimumConversionLamports().toString(),
+      wxmrAvailable: wxmrClaimsEnabled(network),
       openClaim: open,
       history: claims,
     };
   }
 
-  async claims(network: string, wallet: string, limit = 20): Promise<MaskedClaimView[]> {
+  private async claims(
+    db: Pick<PoolClient, 'query'>,
+    network: string,
+    wallet: string,
+    claimId?: string
+  ): Promise<MaskedClaimView[]> {
     const rows = (
-      await this.db.query<{
+      await db.query<{
         id: string;
         currency: ClaimCurrency;
         lamports: string;
@@ -170,31 +167,30 @@ export class MaskedClaimStore {
         xmr_atomic: string | null;
         created_at: Date;
         failure: string | null;
-        job_statuses: string[] | null;
       }>(
-        `SELECT m.id,m.currency,m.lamports::text,m.status,m.xmr_atomic::text,m.created_at,m.failure,
-           (SELECT array_agg(j.status) FROM wallet_jobs j WHERE j.id=ANY(m.sol_jobs)) AS job_statuses
-         FROM masked_claims m WHERE m.network_genesis=$1 AND m.wallet=$2 ORDER BY m.created_at DESC LIMIT $3`,
-        [network, wallet, limit]
+        `SELECT m.id,m.currency,m.lamports::text,m.xmr_atomic::text,m.created_at,m.failure,
+           CASE WHEN m.currency='sol' AND m.status='sent' THEN ${SOL_CLAIM_STATUS} ELSE m.status END AS status
+         FROM masked_claims m WHERE m.network_genesis=$1 AND m.wallet=$2 AND ($3::uuid IS NULL OR m.id=$3)
+         ORDER BY m.created_at DESC,m.id DESC LIMIT 20`,
+        [network, wallet, claimId ?? null]
       )
     ).rows;
     return rows.map((row) => ({
       id: row.id,
       currency: row.currency,
       lamports: row.lamports,
-      // SOL claims follow their payout jobs.
-      status:
-        row.currency === 'sol' && row.status === 'sent' && row.job_statuses?.length
-          ? row.job_statuses.every((status) => status === 'finalized')
-            ? 'paid'
-            : row.job_statuses.every((status) => status === 'finalized' || status === 'failed')
-              ? 'failed'
-              : 'sent'
-          : row.status,
+      status: row.status,
       xmrAtomic: row.xmr_atomic,
       createdAt: new Date(row.created_at).toISOString(),
       failure: row.failure,
     }));
+  }
+
+  private async finishRequest(client: PoolClient, network: string, wallet: string, id: string) {
+    const [claim] = await this.claims(client, network, wallet, id);
+    if (!claim) throw new Error('The requested claim could not be read');
+    await client.query('COMMIT');
+    return claim;
   }
 
   /**
@@ -209,15 +205,11 @@ export class MaskedClaimStore {
     requestId: string;
     authorizationDigest: string;
     moneroAddress?: string;
-    xmrAvailable: boolean;
     env?: NodeJS.ProcessEnv;
   }): Promise<MaskedClaimView> {
     const { networkGenesis: network, wallet, currency } = input;
-    // XMR claims queue even while the payout wallet is down and pay when it returns.
     if (currency === 'xmr' && !input.moneroAddress)
       throw new MaskedClaimError('Native XMR payouts need a Monero address');
-    if (currency === 'wxmr' && (input.xmrAvailable || !wxmrPayoutsEnabled(input.env)))
-      throw new MaskedClaimError('wXMR is offered only while native XMR payouts are down');
     const client = await this.db.connect();
     try {
       await client.query('BEGIN');
@@ -234,9 +226,19 @@ export class MaskedClaimStore {
       if (existing) {
         if (existing.authorization_digest !== input.authorizationDigest)
           throw new MaskedClaimError('This request conflicts with an earlier signed claim');
-        await client.query('COMMIT');
-        return (await this.claims(network, wallet, 50)).find((claim) => claim.id === existing.id)!;
+        return await this.finishRequest(client, network, wallet, existing.id);
       }
+      if (currency === 'wxmr' && !wxmrClaimsEnabled(network, input.env))
+        throw new MaskedClaimError('wXMR payouts are temporarily unavailable', 503);
+      await client.query(
+        `WITH finished AS (
+           SELECT m.id,${SOL_CLAIM_STATUS} AS status FROM masked_claims m
+           WHERE m.network_genesis=$1 AND m.wallet=$2 AND m.currency='sol' AND m.status='sent'
+         )
+         UPDATE masked_claims m SET status=finished.status FROM finished
+         WHERE m.id=finished.id AND finished.status IN('paid','failed')`,
+        [network, wallet]
+      );
       const preliminary = [
         ...(await this.creatorRows(client, network, wallet)).map((row) => row.mint),
         ...(await this.holderRows(client, network, wallet)).map((row) => row.mint),
@@ -252,8 +254,16 @@ export class MaskedClaimStore {
       if (amount <= 0n) throw new MaskedClaimError('Nothing is claimable yet');
       if (amount !== input.lamports)
         throw new MaskedClaimError('Your earnings changed. Refresh and sign again.');
-      if (currency !== 'sol' && amount < minimumXmrLamports(input.env))
-        throw new MaskedClaimError('Earn a little more before claiming in XMR', 400);
+      if (currency !== 'sol' && amount < minimumConversionLamports(input.env))
+        throw new MaskedClaimError(
+          `Earn a little more before claiming in ${currency === 'wxmr' ? 'wXMR' : 'XMR'}`,
+          400
+        );
+      if (currency === 'wxmr') {
+        const collectors = new Set([...creators, ...holders].map((row) => row.collector));
+        if (collectors.size !== 1 || collectors.has(wallet))
+          throw new MaskedClaimError('wXMR payout is unavailable for these earnings', 409);
+      }
       const id = randomUUID();
       const jobs: string[] = [];
       if (currency === 'sol') {
@@ -342,8 +352,7 @@ export class MaskedClaimStore {
             ]
           );
       }
-      await client.query('COMMIT');
-      return (await this.claims(network, wallet, 50)).find((claim) => claim.id === id)!;
+      return await this.finishRequest(client, network, wallet, id);
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {});
       if (error instanceof Error && /masked_claims_one_open/.test(error.message))

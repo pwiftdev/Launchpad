@@ -43,7 +43,12 @@ import {
   holderClaimTotal,
 } from './walletHolderClaims';
 import { insertMskdConversion, settleMskdConversion, mskdTokenLiability } from './walletMskdStore';
-import { queueWxmrPayments, settleWxmrPayment, type WxmrAlert } from './maskedWxmrClaims';
+import {
+  queueWxmrPayments,
+  resumeWxmrClaim,
+  settleWxmrPayment,
+  type WxmrAlert,
+} from './maskedWxmrClaims';
 import { mskdBuybackMint } from './maskedBuyback';
 import {
   MAXIMUM_MSKD_CONVERSION_LAMPORTS,
@@ -121,7 +126,7 @@ export class WalletStore {
       await client.query('COMMIT');
       return result;
     } catch (error) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       throw error;
     } finally {
       client.release();
@@ -130,11 +135,14 @@ export class WalletStore {
   private async lock(client: PoolClient, network: string, mint: string) {
     // Operations may be funded across Bond it. coins belonging to the same collector.
     // A consistent global-before-coin lock order also protects treasury reservations.
-    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
-      `wallet-operating:${network}`,
-    ]);
+    await this.lockOperating(client, network);
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
       `wallet-settlement:${network}:${mint}`,
+    ]);
+  }
+  private async lockOperating(client: PoolClient, network: string) {
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+      `wallet-operating:${network}`,
     ]);
   }
   private async coin(
@@ -1010,8 +1018,8 @@ export class WalletStore {
   }
 
   /**
-   * Allocates one completed hour of a Masked coin's holder income by time-weighted balances:
-   * that hour's samples plus the closing sample taken in the first window of the next hour.
+   * Allocates one completed hour of a Masked coin's holder income by time-weighted balances.
+   * The first sample of the next hour supplies the finalized slot cutoff for eligible income.
    * Too few samples leaves the income unallocated; it rolls into the next hour.
    */
   async createMaskedEpoch(network: string, mint: string, epoch: number) {
@@ -1047,9 +1055,8 @@ export class WalletStore {
       const hourSamples = rows.filter((row) => Number(row.sample_window) < closing);
       if (!close || hourSamples.length < MASKED_MINIMUM_SAMPLES)
         return { status: 'insufficient_samples' as const, samples: hourSamples.length };
-      const used = [...hourSamples, close];
       const snapshot = timeWeightedBalances(
-        used.map((row) => ({
+        hourSamples.map((row) => ({
           balances: row.balances.map(([wallet, tokens]) => ({ wallet, tokens: BigInt(tokens) })),
           excluded: new Set(row.excluded),
         }))
@@ -1059,7 +1066,13 @@ export class WalletStore {
       const allocation = allocateHolderSnapshot(budget, snapshot),
         allocated = budget - allocation.carryForward;
       const digest = createHash('sha256')
-        .update(JSON.stringify(['masked-time-weighted-v1', ...used.map((row) => row.digest)]))
+        .update(
+          JSON.stringify([
+            'masked-time-weighted-v2',
+            hourSamples.map((row) => row.digest),
+            close.digest,
+          ])
+        )
         .digest('hex');
       const saved = (
         await client.query<WalletEpoch>(
@@ -1076,7 +1089,7 @@ export class WalletStore {
             allocated.toString(),
             allocation.carryForward.toString(),
             JSON.stringify([...snapshot.excluded].sort()),
-            used.length,
+            hourSamples.length,
           ]
         )
       ).rows[0]!;
@@ -1118,10 +1131,15 @@ export class WalletStore {
     alert?: (alert: WxmrAlert) => void;
   }) {
     return this.tx(async (client) => {
-      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
-        `wallet-operating:${input.network}`,
-      ]);
+      await this.lockOperating(client, input.network);
       return queueWxmrPayments(client, input);
+    });
+  }
+
+  async resumeMaskedWxmrClaim(network: string, collector: string, reviewedJob: string) {
+    return this.tx(async (client) => {
+      await this.lockOperating(client, network);
+      return resumeWxmrClaim(client, network, collector, reviewedJob);
     });
   }
 
@@ -1133,9 +1151,7 @@ export class WalletStore {
   async transferMskdBuyback(network: string, sourceMint: string, targetMint: string) {
     if (sourceMint === targetMint) throw new Error('$MSKD buys back with other coins’ income');
     return this.tx(async (client) => {
-      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
-        `wallet-operating:${network}`,
-      ]);
+      await this.lockOperating(client, network);
       for (const mint of [sourceMint, targetMint].sort())
         await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
           `wallet-settlement:${network}:${mint}`,
@@ -1477,7 +1493,11 @@ export class WalletStore {
       ).rows[0]!;
     });
   }
-  async prepareJob(id: string, prepared: PreparedWalletExecution): Promise<WalletJob> {
+  async prepareJob(
+    id: string,
+    prepared: PreparedWalletExecution,
+    replacedDigest: string | null = null
+  ): Promise<WalletJob> {
     const bytes = Buffer.from(prepared.transactionBase64, 'base64'),
       tx = VersionedTransaction.deserialize(bytes);
     if (
@@ -1496,6 +1516,12 @@ export class WalletStore {
         await client.query<WalletJob>('SELECT * FROM wallet_jobs WHERE id=$1 FOR UPDATE', [id])
       ).rows[0];
       if (!job) throw new Error('Wallet job missing');
+      if (replacedDigest) {
+        if (job.kind !== 'holder_conversion' && job.kind !== 'wxmr_claim')
+          throw new Error('Only unsigned swap quotes can be replaced');
+        if (job.status !== 'prepared' || job.signature || job.message_digest !== replacedDigest)
+          return job;
+      } else if (job.status !== 'queued') return job;
       const coin = await this.coin(client, job.network_genesis, job.mint);
       if (
         job.network_genesis !== prepared.networkGenesis ||
@@ -1554,7 +1580,6 @@ export class WalletStore {
         BigInt(operating) + BigInt(temporary) > 18446744073709551615n
       )
         throw new Error('Explicit bounded operating fee/rent estimate required');
-      if (job.status !== 'queued') return job;
       if (coin.policy_version === 'bond-v1') {
         const funds = await this.operatingCapacity(client, job.network_genesis, coin.collector);
         const incoming =

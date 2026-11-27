@@ -9,6 +9,7 @@ import { MeteoraWalletAdapter } from './walletAdapter';
 import { WalletExternalSigner } from './walletSigner';
 import { loadExternalSignerCommand } from './externalSigner';
 import { assertWalletExecutionGate } from './walletGate';
+import { mskdBuybackMint } from './maskedBuyback';
 import type { SchedulerLease } from './scheduler';
 import {
   drainWalletExecutionQueue,
@@ -25,8 +26,9 @@ const commands = new Set([
   'recover',
   'run',
   'prepare-platform',
+  'resume-wxmr',
 ]);
-const booleans = new Set(['--execute', '--automatic']);
+const booleans = new Set(['--execute', '--automatic', '--masked-buyback-only']);
 const flags = new Set([
   ...booleans,
   '--mint',
@@ -71,7 +73,7 @@ export async function runWalletCli(argv = process.argv.slice(2)) {
   const { command, options } = walletCliOptions(argv);
   if (command === '--help') {
     console.log(
-      'Wallet operations: status, index, plan, reconcile, sign, relay, recover, prepare-platform, run. Default is read-only dry run. --execute writes durable unsigned plans. prepare-platform requires --mint and --max-spend-lamports. --automatic additionally enables explicitly gated external signing and relay. No private keys are loaded here.'
+      'Wallet operations: status, index, plan, reconcile, sign, relay, recover, prepare-platform, resume-wxmr, run. Default is read-only dry run. --execute writes durable unsigned plans. prepare-platform requires --mint and --max-spend-lamports. resume-wxmr requires --id with the last reviewed failed payment job. --automatic additionally enables explicitly gated external signing and relay. No private keys are loaded here.'
     );
     return;
   }
@@ -88,16 +90,21 @@ export async function runWalletCli(argv = process.argv.slice(2)) {
     throw new Error('Invalid buyback limit');
   if (
     (options['--automatic'] && command !== 'run') ||
+    (options['--masked-buyback-only'] &&
+      (maxSpend === undefined || (command !== 'run' && command !== 'plan'))) ||
     (options['--signer-config'] && options['--signer-command']) ||
     ((options['--signer-config'] || options['--signer-command']) &&
       command !== 'sign' &&
       options['--automatic'] !== 'true') ||
     (['sign', 'relay', 'recover'].includes(command) && !options['--id']) ||
     (command === 'prepare-platform' && (!options['--mint'] || maxSpend === undefined)) ||
+    (command === 'resume-wxmr' &&
+      !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(options['--id'] ?? '')) ||
     (options['--id'] && options['--mint'])
   )
     throw new Error('Invalid signer options');
   const genesis = expectedNetworkGenesis(process.env);
+  const buybackMint = options['--masked-buyback-only'] ? mskdBuybackMint(genesis) : undefined;
   if (!process.env.RPC_URL) throw new Error('Private RPC URL required');
   const controller = new AbortController();
   let shutdownTimer: ReturnType<typeof setTimeout> | undefined;
@@ -194,13 +201,28 @@ export async function runWalletCli(argv = process.argv.slice(2)) {
       const alerts = new Set<string>();
       const healthy = () => !controller.signal.aborted && lease.alive();
       const rows: Array<{ mint: string; status: string }> = [];
+      let resumedClaim: string | null | undefined;
       try {
-        const mints = options['--mint']
-          ? [options['--mint']]
-          : options['--id']
-            ? [(await worker.required(options['--id'])).mint]
-            : await saved.discover(maximumCoins);
+        if ((command === 'run' || command === 'plan') && !options['--mint'] && healthy()) {
+          try {
+            await worker.queueWxmrPayments();
+          } catch {
+            alerts.add('WALLET_WXMR_QUEUE_UNAVAILABLE');
+          }
+        }
         const collector = wallets.collector.toBase58();
+        if (command === 'resume-wxmr') {
+          await runtimeGate();
+          resumedClaim = await store.resumeMaskedWxmrClaim(genesis, collector, options['--id']!);
+        }
+        const mints =
+          command === 'resume-wxmr'
+            ? []
+            : options['--mint']
+              ? [options['--mint']]
+              : options['--id']
+                ? [(await worker.required(options['--id'])).mint]
+                : await saved.discover(maximumCoins);
         const dispatch = async () => {
           const candidates = await store.executionCandidates(
             genesis,
@@ -246,7 +268,9 @@ export async function runWalletCli(argv = process.argv.slice(2)) {
                   if (job.signature) await worker.reconcile(job.id);
                 }
               if (command !== 'reconcile') {
-                await worker.plan(mint, maxSpend, maximumJobs, automatic);
+                const buybackLimit =
+                  buybackMint === undefined || mint === buybackMint ? maxSpend : undefined;
+                await worker.plan(mint, buybackLimit, maximumJobs, automatic);
               }
             }
             rows.push({ mint, status: 'completed' });
@@ -281,6 +305,7 @@ export async function runWalletCli(argv = process.argv.slice(2)) {
           transactionsSigned: signed,
           transactionsSent: sent,
           alerts: [...alerts],
+          resumedClaim,
           unsignedOnly: !automatic && !['sign', 'relay'].includes(command),
         })
       );

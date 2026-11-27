@@ -6,6 +6,8 @@ const {
   decodeSigningKey,
   cycleProfile,
   automaticArguments,
+  buybackArguments,
+  schedulerAlert,
   PINS,
   DEV_PINS,
 } = require('../deploy/private-worker/bootstrap.cjs');
@@ -93,6 +95,44 @@ test('the Dev worker keeps every cycle on its pinned mainnet policy', () => {
     () => configuration(manifest, { ...env, LAUNCH_POLICY_VERSION: 'bond-v1' }),
     /REVIEWED_CONFIG/
   );
+  const masked = {
+    MAINNET_MASKED_CONFIG_KEY: 'A'.repeat(43),
+    MSKD_PAYOUT_POOL: 'B'.repeat(43),
+  };
+  assert.deepEqual(configuration(manifest, { ...env, ...masked }).rewardEnvironment, masked);
+  assert.deepEqual(buybackArguments(configuration(manifest, env), manifest), []);
+  assert.deepEqual(buybackArguments(configuration(manifest, { ...env, ...masked }), manifest), [
+    '--max-spend-lamports',
+    '10000000',
+    '--masked-buyback-only',
+  ]);
+  assert.throws(
+    () => configuration(manifest, { ...env, ...masked, MSKD_PAYOUT_POOL: '' }),
+    /PRIVATE_WORKER_REWARD_CONFIG_INVALID/
+  );
+});
+test('forwards only known scheduler alert fields to the host log', () => {
+  const payout = {
+    event: 'masked_wxmr_alert',
+    level: 'critical',
+    claimId: '12345678-abcd-abcd-abcd-123456789012',
+  };
+  const epoch = {
+    event: 'masked_epoch_alert',
+    level: 'warning',
+    mint: 'A'.repeat(43),
+    epoch: 450000,
+    samples: 4,
+  };
+  for (const alert of [payout, epoch])
+    assert.deepEqual(
+      schedulerAlert(JSON.stringify({ ...alert, message: 'provider secret' })),
+      alert
+    );
+  assert.equal(schedulerAlert('raw provider error'), null);
+  assert.equal(schedulerAlert(JSON.stringify({ ...payout, claimId: 'private' })), null);
+  assert.equal(schedulerAlert(JSON.stringify({ ...epoch, samples: 'private' })), null);
+  assert.equal(schedulerAlert(JSON.stringify({ ...payout, event: 'unrelated' })), null);
 });
 test('signer setup validates the seed and derived collector, rather than trusting the public half', () => {
   const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519');

@@ -1,17 +1,10 @@
 const { PublicKey } = require('@solana/web3.js');
 const owner = require('../docs/mainnet-authorities.public.json');
 const devCompany = require('../docs/mskd-mainnet-dev-wallets.public.json');
-const { NETWORK_GENESIS } = require('./network-policy.cjs');
+const { MAINNET_REWARD_PINS, NETWORK_GENESIS } = require('./network-policy.cjs');
 
 function pinnedMainnetCompanyWallets(policyVersion) {
-  return [
-    'dev-v1',
-    'cashback-v1',
-    'mskd-v1',
-    'hsol-v1',
-    'cashback-hsol-v1',
-    'mskd-hsol-v1',
-  ].includes(policyVersion)
+  return policyVersion === 'dev-v1' || Object.hasOwn(MAINNET_REWARD_PINS, policyVersion)
     ? devCompany
     : (owner.company ?? { collector: owner.vault.operator, treasury: owner.vault.treasury });
 }
@@ -36,6 +29,7 @@ exports.companyWallets = function companyWallets(env, genesis, options = {}) {
       collectorKey === record.collector && treasuryKey === record.treasury;
     const historical =
       env.LAUNCH_POLICY_VERSION !== 'dev-v1' &&
+      env.LAUNCH_POLICY_VERSION !== 'masked-v1' &&
       options.allowLegacy === true &&
       (owner.legacyCompanyWallets ?? []).some(
         (record) => record.policyVersion === 'wallet-v1' && matches(record)

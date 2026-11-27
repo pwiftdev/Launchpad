@@ -3,7 +3,7 @@ import { parseEnv } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { validateEnv } from './validate-env.mjs';
 import { companyWallets } from './company-wallets.cjs';
-import { mainnetLaunchPolicy, NETWORK_GENESIS } from './network-policy.cjs';
+import { mainnetConfigPin, mainnetLaunchPolicy, NETWORK_GENESIS } from './network-policy.cjs';
 
 /** Offline configuration checks only. Values and provider errors never enter the report. */
 export function deploymentReadiness(env) {
@@ -27,12 +27,30 @@ export function deploymentReadiness(env) {
   check('activeCollectorMatchesOwnerRecord', currentWallets);
   check('mainnetNetwork', env.NEXT_PUBLIC_NETWORK === 'mainnet-beta');
   const policy = mainnetLaunchPolicy(env);
+  const masked =
+    env.NEXT_PUBLIC_SITE_URL === 'https://mskd.fun' || Boolean(env.MAINNET_MASKED_CONFIG_KEY);
   check('mainnetLaunchPolicy', env.LAUNCH_POLICY_VERSION === policy);
   check(
     'canonicalDeploymentOrigin',
     env.NEXT_PUBLIC_SITE_URL === 'https://rinsed-launchpad-1675f6b9bebf.herokuapp.com' ||
-      (policy === 'bond-v1' && env.NEXT_PUBLIC_SITE_URL === 'https://plzzz.bond')
+      (policy === 'bond-v1' && env.NEXT_PUBLIC_SITE_URL === 'https://plzzz.bond') ||
+      (policy === 'dev-v1' && env.NEXT_PUBLIC_SITE_URL === 'https://mskd.fun')
   );
+  if (masked) {
+    const config = mainnetConfigPin('masked-v1', env);
+    const previous = mainnetConfigPin('mskd-v1', env);
+    check('maskedConfigPinned', config && config !== env.POOL_CONFIG_KEY && config !== previous);
+    check('legacyMskdConfigPinned', previous && previous !== env.POOL_CONFIG_KEY);
+    const pool = env.MSKD_PAYOUT_POOL ?? '';
+    check(
+      'wxmrPoolPinned',
+      /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(pool) &&
+        pool !== config &&
+        pool !== previous &&
+        pool !== env.POOL_CONFIG_KEY
+    );
+    check('wxmrClaimsEnabled', env.MASKED_WXMR_PAYOUTS_ENABLED === 'true');
+  }
   check('databaseConfigured', /^postgres(?:ql)?:\/\//.test(env.DATABASE_URL ?? ''));
   check('collectorConfigured', Boolean(env.FEE_COLLECTOR_PUBLIC_KEY));
   check('treasuryConfigured', Boolean(env.TREASURY_PUBLIC_KEY));

@@ -32,18 +32,18 @@ export function CommunityInvite() {
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && dismiss()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-[560px] gap-0 overflow-y-auto overscroll-contain rounded-xl border-white/15 bg-[#160b06] shadow-2xl outline-none motion-reduce:animate-none">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-[560px] gap-0 overflow-y-auto overscroll-contain rounded-[30px] outline-none motion-reduce:animate-none">
         <DialogCloseButton
           aria-label="Close community invite"
-          className="absolute right-3 top-3 z-10 size-11 bg-black/65 text-white hover:bg-black focus-visible:outline-2 focus-visible:outline-white"
+          className="absolute right-4 top-4 z-10 size-10 bg-black/45 text-white ring-1 ring-inset ring-white/15 backdrop-blur-md hover:bg-black/70 focus-visible:outline-2 focus-visible:outline-white"
         />
         <div
           aria-hidden="true"
-          className="aspect-[1280/853] bg-cover bg-center"
+          className="aspect-[1280/853] bg-cover bg-center [mask-image:linear-gradient(180deg,#000_70%,transparent)]"
           style={{ backgroundImage: `url("${BRAND.assets.communityInvite}")` }}
         />
         <div className="flex flex-col items-center px-5 py-6 text-center sm:px-8 sm:py-7">
-          <DialogTitle className="font-display text-xl font-normal leading-snug text-white sm:text-2xl">
+          <DialogTitle className="text-xl font-semibold tracking-tight leading-snug text-white sm:text-2xl">
             Join the {BRAND.longName} community
           </DialogTitle>
           <DialogDescription className="mt-2 text-base text-neutral-200">

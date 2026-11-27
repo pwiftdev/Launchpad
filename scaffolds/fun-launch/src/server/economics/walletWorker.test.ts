@@ -234,9 +234,32 @@ describe('Masked wXMR payments sign only with a fresh swap quote', () => {
     await f.worker.relay('1');
     expect(f.rpc.sendRawTransaction).toHaveBeenCalledOnce();
   });
-  it('refuses to sign once the quote is stale', async () => {
+  it('refreshes an unsigned quote before signing even when its blockhash is valid', async () => {
     const f = payment(Date.now() - MSKD_QUOTE_LIFETIME_MS - 1);
-    await expect(f.worker.sign('1')).rejects.toThrow('quote has expired');
+    const prepared = { expectations: { quoteCreatedAt: Date.now() } };
+    f.worker.adapter.prepareWxmrClaim = vi.fn().mockResolvedValue(prepared);
+    f.store.prepareJob = vi.fn(async () => {
+      f.getJob().expectations.quoteCreatedAt = prepared.expectations.quoteCreatedAt;
+      return f.getJob();
+    });
+    await f.worker.sign('1');
+    expect(f.store.prepareJob).toHaveBeenCalledWith('1', prepared, f.getJob().message_digest);
+    expect(f.signer.sign).toHaveBeenCalledOnce();
+  });
+  it('does not persist or sign a replacement after lease loss during quoting', async () => {
+    const f = payment(Date.now() - MSKD_QUOTE_LIFETIME_MS - 1);
+    f.worker.adapter.prepareWxmrClaim = vi.fn().mockResolvedValue({});
+    f.store.prepareJob = vi.fn();
+    f.gate.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('lease lost'));
+    await expect(f.worker.sign('1')).rejects.toThrow('lease lost');
+    expect(f.store.prepareJob).not.toHaveBeenCalled();
+    expect(f.signer.sign).not.toHaveBeenCalled();
+  });
+  it('leaves an unsigned job pending when a fresh quote is unavailable', async () => {
+    const f = payment(Date.now() - MSKD_QUOTE_LIFETIME_MS - 1);
+    f.worker.adapter.prepareWxmrClaim = vi.fn().mockRejectedValue(new Error('thin liquidity'));
+    await expect(f.worker.sign('1')).rejects.toThrow('thin liquidity');
+    expect(f.getJob().status).toBe('prepared');
     expect(f.signer.sign).not.toHaveBeenCalled();
   });
 });
@@ -297,6 +320,31 @@ it('hourly planner skips empty income and accepts a real late snapshot after col
     epoch: 1,
     snapshot: { blockTime: 7350, slot: 1000, complete: true },
   });
+});
+it('retries an unclosed Masked hour after its closing window and skips it once recorded', async () => {
+  const f = fixture(),
+    mint = f.getJob().mint;
+  vi.spyOn(f.worker, 'coin').mockResolvedValue({ mode: 'masked', mint } as never);
+  vi.spyOn(f.worker, 'index').mockResolvedValue({ complete: true, dbc: {} as never, damm: null });
+  Object.assign(f.rpc, { getBlockTime: async () => 8100 });
+  const balances = vi.fn(async () => [{ bucket: 'community', available: '50000000' }]);
+  const createMaskedEpoch = vi
+    .fn()
+    .mockRejectedValueOnce(new Error('interrupted allocation'))
+    .mockResolvedValue({ status: 'created' });
+  Object.assign(f.store, {
+    balances,
+    createMaskedEpoch,
+    hasMaskedSample: async () => true,
+    pendingJobs: async (): Promise<WalletJob[]> => [],
+    pendingFeeEvents: async (): Promise<never[]> => [],
+  });
+  await expect(f.worker.plan(mint)).rejects.toThrow('interrupted allocation');
+  await f.worker.plan(mint);
+  await f.worker.plan(mint);
+  expect(createMaskedEpoch).toHaveBeenCalledTimes(2);
+  expect(createMaskedEpoch).toHaveBeenLastCalledWith(fixtureGenesis, mint, 1);
+  expect(balances).toHaveBeenCalledTimes(3);
 });
 import { WalletBuybackUnavailable } from './walletAdapter';
 it('automatic planning queues the treasury only with the quarter-hour intent and fixed cap', async () => {

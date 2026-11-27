@@ -14,7 +14,7 @@ export const SplitBadge = ({
   return (
     <span
       className={cn(
-        'rounded border border-neutral-700 px-1 py-px font-mono text-[10px] font-medium text-neutral-300',
+        'rounded-full bg-white/[0.06] px-1.5 py-px font-mono text-[10px] font-medium text-neutral-300 ring-1 ring-inset ring-white/[0.08]',
         className
       )}
       title={`Locked at launch: holders get ${holders}% and the creator ${100 - holders}% of the ${pct(SPLIT.beneficiaryBps)} share of every trade.`}

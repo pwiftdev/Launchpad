@@ -30,19 +30,32 @@ export const CreatorSharePicker = ({
         onChange={(e) => onChange(Number(e.target.value))}
         aria-label="Creator share of the fee"
         aria-valuetext={`Creator ${creator}%, holders ${100 - creator}%`}
-        className="mt-4 h-2 w-full cursor-pointer appearance-none rounded-full bg-neutral-850 accent-primary"
+        className="range-glass mt-5 w-full"
+        style={{ '--fill': `${value / 100}%` } as React.CSSProperties}
       />
       <div className="mt-2 flex justify-between font-mono text-[10px] text-neutral-600" aria-hidden>
         {CREATOR_SHARE_OPTIONS.map((bps) => (
-          <span key={bps} className={cn('w-6 text-center', bps === value && 'text-foreground')}>
+          <button
+            key={bps}
+            type="button"
+            tabIndex={-1}
+            onClick={() => onChange(bps)}
+            className={cn(
+              'w-7 rounded-md py-0.5 text-center transition-all duration-200 ease-out hover:text-neutral-200',
+              bps === value && 'scale-110 font-semibold text-primary'
+            )}
+          >
             {bps / 100}
-          </span>
+          </button>
         ))}
       </div>
-      <p className="mt-3 rounded-xl border border-amber/20 bg-amber/5 p-3 text-xs leading-relaxed text-neutral-400">
-        <span className="font-semibold text-foreground">Locked forever.</span> The split is signed
-        with your launch and written into the coin&rsquo;s metadata. Nobody can change it after
-        launch, not you and not Masked.
+      <p className="mt-4 flex gap-2.5 rounded-2xl border border-amber/20 bg-amber/[0.06] p-3.5 text-xs leading-relaxed text-neutral-300">
+        <span aria-hidden className="iconify mt-px h-4 w-4 shrink-0 text-amber ph--lock-key-fill" />
+        <span>
+          <span className="font-semibold text-foreground">Locked forever.</span> The split is signed
+          with your launch and written into the coin&rsquo;s metadata. Nobody can change it after
+          launch, not you and not Masked.
+        </span>
       </p>
     </div>
   );
@@ -59,9 +72,11 @@ const Share = ({
   bps: number;
   align?: 'left' | 'right';
 }) => (
-  <div className={cn('rounded-xl bg-neutral-950 p-3', align === 'right' && 'text-right')}>
-    <p className="text-2xs uppercase tracking-wider text-neutral-500">{label}</p>
-    <p className="mt-1 font-pixel text-[28px] leading-none">{percent}%</p>
+  <div className={cn('tile p-4', align === 'right' && 'text-right')}>
+    <p className="text-[12px] text-neutral-400">{label}</p>
+    <p className="mt-1.5 font-mono text-[34px] font-semibold leading-none tracking-[-0.04em] transition-all duration-200">
+      {percent}%
+    </p>
     <p className="mt-1 font-mono text-[11px] text-neutral-500">{pct(bps)} of every trade</p>
   </div>
 );

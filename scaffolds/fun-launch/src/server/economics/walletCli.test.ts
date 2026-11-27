@@ -17,6 +17,8 @@ const fake = vi.hoisted(() => ({
   required: vi.fn(),
   recover: vi.fn(),
   prepare: vi.fn(),
+  queueWxmrPayments: vi.fn(),
+  resumeMaskedWxmrClaim: vi.fn(),
 }));
 vi.mock('../database', () => ({
   database: () => {
@@ -30,6 +32,7 @@ vi.mock('./walletStore', () => ({
     executionCandidates = fake.candidates;
     oldestUserClaimSeconds = fake.claimAge;
     custodyRequirement = fake.custody;
+    resumeMaskedWxmrClaim = fake.resumeMaskedWxmrClaim;
   },
 }));
 vi.mock('./walletWorker', () => ({
@@ -42,6 +45,7 @@ vi.mock('./walletWorker', () => ({
     required = fake.required;
     recover = fake.recover;
     prepare = fake.prepare;
+    queueWxmrPayments = fake.queueWxmrPayments;
   },
 }));
 vi.mock('./walletSchedulerStore', () => ({
@@ -78,6 +82,8 @@ beforeEach(() => {
   fake.relay.mockClear();
   fake.recover.mockReset();
   fake.prepare.mockReset();
+  fake.queueWxmrPayments.mockReset();
+  fake.resumeMaskedWxmrClaim.mockReset();
   fake.required.mockReset();
   fake.pending.mockResolvedValue([{ id: 'saved', signature: 'already-signed' }]);
   fake.candidates.mockResolvedValue([{ id: 'saved' }]);
@@ -109,6 +115,10 @@ describe('finite private wallet CLI', () => {
     const order: string[] = [],
       lease = { alive: () => true, progress: vi.fn(), finish: vi.fn(), release: vi.fn() };
     fake.acquire.mockResolvedValue(lease);
+    fake.queueWxmrPayments.mockImplementationOnce(async () => {
+      order.push('queue');
+      throw new Error('wXMR queue connection interrupted');
+    });
     fake.reconcile.mockImplementation(async () => {
       order.push('reconcile');
     });
@@ -121,7 +131,8 @@ describe('finite private wallet CLI', () => {
         order.push('plan');
       });
     await runWalletCli(['run', '--execute', '--cycles', '1', '--maximum-coins', '2']);
-    expect(order).toEqual(['reconcile', 'plan', 'reconcile', 'plan']);
+    expect(order).toEqual(['queue', 'reconcile', 'plan', 'reconcile', 'plan']);
+    expect(fake.queueWxmrPayments).toHaveBeenCalledOnce();
     expect(fake.sign).not.toHaveBeenCalled();
     expect(fake.relay).not.toHaveBeenCalled();
     expect(lease.progress).toHaveBeenCalledTimes(2);
@@ -143,6 +154,34 @@ describe('finite private wallet CLI', () => {
     expect(() => walletCliOptions(['run', '--execute', '--execute'])).toThrow();
     await expect(runWalletCli(['run', '--cycles', '0'])).rejects.toThrow('bounded');
     expect(() => walletCliOptions(['run', '--private-key', 'secret'])).toThrow();
+  });
+  it('schedules capped Masked buybacks for the configured target only', async () => {
+    fake.acquire.mockResolvedValue({
+      alive: () => true,
+      progress: vi.fn(),
+      finish: vi.fn(),
+      release: vi.fn(),
+    });
+    vi.stubEnv('MASKED_TEST_BUYBACK_MINT', mints[0]);
+    const flags = ['run', '--execute', '--max-spend-lamports', '10000000', '--masked-buyback-only'];
+    await runWalletCli(flags);
+    expect(fake.plan).toHaveBeenNthCalledWith(1, mints[0], 10000000n, 20, false);
+    expect(fake.plan).toHaveBeenNthCalledWith(2, mints[1], undefined, 20, false);
+
+    fake.plan.mockClear();
+    vi.stubEnv('MASKED_TEST_BUYBACK_MINT', undefined);
+    await runWalletCli(flags);
+    expect(fake.plan).toHaveBeenNthCalledWith(1, mints[0], undefined, 20, false);
+    expect(fake.plan).toHaveBeenNthCalledWith(2, mints[1], undefined, 20, false);
+  });
+  it('does not release a reviewed claim for retry after lease loss', async () => {
+    const lease = { alive: () => false, progress: vi.fn(), finish: vi.fn(), release: vi.fn() };
+    fake.acquire.mockResolvedValue(lease);
+    await expect(
+      runWalletCli(['resume-wxmr', '--execute', '--id', '4ac018cf-80d8-4634-bd51-cabfebdaa54f'])
+    ).rejects.toThrow('lease lost');
+    expect(fake.resumeMaskedWxmrClaim).not.toHaveBeenCalled();
+    expect(lease.release).toHaveBeenCalledOnce();
   });
 });
 it('automatic expired attempt recovery requires positive proof and waits until another tick to sign again', async () => {

@@ -9,6 +9,12 @@
   ],
   "semverGroups": [
     {
+      "label": "Keep the reviewed Monero curve implementation on an exact version",
+      "range": "",
+      "dependencies": ["@noble/curves"],
+      "packages": ["@meteora-invent/scaffold/fun-launch"]
+    },
+    {
       "label": "@ledgerhq/errors must stay pinned: 6.37.0 (latest, deprecated) ships a broken ESM build that crashes next build",
       "range": "",
       "dependencies": ["@ledgerhq/errors"],

@@ -11,6 +11,7 @@ function fixture() {
     )
   );
   const row = (id: string) => jobs.get(id)!;
+  row('old').kind = 'wxmr_claim';
   const worker = {
     required: vi.fn(async (id: string) => ({ ...row(id) })),
     sign: vi.fn(async (id: string) =>

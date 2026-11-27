@@ -34,7 +34,7 @@ export const SocialLinks = ({
           aria-label={label}
           title={label}
           onClick={(event) => event.stopPropagation()}
-          className="grid h-7 w-7 place-items-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-850 hover:text-foreground"
+          className="grid h-7 w-7 place-items-center rounded-full text-neutral-400 transition-all duration-200 ease-spring hover:scale-110 hover:bg-white/[0.08] hover:text-foreground"
         >
           <span className={cn('iconify h-3.5 w-3.5', icon)} />
         </a>

@@ -22,14 +22,16 @@ export const LaunchPreviewCard = ({
   /** Masked: the creator's share of the 0.60%, in bps of that share. */
   creatorShareBps?: number;
 }) => (
-  <div className="surface p-5">
-    <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-      Preview on the board
-    </p>
-    <div className="mt-3 flex gap-3 rounded-xl border border-neutral-850 bg-neutral-950 p-3">
-      <CoinAvatar image={image} symbol={ticker || 'P'} className="h-16 w-16 text-2xl" />
+  <div className="surface rounded-3xl p-5">
+    <p className="eyebrow">Preview on the board</p>
+    <div className="tile mt-3 flex gap-3.5 p-3.5">
+      <CoinAvatar
+        image={image}
+        symbol={ticker || 'P'}
+        className="h-16 w-16 rounded-2xl text-2xl shadow-[0_12px_26px_-12px_rgba(0,0,0,0.95)]"
+      />
       <div className="min-w-0 flex-1">
-        <p className="truncate font-bold">{name || 'Your coin'}</p>
+        <p className="truncate text-[15px] font-semibold tracking-tight">{name || 'Your coin'}</p>
         <p className="truncate font-mono text-xs text-neutral-500">
           ${(ticker || 'TICKER').toUpperCase()}
         </p>
@@ -38,13 +40,9 @@ export const LaunchPreviewCard = ({
             <span className="iconify h-3 w-3 ph--crosshair-fill" />
             Launch slot {pct(SCHEDULE.startingFeeBps)}
           </span>
-          <span className="border border-neutral-700 px-2 py-0.5 font-term text-2xs font-semibold uppercase tracking-wide text-neutral-300">
-            {launchMode.label}
-          </span>
+          <span className="chip py-0.5 text-[10px]">{launchMode.label}</span>
           {creatorShareBps !== undefined && (
-            <span className="border border-neutral-700 px-2 py-0.5 font-term text-2xs font-semibold uppercase tracking-wide text-neutral-300">
-              Holders {100 - creatorShareBps / 100}%
-            </span>
+            <span className="chip py-0.5 text-[10px]">Holders {100 - creatorShareBps / 100}%</span>
           )}
         </div>
         <BondingBar progress={0} className="mt-2 h-1.5" />

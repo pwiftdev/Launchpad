@@ -5,7 +5,6 @@ import { decodeTrades } from '../tradeDecoder';
 import type { DisplayStore, IndexedTrade } from './store';
 
 export type ScanRpc = Pick<Connection, 'getSignaturesForAddress' | 'getTransactions'>;
-const PAGE = 1000;
 /** Transactions decoded per pool per pass; a busier pool continues on the next pass. */
 const FORWARD_BUDGET = 400;
 const BACKFILL_BUDGET = 200;
@@ -46,8 +45,8 @@ async function decode(
 }
 
 /**
- * One pass over a pool. New swaps are read oldest first and the cursor only moves past
- * transactions that were actually fetched, so a failed fetch is retried on the next pass.
+ * One pass over a pool. A busy pool walks a bounded window backwards and keeps its previous
+ * cursor until every page in the window has been fetched and written.
  */
 export async function scanPool(args: {
   rpc: ScanRpc;
@@ -61,41 +60,51 @@ export async function scanPool(args: {
   let newest = saved?.newest_signature ?? null,
     backfillBefore = saved?.backfill_before ?? null,
     complete = saved?.backfill_complete ?? false,
+    forwardHead = saved?.forward_head ?? null,
+    forwardBefore = saved?.forward_before ?? null,
     inserted = 0,
     more = false;
 
-  // Forward: everything newer than the cursor, newest first from the RPC.
-  const fresh: ConfirmedSignatureInfo[] = [];
-  let before: string | undefined;
-  for (;;) {
-    const page = await rpc.getSignaturesForAddress(
-      address,
-      { limit: PAGE, ...(newest ? { until: newest } : {}), ...(before ? { before } : {}) },
-      'confirmed'
-    );
-    fresh.push(...page);
-    if (page.length < PAGE || fresh.length >= FORWARD_BUDGET * 4) break;
-    before = page.at(-1)!.signature;
-  }
-  if (!saved) {
-    // First pass: the newest pages become the start of history; anything older is backfilled.
-    backfillBefore = fresh.length >= PAGE ? fresh.at(-1)!.signature : null;
-    complete = fresh.length < PAGE;
-  }
-  // Process the oldest new transactions first, within this pass's budget.
-  const ordered = fresh.filter((sig) => !sig.err).reverse();
-  const budget = ordered.slice(0, FORWARD_BUDGET);
-  more = ordered.length > budget.length;
-  for (const item of await decode(rpc, pool, coin, budget)) {
+  const fresh = await rpc.getSignaturesForAddress(
+    address,
+    {
+      limit: FORWARD_BUDGET,
+      ...(newest ? { until: newest } : {}),
+      ...(forwardBefore ? { before: forwardBefore } : {}),
+    },
+    'confirmed'
+  );
+  const full = fresh.length === FORWARD_BUDGET;
+  const trades: IndexedTrade[] = [];
+  let processed: string | undefined;
+  for (const item of await decode(rpc, pool, coin, fresh.filter((sig) => !sig.err).reverse())) {
     if ('missing' in item) {
       more = true;
       break;
     }
-    inserted += await store.insertTrades(coin.mint, item.trades);
-    newest = item.signature;
+    trades.push(...item.trades);
+    processed = item.signature;
   }
-  // Failed transactions newer than the last processed one only move the cursor when nothing is pending.
-  if (!more && fresh[0]) newest = fresh[0].signature;
+  if (trades.length) inserted += await store.insertTrades(coin.mint, trades);
+  if (more) {
+    if (!full && !forwardHead && processed) {
+      if (!newest && !backfillBefore) complete = true;
+      newest = processed;
+    }
+  } else if (full && newest) {
+    forwardHead ??= fresh[0]!.signature;
+    forwardBefore = fresh.at(-1)!.signature;
+    more = true;
+  } else {
+    if (!newest && !backfillBefore) {
+      // A new pool starts with the newest page. Older history has its own cursor.
+      backfillBefore = full ? fresh.at(-1)!.signature : null;
+      complete = !full;
+    }
+    more = forwardHead !== null;
+    newest = forwardHead ?? fresh[0]?.signature ?? newest;
+    forwardHead = forwardBefore = null;
+  }
 
   // Backfill: one page further back per pass until the pool's first transaction.
   if (!complete && backfillBefore) {
@@ -111,13 +120,19 @@ export async function scanPool(args: {
       page.filter((sig) => !sig.err)
     );
     if (decoded.every((item) => !('missing' in item))) {
-      for (const item of decoded)
-        if (!('missing' in item)) inserted += await store.insertTrades(coin.mint, item.trades);
+      const trades = decoded.flatMap((item) => ('missing' in item ? [] : item.trades));
+      if (trades.length) inserted += await store.insertTrades(coin.mint, trades);
       backfillBefore = page.at(-1)?.signature ?? backfillBefore;
       complete = page.length < BACKFILL_BUDGET;
     }
     more ||= !complete;
   }
-  await store.saveCursor(pool, coin.mint, { newest, backfillBefore, complete });
+  await store.saveCursor(pool, coin.mint, {
+    newest,
+    backfillBefore,
+    complete,
+    forwardHead,
+    forwardBefore,
+  });
   return { inserted, more };
 }

@@ -9,20 +9,18 @@ import { modeForPolicy } from './launch-policy.cjs';
 const args = process.argv.slice(2);
 if (args.length === 1 && args[0] === '--help') {
   console.log(
-    'Prepare a Meteora config without signing or broadcasting. Mainnet accepts --mainnet-dev, --mainnet-cashback, --mainnet-mskd or --mainnet-hsol followed by a private connection file and --output with a new private path. Bond it. uses --connection-file. Devnet uses --devnet mskd|dev|cashback with explicit FEE_COLLECTOR_PUBLIC_KEY and TREASURY_PUBLIC_KEY.'
+    'Prepare a Meteora config without signing or broadcasting. Use --mainnet-masked and a private connection file, or --devnet masked and explicit FEE_COLLECTOR_PUBLIC_KEY and TREASURY_PUBLIC_KEY. End with --output and a new private path. The other reviewed modes and the Bond it. --connection-file option remain supported.'
   );
 } else {
   try {
     const devnet = args[0] === '--devnet';
-    const mainnetMode = /^--mainnet-(dev|cashback|mskd|hsol|cashback-hsol|mskd-hsol)$/.exec(
-      args[0] ?? ''
-    )?.[1];
+    const mainnetMode = /^--mainnet-([a-z-]+)$/.exec(args[0] ?? '')?.[1];
     const policyVersion = devnet ? `${args[1]}-v1` : mainnetMode ? `${mainnetMode}-v1` : 'bond-v1';
     if (
       args.length !== 4 ||
       (!devnet && !mainnetMode && args[0] !== '--connection-file') ||
       args[2] !== '--output' ||
-      (devnet && !modeForPolicy(policyVersion))
+      ((devnet || mainnetMode) && !modeForPolicy(policyVersion))
     )
       throw Error('Invalid preparation arguments');
     const workspace = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),

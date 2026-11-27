@@ -56,6 +56,10 @@ function constraintsByMeaning(rows) {
     (a, b) => a.table_name.localeCompare(b.table_name) || a.name.localeCompare(b.name)
   );
 }
+async function setCatalogFormatting(client) {
+  await client.query("SET LOCAL TIME ZONE 'UTC'");
+  await client.query("SET LOCAL DateStyle TO 'ISO, MDY'");
+}
 async function readSchemaCatalog(client, scope) {
   const tables = (
     await client.query(
@@ -140,4 +144,12 @@ function compareSchema(expected, actual) {
   }
   return issues;
 }
-module.exports = { canonical, sql, constraintsByMeaning, readSchemaCatalog, compareSchema, sha };
+module.exports = {
+  canonical,
+  sql,
+  constraintsByMeaning,
+  setCatalogFormatting,
+  readSchemaCatalog,
+  compareSchema,
+  sha,
+};

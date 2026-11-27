@@ -8,15 +8,16 @@ import { toast } from 'sonner';
 import Page from '@/components/ui/Page/Page';
 import { Decrypt } from '@/components/brand/Decrypt';
 import { BRAND } from '@/constants/brand';
-import { NETWORK } from '@/constants/network';
 import { useCoins } from '@/hooks/useCoins';
 import { adminPageRedirect } from '@/server/adminPage';
 import { cn } from '@/lib/utils';
-import { formatXmr, isMoneroAddress } from '@/lib/monero';
+import { formatXmr } from '@/lib/monero';
+import { formatSol } from '@/lib/tokenUnits';
 import {
   CURRENCY_LABEL,
+  formatWxmr,
   maskedClaimMessage,
-  type ClaimCurrency,
+  type SolanaClaimCurrency,
   type EarningsView,
   type MaskedClaimView,
 } from '@/lib/maskedEarnings';
@@ -24,18 +25,15 @@ import {
 export const getServerSideProps: GetServerSideProps = async (context) =>
   adminPageRedirect(context) ?? { props: {} };
 
-const moneroNetwork = NETWORK === 'mainnet-beta' ? 'mainnet' : 'stagenet';
-const sol = (lamports: string | bigint) => Number(BigInt(lamports)) / 1e9;
-const formatSol = (lamports: string | bigint) =>
-  `${sol(lamports).toLocaleString(undefined, { maximumFractionDigits: 6 })} SOL`;
-
 const STATUS: Record<MaskedClaimView['status'], string> = {
-  queued: 'Waiting for the daily payout',
-  batched: 'In today’s payout',
-  sent: 'Sent, confirming',
+  queued: 'Waiting for payout',
+  batched: 'In a payout batch',
+  sent: 'Payout in progress',
   paid: 'Paid',
-  failed: 'Failed, earnings returned',
+  failed: 'Payout failed',
 };
+
+const CLAIM_OPTIONS = ['wxmr', 'sol'] as const;
 
 /** Every Masked creator and holder claims here, once, across all their coins. */
 export default function Earnings() {
@@ -43,16 +41,22 @@ export default function Earnings() {
   const { setShowModal } = useUnifiedWalletContext();
   const client = useQueryClient();
   const wallet = publicKey?.toBase58();
+  const [walletInput, setWalletInput] = useState('');
+  const [lookupWallet, setLookupWallet] = useState<string | null>(null);
+  const viewedWallet = lookupWallet ?? wallet;
+  const ownsWallet = !!wallet && viewedWallet === wallet;
   const { data: coins } = useCoins();
   const symbols = useMemo(
     () => new Map((coins ?? []).map((coin) => [coin.mint, coin.symbol])),
     [coins]
   );
   const earnings = useQuery<EarningsView>({
-    queryKey: ['earnings', wallet],
-    enabled: !!wallet,
+    queryKey: ['earnings', viewedWallet],
+    enabled: !!viewedWallet,
     queryFn: async ({ signal }) => {
-      const response = await fetch(`/api/earnings?wallet=${wallet}`, { signal });
+      const response = await fetch(`/api/earnings?wallet=${encodeURIComponent(viewedWallet!)}`, {
+        signal,
+      });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? 'Earnings are unavailable');
       return body;
@@ -60,25 +64,23 @@ export default function Earnings() {
     refetchInterval: 30_000,
   });
   const data = earnings.data;
-  const [choice, setChoice] = useState<ClaimCurrency>('xmr');
-  const [address, setAddress] = useState('');
+  const [currency, setCurrency] = useState<SolanaClaimCurrency>('wxmr');
   const [submitting, setSubmitting] = useState(false);
-  // XMR comes first; while native payouts are down, wXMR takes its place.
-  const currency: ClaimCurrency = choice === 'sol' ? 'sol' : data?.wxmrAvailable ? 'wxmr' : 'xmr';
   const amount = data ? (currency === 'sol' ? data.solClaimableLamports : data.totalLamports) : '0';
-  const addressValid = currency !== 'xmr' || isMoneroAddress(address.trim(), moneroNetwork);
+  const wxmrPaused = currency === 'wxmr' && !data?.wxmrAvailable;
   const belowMinimum =
-    !!data && currency !== 'sol' && BigInt(data.totalLamports) < BigInt(data.minimumXmrLamports);
+    !!data && currency === 'wxmr' && BigInt(amount) < BigInt(data.minimumWxmrLamports);
   const canClaim =
+    ownsWallet &&
     !!data &&
     !data.openClaim &&
     BigInt(amount) > 0n &&
-    addressValid &&
+    !wxmrPaused &&
     !belowMinimum &&
     !submitting;
 
   async function claim() {
-    if (!data || !wallet) return;
+    if (!canClaim || !data || !wallet) return;
     if (!signMessage) {
       toast.error('Use a wallet that can sign messages');
       return;
@@ -89,7 +91,6 @@ export default function Earnings() {
         networkGenesis: data.networkGenesis,
         wallet,
         currency,
-        ...(currency === 'xmr' ? { moneroAddress: address.trim() } : {}),
         lamports: amount,
         requestId: crypto.randomUUID(),
         issuedAt: Date.now(),
@@ -108,16 +109,11 @@ export default function Earnings() {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? 'Claim failed');
-      toast.success(
-        currency === 'sol'
-          ? 'Claimed. Your SOL is on its way.'
-          : 'Claimed. It goes out in the next daily payout.'
-      );
-      setAddress('');
-      await client.invalidateQueries({ queryKey: ['earnings', wallet] });
+      toast.success('Claim submitted. Track your payout here.');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Claim failed');
     } finally {
+      await client.invalidateQueries({ queryKey: ['earnings', wallet] });
       setSubmitting(false);
     }
   }
@@ -129,49 +125,112 @@ export default function Earnings() {
       </Head>
       <header className="pb-8 pt-4 md:pt-8">
         <p className="eyebrow">My earnings</p>
-        <h1 className="mt-4 font-display text-[30px] uppercase leading-[1.05] md:text-[44px]">
+        <h1 className="mt-4 text-[30px] font-semibold leading-[1.02] tracking-[-0.045em] md:text-[44px]">
           <Decrypt text="Your earnings." />
           <br />
-          <Decrypt text="Claimed in Monero." delay={160} className="text-holo" />
+          <Decrypt text="Claim in wXMR." delay={160} className="text-holo" />
         </h1>
         <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-neutral-400">
           Creator shares and holder rewards from every Masked coin collect here. Claim them all at
-          once, in native XMR or in SOL.
+          once in wrapped Monero (wXMR) or SOL to your connected wallet.
+        </p>
+        <p className="mt-2 text-sm text-neutral-400">
+          Direct payouts to Monero wallets are in development.
         </p>
       </header>
 
-      {!wallet ? (
-        <div className="surface p-6">
-          <p className="text-sm text-neutral-400">
+      <form
+        className="surface enter enter-1 mb-4 rounded-3xl p-5 sm:p-6"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const address = walletInput.trim();
+          if (address) setLookupWallet(address);
+        }}
+      >
+        <label htmlFor="earnings-wallet" className="text-[15px] font-semibold tracking-tight">
+          Look up a Solana wallet
+        </label>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input
+            id="earnings-wallet"
+            placeholder="Solana wallet address"
+            className="well h-11 min-w-0 flex-1 rounded-xl px-3.5 font-mono text-[13px] text-foreground outline-none transition-all duration-200 ease-out placeholder:font-sans placeholder:text-neutral-600 focus:border-primary/50 focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.35),0_0_0_4px_rgba(255,102,0,0.12)]"
+            autoComplete="off"
+            spellCheck={false}
+            required
+            maxLength={44}
+            value={walletInput}
+            onChange={(event) => setWalletInput(event.target.value)}
+          />
+          <button type="submit" className="btn-glass h-11 px-4 text-[13px]">
+            View earnings
+          </button>
+        </div>
+        {lookupWallet && (
+          <button
+            type="button"
+            className="mt-3 inline-flex items-center gap-1 text-[13px] text-primary transition-opacity hover:opacity-80"
+            onClick={() => {
+              setLookupWallet(null);
+              setWalletInput('');
+            }}
+          >
+            {wallet ? 'Return to my earnings' : 'Clear wallet lookup'}
+          </button>
+        )}
+      </form>
+
+      {!viewedWallet ? (
+        <div className="surface enter enter-2 flex flex-col items-center rounded-3xl px-6 py-10 text-center">
+          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-b from-white/[0.12] to-white/[0.03] text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_12px_28px_-12px_rgba(0,0,0,0.9)] ring-1 ring-inset ring-white/10">
+            <span aria-hidden className="iconify h-6 w-6 ph--wallet-fill" />
+          </span>
+          <p className="mt-4 text-[15px] font-semibold">Connect to see your earnings</p>
+          <p className="mt-1 max-w-sm text-sm text-neutral-400">
             Connect the wallet that launched or holds Masked coins.
           </p>
           <button
             type="button"
             onClick={() => setShowModal(true)}
-            className="btn-holo mt-4 h-11 rounded-lg px-5 text-sm"
+            className="btn-holo mt-5 h-11 px-6 text-[14px]"
           >
             Connect wallet
           </button>
         </div>
       ) : earnings.isLoading ? (
-        <div className="surface p-6 text-sm text-neutral-400">Loading your earnings…</div>
+        <div className="surface space-y-3 rounded-3xl p-6" aria-busy aria-label="Loading earnings">
+          <div className="skeleton h-3 w-24" />
+          <div className="skeleton h-10 w-56" />
+          <div className="skeleton h-3 w-full" />
+          <div className="skeleton h-3 w-2/3" />
+        </div>
       ) : earnings.error || !data ? (
-        <div className="surface p-6 text-sm text-rose" role="alert">
+        <div className="surface rounded-3xl p-6 text-sm text-rose" role="alert">
           {earnings.error instanceof Error ? earnings.error.message : 'Earnings are unavailable'}
         </div>
       ) : (
-        <div className="flex flex-col gap-5">
-          <section className="surface p-6" aria-labelledby="claimable">
+        <div className="flex flex-col gap-4">
+          <section
+            className="holo-border enter enter-2 overflow-hidden rounded-3xl p-6 sm:p-7"
+            aria-labelledby="claimable"
+          >
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -right-24 -top-28 -z-10 h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(255,110,20,0.28),transparent_65%)] blur-2xl"
+            />
             <p id="claimable" className="eyebrow">
               Ready to claim
             </p>
-            <p className="mt-3 font-pixel text-[36px] leading-none">
+            <p className="mt-3 font-mono text-[44px] font-semibold leading-none tracking-[-0.04em] sm:text-[52px]">
               {formatSol(data.totalLamports)}
             </p>
             {data.coins.length > 0 && (
-              <ul className="mt-5 divide-y divide-neutral-850 border-y border-neutral-850 text-sm">
+              <ul className="mt-6 space-y-1.5 text-sm">
                 {data.coins.map((coin) => (
-                  <li key={coin.mint} className="flex items-center gap-3 py-2.5">
+                  <li
+                    key={coin.mint}
+                    className="tile tile-hover flex items-center gap-3 px-3.5 py-3"
+                  >
                     <Link
                       href={`/token/${coin.mint}`}
                       className="w-28 shrink-0 truncate font-mono hover:text-primary"
@@ -198,122 +257,118 @@ export default function Earnings() {
           </section>
 
           {data.openClaim ? (
-            <section className="surface p-6">
-              <p className="eyebrow">Your claim</p>
+            <section className="surface enter enter-3 rounded-3xl p-6">
+              <p className="eyebrow">{ownsWallet ? 'Your claim' : 'Pending claim'}</p>
               <p className="mt-3 text-sm">
-                {formatSol(data.openClaim.lamports)} in {CURRENCY_LABEL[data.openClaim.currency]}:{' '}
+                {formatSol(data.openClaim.lamports)} of earnings ·{' '}
+                {CURRENCY_LABEL[data.openClaim.currency]} ·{' '}
                 <span className="font-semibold">{STATUS[data.openClaim.status]}</span>
               </p>
               <p className="mt-2 text-xs text-neutral-500">
-                One claim at a time. New earnings wait here until it is paid.
+                {data.openClaim.failure ??
+                  'One claim at a time. New earnings wait here until it finishes.'}
               </p>
             </section>
-          ) : (
-            <section className="surface p-6" aria-labelledby="claim">
+          ) : ownsWallet ? (
+            <section className="surface enter enter-3 rounded-3xl p-6" aria-labelledby="claim">
               <p id="claim" className="eyebrow">
                 Claim
               </p>
               <div role="radiogroup" aria-label="Pay in" className="mt-4 grid gap-2 sm:grid-cols-2">
-                {(['xmr', 'sol'] as const).map((option) => {
-                  const label =
-                    option === 'xmr' ? CURRENCY_LABEL[currency === 'wxmr' ? 'wxmr' : 'xmr'] : 'SOL';
-                  const selected = option === 'sol' ? currency === 'sol' : currency !== 'sol';
+                {CLAIM_OPTIONS.map((option) => {
+                  const selected = currency === option;
                   return (
                     <button
                       key={option}
                       type="button"
                       role="radio"
                       aria-checked={selected}
-                      onClick={() => setChoice(option)}
+                      onClick={() => setCurrency(option)}
                       className={cn(
-                        'rounded-xl border p-3.5 text-left transition-colors',
+                        'relative rounded-2xl border p-4 text-left transition-all duration-200 ease-out',
                         selected
-                          ? 'border-foreground bg-neutral-900'
-                          : 'border-neutral-800 bg-neutral-950 hover:border-neutral-600'
+                          ? 'border-primary/50 bg-primary/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_4px_rgba(255,102,0,0.08),0_14px_30px_-16px_rgba(255,102,0,0.5)]'
+                          : 'border-white/[0.08] bg-white/[0.03] hover:-translate-y-px hover:border-white/20'
                       )}
                     >
-                      <span className="block text-sm font-semibold">{label}</span>
+                      <span
+                        aria-hidden
+                        className={cn(
+                          'absolute right-3.5 top-3.5 grid h-5 w-5 place-items-center rounded-full transition-all duration-200 ease-spring',
+                          selected
+                            ? 'scale-100 bg-primary text-[#1a0900]'
+                            : 'scale-90 ring-1 ring-inset ring-white/15'
+                        )}
+                      >
+                        {selected && <span className="iconify h-3 w-3 ph--check-bold" />}
+                      </span>
+                      <span className="block text-[15px] font-semibold">
+                        {CURRENCY_LABEL[option]}
+                      </span>
                       <span className="mt-1 block text-xs text-neutral-500">
                         {option === 'sol'
-                          ? `${formatSol(data.solClaimableLamports)} now, to this wallet`
-                          : currency === 'wxmr'
-                            ? 'Native XMR payouts are down, so this pays wXMR to this wallet instead'
-                            : data.xmrAvailable
-                              ? 'Paid daily to your Monero address at that day’s rate'
-                              : 'XMR payouts are delayed; your claim waits and pays when they resume'}
+                          ? `${formatSol(data.solClaimableLamports)} available in SOL`
+                          : 'All eligible earnings converted at payout'}
                       </span>
                     </button>
                   );
                 })}
               </div>
 
-              {currency === 'xmr' && (
-                <div className="mt-4">
-                  <label
-                    htmlFor="monero-address"
-                    className="mb-1.5 block text-sm font-medium text-neutral-300"
-                  >
-                    Monero address
-                  </label>
-                  <input
-                    id="monero-address"
-                    value={address}
-                    onChange={(event) => setAddress(event.target.value)}
-                    spellCheck={false}
-                    autoComplete="off"
-                    placeholder={
-                      moneroNetwork === 'mainnet' ? '4… or 8…' : 'Stagenet address 5… or 7…'
-                    }
-                    className="w-full rounded-xl border border-neutral-800 bg-neutral-950 px-3.5 py-2.5 font-mono text-xs text-foreground placeholder:text-neutral-600 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
-                  {address && !addressValid ? (
-                    <p className="mt-1.5 text-xs text-rose" role="alert">
-                      That is not a valid {moneroNetwork} Monero address.
-                    </p>
-                  ) : (
-                    <p className="mt-1.5 text-xs text-neutral-500">
-                      Use a fresh subaddress for each claim. We keep it encrypted and erase it once
-                      the payout settles.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {belowMinimum && (
+              {wxmrPaused ? (
+                <p className="mt-4 text-xs text-neutral-400">
+                  wXMR payouts are temporarily unavailable. Your earnings stay here.
+                </p>
+              ) : belowMinimum ? (
                 <p className="mt-4 text-xs text-neutral-500">
-                  XMR claims start at {formatSol(data.minimumXmrLamports)} of earnings. Your
+                  wXMR claims start at {formatSol(data.minimumWxmrLamports)} of earnings. Your
                   earnings keep collecting until then.
                 </p>
-              )}
+              ) : null}
               <button
                 type="button"
                 disabled={!canClaim}
                 onClick={claim}
-                className="btn-holo mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[15px] disabled:opacity-50"
+                className="btn-holo mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-[15px] disabled:opacity-60"
               >
                 {submitting
                   ? 'Waiting for your signature…'
-                  : `Claim ${formatSol(amount)} in ${CURRENCY_LABEL[currency]}`}
+                  : currency === 'wxmr'
+                    ? 'Claim in wXMR'
+                    : `Claim ${formatSol(amount)}`}
               </button>
             </section>
-          )}
+          ) : null}
 
           {data.history.length > 0 && (
-            <section className="surface p-6" aria-labelledby="history">
+            <section className="surface enter enter-4 rounded-3xl p-6" aria-labelledby="history">
               <p id="history" className="eyebrow">
                 Past claims
               </p>
-              <ul className="mt-4 divide-y divide-neutral-850 text-sm">
+              <ul className="mt-4 space-y-1 text-sm">
                 {data.history.map((item) => (
-                  <li key={item.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
+                  <li
+                    key={item.id}
+                    className="-mx-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-2 py-2.5 transition-colors duration-200 hover:bg-white/[0.035]"
+                  >
                     <span className="font-mono">{formatSol(item.lamports)}</span>
                     <span className="text-neutral-500">{CURRENCY_LABEL[item.currency]}</span>
-                    {item.xmrAtomic && (
+                    {item.status === 'paid' && item.xmrAtomic && (
                       <span className="font-mono text-neutral-400">
-                        {formatXmr(BigInt(item.xmrAtomic))} XMR
+                        {item.currency === 'wxmr'
+                          ? formatWxmr(item.xmrAtomic)
+                          : `${formatXmr(BigInt(item.xmrAtomic))} XMR`}
                       </span>
                     )}
-                    <span className="ml-auto text-xs text-neutral-400">{STATUS[item.status]}</span>
+                    <span
+                      className={cn(
+                        'chip ml-auto',
+                        item.status === 'paid' && 'border-emerald/25 bg-emerald/10 text-emerald',
+                        item.status === 'failed' && 'border-rose/25 bg-rose/10 text-rose'
+                      )}
+                    >
+                      {STATUS[item.status]}
+                    </span>
                   </li>
                 ))}
               </ul>

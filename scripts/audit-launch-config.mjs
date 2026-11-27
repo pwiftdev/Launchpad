@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { inspectLaunchConfig, decodeLaunchConfig, reviewedQuote, modeForPolicy } from './launch-policy.cjs';
+import {
+  inspectLaunchConfig,
+  decodeLaunchConfig,
+  reviewedQuote,
+  modeForPolicy,
+} from './launch-policy.cjs';
 import { companyWallets } from './company-wallets.cjs';
 import { buildWalletLaunchTemplate } from './wallet-launch-template.cjs';
 import { expectedNetworkGenesis, localValidatorPolicy } from './network-policy.cjs';
@@ -29,16 +34,17 @@ try {
   if (selected === 'localnet' && !localValidatorPolicy(env))
     throw Error('Invalid isolated validator policy');
   const expected = expectedNetworkGenesis(env),
-    policyVersion = env.LAUNCH_POLICY_VERSION || 'bond-v1',
+    policyVersion = env.REGISTRATION_POLICY_VERSION || env.LAUNCH_POLICY_VERSION || 'bond-v1',
     quote = reviewedQuote(policyVersion, expected, env),
-    wallets = companyWallets(env, expected),
+    wallets = companyWallets({ ...env, LAUNCH_POLICY_VERSION: policyVersion }, expected),
     authorities = {
       feeClaimer: wallets.collector.toBase58(),
       leftoverReceiver: wallets.treasury.toBase58(),
       policyVersion,
       ...quote,
     };
-  if (policyVersion !== 'bond-v1' && !modeForPolicy(policyVersion)) throw Error('Unsupported release policy');
+  if (policyVersion !== 'bond-v1' && !modeForPolicy(policyVersion))
+    throw Error('Unsupported release policy');
   let config,
     address,
     digest,
@@ -95,8 +101,8 @@ try {
         address,
         configDigest: digest,
         economicPolicyMatches: issues.length === 0,
-        startingTaxPercent: policy.startingFeeBps / 100,
-        targetPercent: policy.endingFeeBps / 100,
+        startingTaxPercent: Number(base.cliffFeeNumerator.toString()) / 10_000_000,
+        targetPercent: modeForPolicy(policyVersion) ? endpoint : policy.endingFeeBps / 100,
         scheduledEndpointPercent: endpoint,
         authorities,
         authorityReview:

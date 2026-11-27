@@ -110,14 +110,14 @@ export const CommandPalette = () => {
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-[rgb(10_8_7/0.62)] backdrop-blur-[6px] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content
           aria-describedby={undefined}
-          className="fixed left-1/2 top-[12vh] z-50 w-[calc(100vw-24px)] max-w-xl -translate-x-1/2 overflow-hidden rounded-xl border border-white/[0.09] bg-panel shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98]"
+          className="glass-strong fixed left-1/2 top-[12vh] z-50 w-[calc(100vw-24px)] max-w-xl -translate-x-1/2 overflow-hidden rounded-3xl outline-none duration-200 ease-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-top-2"
         >
           <Dialog.Title className="sr-only">Search</Dialog.Title>
-          <div className="flex items-center gap-3 border-b border-neutral-850 px-4">
-            <span className="iconify h-5 w-5 text-neutral-500 ph--magnifying-glass" />
+          <div className="flex items-center gap-3 border-b border-white/[0.07] px-5">
+            <span className="iconify h-5 w-5 text-primary ph--magnifying-glass-bold" />
             <input
               autoFocus
               value={query}
@@ -138,9 +138,9 @@ export const CommandPalette = () => {
               role="combobox"
               aria-expanded
               aria-controls="palette-list"
-              className="h-14 flex-1 bg-transparent text-base outline-none placeholder:text-neutral-600"
+              className="h-16 flex-1 bg-transparent text-[16px] outline-none placeholder:text-neutral-500"
             />
-            <kbd className="rounded border border-neutral-800 px-1.5 font-mono text-[10px] text-neutral-500">
+            <kbd className="rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-term text-[10px] text-neutral-400 shadow-[inset_0_-1px_0_rgba(0,0,0,0.4)]">
               Esc
             </kbd>
           </div>
@@ -170,18 +170,27 @@ export const CommandPalette = () => {
                     }}
                     onClick={entry.run}
                     className={cn(
-                      'flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm',
-                      i === active ? 'bg-neutral-900 text-foreground' : 'text-neutral-300'
+                      'flex cursor-pointer items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-colors duration-200',
+                      i === active
+                        ? 'bg-gradient-to-b from-white/[0.10] to-white/[0.04] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                        : 'text-neutral-300'
                     )}
                   >
                     {entry.coin ? (
                       <CoinAvatar
                         image={entry.coin.image}
                         symbol={entry.coin.symbol}
-                        className="h-7 w-7 rounded-md text-xs"
+                        className="h-8 w-8 rounded-xl text-xs"
                       />
                     ) : (
-                      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-neutral-400">
+                      <span
+                        className={cn(
+                          'flex h-8 w-8 items-center justify-center rounded-xl ring-1 ring-inset ring-white/10 transition-colors duration-200',
+                          i === active
+                            ? 'bg-primary/15 text-primary'
+                            : 'bg-white/[0.04] text-neutral-400'
+                        )}
+                      >
                         <span className={cn('iconify h-4 w-4', entry.icon)} />
                       </span>
                     )}

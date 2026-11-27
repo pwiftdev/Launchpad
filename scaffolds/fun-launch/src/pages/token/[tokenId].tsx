@@ -65,11 +65,11 @@ export default function TokenPage({ share }: { share: ShareMeta }) {
       {coin ? (
         <CoinPanel
           coin={coin}
-          className="surface min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
+          className="surface min-h-0 flex-1 overflow-x-hidden overflow-y-auto rounded-3xl"
           headerActions={
             <Link
               href="/"
-              className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-900 hover:text-neutral-100"
+              className="grid h-9 w-9 place-items-center rounded-full text-neutral-400 ring-1 ring-inset ring-white/10 transition-all duration-200 ease-out hover:rotate-90 hover:bg-white/10 hover:text-neutral-50"
               aria-label="Back to the board"
             >
               <span className="iconify block h-5 w-5 ph--x" />
@@ -88,9 +88,15 @@ export default function TokenPage({ share }: { share: ShareMeta }) {
           </Link>
         </div>
       ) : (
-        <div className="surface space-y-4 p-5" aria-busy>
-          <div className="h-10 w-1/3 animate-pulse rounded-lg bg-neutral-900" />
-          <div className="h-[420px] animate-pulse rounded-lg bg-neutral-900" />
+        <div className="surface space-y-4 rounded-3xl p-5" aria-busy>
+          <div className="flex items-center gap-3">
+            <div className="skeleton h-14 w-14 rounded-2xl" />
+            <div className="flex-1 space-y-2">
+              <div className="skeleton h-4 w-1/3" />
+              <div className="skeleton h-3 w-1/4" />
+            </div>
+          </div>
+          <div className="skeleton h-[420px] rounded-3xl" />
         </div>
       )}
     </Page>

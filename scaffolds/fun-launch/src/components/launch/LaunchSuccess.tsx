@@ -121,7 +121,7 @@ function LaunchSuccessContent({ receipt, preview = false, onReset }: LaunchSucce
   return (
     <div className="space-y-5" data-launch-success={pending ? 'pending' : 'true'}>
       {pending && (
-        <section className="rounded-xl border border-amber/30 bg-amber/5 p-4" role="status">
+        <section className="rounded-2xl border border-amber/30 bg-amber/[0.06] p-4" role="status">
           <h2 className="font-semibold text-amber">
             {safeRetry === 'expired'
               ? 'Launch expired · no mint found'
@@ -159,7 +159,7 @@ function LaunchSuccessContent({ receipt, preview = false, onReset }: LaunchSucce
       {preview && (
         <div
           role="status"
-          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber/25 bg-amber/5 px-4 py-3 text-sm text-amber"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber/25 bg-amber/[0.06] px-4 py-3 text-sm text-amber"
         >
           <span>Post-launch preview · no token created. Stats below are sample data.</span>
           <Link href="/launch" className="font-medium underline underline-offset-4">
@@ -175,18 +175,18 @@ function LaunchSuccessContent({ receipt, preview = false, onReset }: LaunchSucce
         >
           <span className="iconify h-4 w-4 ph--arrow-left" /> Back to the board
         </Link>
-        <span className="rounded-full border border-neutral-800 px-3 py-1 text-xs text-neutral-400">
+        <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-neutral-400">
           Solana {NETWORK_LABEL}
         </span>
       </div>
 
       <section
-        className="relative isolate overflow-hidden rounded-2xl border border-primary/20 bg-neutral-950 p-6 md:p-9"
+        className="holo-border enter relative isolate overflow-hidden rounded-[30px] p-6 md:p-9"
         aria-label={pending ? 'Launch pending' : 'Launch complete'}
       >
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -right-20 -top-40 h-[520px] w-[520px] rounded-full bg-primary/10 blur-3xl"
+          className="pointer-events-none absolute -right-20 -top-40 -z-10 h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle,rgba(255,110,20,0.3),transparent_65%)] blur-3xl"
         />
         <div
           aria-hidden="true"
@@ -212,11 +212,11 @@ function LaunchSuccessContent({ receipt, preview = false, onReset }: LaunchSucce
                   : 'Launch confirmed'}
             </span>
             <div className="mt-7 flex flex-col items-start gap-5 sm:flex-row sm:items-center">
-              <div className="relative rounded-2xl border border-white/10 bg-white/5 p-2 shadow-xl">
+              <div className="relative rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.10] to-white/[0.03] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_24px_50px_-20px_rgba(0,0,0,0.95)]">
                 <CoinAvatar
                   image={receipt.image}
                   symbol={receipt.symbol}
-                  className="h-28 w-28 rounded-xl text-5xl md:h-32 md:w-32"
+                  className="h-28 w-28 rounded-2xl text-5xl md:h-32 md:w-32"
                 />
                 <span
                   className={`absolute -bottom-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full border-4 border-neutral-950 ${pending ? 'bg-amber' : 'bg-emerald'} text-neutral-950`}
@@ -253,9 +253,9 @@ function LaunchSuccessContent({ receipt, preview = false, onReset }: LaunchSucce
             </div>
           </div>
 
-          <div className="rounded-xl border border-neutral-800 bg-background/70 p-5 backdrop-blur-sm">
+          <div className="tile p-5">
             <p className="eyebrow">Launch receipt</p>
-            <div className="mt-5 flex items-center gap-3 border-b border-neutral-800 pb-5">
+            <div className="mt-5 flex items-center gap-3 border-b border-white/10 pb-5">
               <span
                 className={`flex h-10 w-10 items-center justify-center rounded-xl ${pending ? 'bg-amber/10 text-amber' : 'bg-emerald/10 text-emerald'}`}
               >
@@ -322,7 +322,7 @@ function LaunchSuccessContent({ receipt, preview = false, onReset }: LaunchSucce
               type="button"
               onClick={() => (watched ? toggle(receipt.mint) : add(receipt.mint, receipt))}
               aria-pressed={watched}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-800 py-2.5 text-xs text-neutral-300 transition-colors hover:border-primary/40 hover:text-primary"
+              className="btn-glass mt-6 flex w-full items-center justify-center gap-2 py-2.5 text-xs"
             >
               <span
                 className={`iconify h-4 w-4 ${watched ? 'ph--star-fill text-amber' : 'ph--star'}`}
@@ -337,7 +337,7 @@ function LaunchSuccessContent({ receipt, preview = false, onReset }: LaunchSucce
         aria-label={preview ? 'Sample launch stats' : 'Live launch stats'}
         className="grid gap-3 sm:grid-cols-3"
       >
-        <div className="surface p-5">
+        <div className="surface tile-hover rounded-3xl p-5">
           <p className="text-xs text-neutral-500">
             {preview ? 'Sample market cap' : 'Live market cap'}
           </p>
@@ -348,7 +348,7 @@ function LaunchSuccessContent({ receipt, preview = false, onReset }: LaunchSucce
             {coin ? 'Updates as trading happens' : 'Waiting for market data'}
           </p>
         </div>
-        <div className="surface p-5">
+        <div className="surface tile-hover rounded-3xl p-5">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-neutral-500">Bonding progress</p>
             <span className="font-mono text-xs text-primary">
@@ -359,14 +359,14 @@ function LaunchSuccessContent({ receipt, preview = false, onReset }: LaunchSucce
             {coin ? (
               <BondingBar progress={coin.progress} isMigrated={coin.isMigrated} />
             ) : (
-              <div className="h-2 rounded-full bg-neutral-850" />
+              <div className="h-2 rounded-full bg-white/[0.07]" />
             )}
           </div>
           <p className="mt-4 text-xs text-neutral-500">
             {coin?.isMigrated ? 'Graduated to the open market' : 'Track the path to graduation'}
           </p>
         </div>
-        <div className="surface p-5">
+        <div className="surface tile-hover rounded-3xl p-5">
           <p className="text-xs text-neutral-500">Creator buy selected at launch</p>
           <p className="mt-2 font-mono text-2xl font-medium tabular">
             {receipt.devBuyPercent}%{' '}

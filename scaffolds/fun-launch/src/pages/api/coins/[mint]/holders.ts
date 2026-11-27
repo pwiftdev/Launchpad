@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiGuard } from '@/server/apiGuard';
 import { parseKey } from '@/server/dbc';
-import { displayStore } from '@/server/display';
-import type { HoldersResponse } from '@/lib/coin';
+import { displayStore, sharedRead } from '@/server/display';
+import { TOP_HOLDER_LIMIT, type HoldersResponse } from '@/lib/coin';
 
 /** Every holder from the latest full token-account scan, largest first. */
 export default async function handler(
@@ -18,8 +18,14 @@ export default async function handler(
   try {
     const coin = await store.coin(mint.toBase58());
     if (!coin) return res.status(404).json({ error: 'Coin not found on MSKD.fun' });
-    const data = await store.holders(coin);
-    // The first scan of a new coin follows within seconds; until then the list is empty.
+    const compact = req.query.view === 'top';
+    const data = compact
+      ? await sharedRead(
+          `top-holders:${store.genesis}:${coin.mint}`,
+          () => store.holders(coin, TOP_HOLDER_LIMIT),
+          30_000
+        )
+      : await store.holders(coin);
     res.setHeader('Cache-Control', 'private, no-store');
     res
       .status(200)

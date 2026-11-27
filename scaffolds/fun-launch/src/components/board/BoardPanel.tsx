@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { Segmented } from '../ui/Segmented';
 
 type BoardPanelProps = React.PropsWithChildren<{
   id: string;
@@ -8,14 +9,16 @@ type BoardPanelProps = React.PropsWithChildren<{
   icon: string;
   iconClassName?: string;
   count?: number;
-  /** Cipher-style index shown before the title, e.g. 1 -> [01] */
+  /** Column number, shown as a quiet index before the title */
   index?: number;
   /** Right side of the header, e.g. sort controls */
   controls?: React.ReactNode;
   className?: string;
 }>;
 
-/** A board column: titled header with optional controls, body scrolls on its own. */
+const STAGGER = ['enter-1', 'enter-2', 'enter-3', 'enter-4'];
+
+/** A board column: a glass panel with a titled header; its list scrolls on its own. */
 export const BoardPanel = ({
   id,
   title,
@@ -31,41 +34,39 @@ export const BoardPanel = ({
   <section
     aria-labelledby={`panel-${id}`}
     className={cn(
-      'board-surface relative flex min-h-0 flex-col overflow-hidden border border-white/[0.09] bg-panel',
+      'board-surface enter flex min-h-0 flex-col overflow-hidden rounded-3xl',
+      index ? STAGGER[Math.min(index, STAGGER.length) - 1] : undefined,
       className
     )}
   >
-    {/* Light catching the top edge */}
-    <span
-      className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"
-      aria-hidden
-    />
-    <header className="flex h-14 shrink-0 items-center gap-2.5 border-b border-white/[0.06] pl-3 pr-2">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center bg-white/[0.04] ring-1 ring-inset ring-white/10">
-        <span className={cn('iconify h-4 w-4', icon, iconClassName ?? 'text-neutral-400')} />
+    <header className="flex h-[60px] shrink-0 items-center gap-3 pl-4 pr-3">
+      <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-white/[0.12] to-white/[0.03] shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_6px_14px_-6px_rgba(0,0,0,0.9)] ring-1 ring-white/10">
+        <span
+          className={cn('iconify h-[18px] w-[18px]', icon, iconClassName ?? 'text-neutral-300')}
+        />
       </span>
       <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <h2
             id={`panel-${id}`}
-            className="truncate whitespace-nowrap font-display text-[13px] uppercase"
+            className="truncate whitespace-nowrap text-[15px] font-semibold tracking-tight"
           >
-            {index !== undefined && (
-              <span className="mr-1.5 text-neutral-600">[{String(index).padStart(2, '0')}]</span>
-            )}
             {title}
           </h2>
           {count !== undefined && (
-            <span className="bg-white/[0.06] px-1.5 py-px font-pixel text-[10px] text-neutral-300">
+            <span className="rounded-full bg-white/[0.07] px-2 py-px font-mono text-[10.5px] font-medium tabular text-neutral-300 ring-1 ring-inset ring-white/[0.08]">
               {count}
             </span>
           )}
         </div>
-        {subtitle && <p className="truncate text-[10px] text-neutral-500">{subtitle}</p>}
+        {subtitle && <p className="truncate text-[11px] text-neutral-500">{subtitle}</p>}
       </div>
       <div className="ml-auto flex items-center">{controls}</div>
     </header>
-    <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+    <div className="mx-3 h-px shrink-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2 pt-2">
+      {children}
+    </div>
   </section>
 );
 
@@ -83,28 +84,5 @@ export function SortControl<T extends string>({
   onChange: (v: T) => void;
   label: string;
 }) {
-  return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      className="flex gap-0.5 rounded-lg border border-neutral-800/60 bg-neutral-900/60 p-0.5"
-    >
-      {options.map((o) => (
-        <button
-          key={o.id}
-          role="radio"
-          aria-checked={value === o.id}
-          onClick={() => onChange(o.id)}
-          className={cn(
-            'rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors',
-            value === o.id
-              ? 'bg-neutral-800 text-foreground shadow-sm'
-              : 'text-neutral-500 hover:text-neutral-200'
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
+  return <Segmented value={value} options={options} onChange={onChange} label={label} size="xs" />;
 }

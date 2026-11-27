@@ -35,6 +35,7 @@ const REWARD_ENVIRONMENT = [
   'MAINNET_HSOL_CONFIG_KEY',
   'MAINNET_CASHBACK_HSOL_CONFIG_KEY',
   'MAINNET_MSKD_HSOL_CONFIG_KEY',
+  'MAINNET_MASKED_CONFIG_KEY',
   'MSKD_PAYOUT_POOL',
 ];
 
@@ -45,7 +46,8 @@ function rewardEnvironment(manifest, env) {
   if (
     (Object.keys(values).length && manifest.policyVersion !== 'dev-v1') ||
     Object.values(values).some((key) => !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(key)) ||
-    Boolean(values.MAINNET_MSKD_CONFIG_KEY) !== Boolean(values.MSKD_PAYOUT_POOL) ||
+    Boolean(values.MAINNET_MSKD_CONFIG_KEY || values.MAINNET_MASKED_CONFIG_KEY) !==
+      Boolean(values.MSKD_PAYOUT_POOL) ||
     new Set([manifest.configKey, ...Object.values(values)]).size !== Object.keys(values).length + 1
   )
     fail('PRIVATE_WORKER_REWARD_CONFIG_INVALID');
@@ -278,6 +280,41 @@ function cycleProfile(cycle, childEnv, automatic) {
 function automaticArguments(automatic, commandFile) {
   return automatic ? ['--automatic', '--signer-config', commandFile] : [];
 }
+function buybackArguments(settings, manifest) {
+  const masked =
+    manifest.policyVersion === 'dev-v1' && settings.rewardEnvironment.MAINNET_MASKED_CONFIG_KEY;
+  if (!settings.buyback || (manifest.policyVersion && !masked)) return [];
+  return ['--max-spend-lamports', settings.buyback, ...(masked ? ['--masked-buyback-only'] : [])];
+}
+function schedulerAlert(line) {
+  let value;
+  try {
+    value = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  if (!value || typeof value !== 'object') return null;
+  const { event, level, claimId, mint, epoch, samples } = value;
+  if (
+    event === 'masked_wxmr_alert' &&
+    ['warning', 'critical'].includes(level) &&
+    typeof claimId === 'string' &&
+    /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(claimId)
+  )
+    return { event, level, claimId };
+  if (
+    event === 'masked_epoch_alert' &&
+    level === 'warning' &&
+    typeof mint === 'string' &&
+    /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint) &&
+    Number.isSafeInteger(epoch) &&
+    epoch >= 0 &&
+    Number.isSafeInteger(samples) &&
+    samples >= 0
+  )
+    return { event, level, mint, epoch, samples };
+  return null;
+}
 async function run() {
   // The historical secret is retained for rollback only and never passed to a child or loaded.
   delete process.env[LEGACY_KEY_ENV];
@@ -454,9 +491,7 @@ async function run() {
         String(settings.maximumJobs),
         '--slippage-bps',
         String(settings.slippageBps),
-        ...(settings.buyback && !manifest.policyVersion
-          ? ['--max-spend-lamports', settings.buyback]
-          : []),
+        ...buybackArguments(settings, manifest),
         ...automaticArguments(profile.automatic, commandFile),
       ];
       const result = await new Promise((resolve) => {
@@ -485,13 +520,16 @@ async function run() {
             terminate();
           }
         });
-        let stderr = 0;
+        const stderr = [];
+        let stderrBytes = 0;
         active.stderr.on('data', (chunk) => {
-          stderr += chunk.length;
-          if (stderr > 65536) {
+          stderrBytes += chunk.length;
+          if (stderrBytes > 65536) {
             overflow = true;
             terminate();
+            return;
           }
+          stderr.push(chunk);
         });
         const finish = (code) => {
           if (finished) return;
@@ -500,6 +538,10 @@ async function run() {
           if (escalation) clearTimeout(escalation);
           escalation = null;
           active = null;
+          for (const line of Buffer.concat(stderr).toString('utf8').split('\n')) {
+            const alert = schedulerAlert(line);
+            if (alert) emit(alert);
+          }
           let summary = {};
           for (const line of stdout.split('\n')) {
             try {
@@ -573,6 +615,8 @@ module.exports = {
   decodeSigningKey,
   cycleProfile,
   automaticArguments,
+  buybackArguments,
+  schedulerAlert,
   PINS,
   DEV_PINS,
 };

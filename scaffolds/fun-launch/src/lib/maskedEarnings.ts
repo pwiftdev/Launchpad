@@ -1,6 +1,8 @@
-// Shared by the "My earnings" screen and its API: what a wallet has earned across Masked coins,
-// and the exact message it signs to claim it.
+import modePolicy from '@/constants/modePolicy.json';
+import { formatTokenUnits } from './tokenUnits';
+
 export type ClaimCurrency = 'xmr' | 'wxmr' | 'sol';
+export type SolanaClaimCurrency = Exclude<ClaimCurrency, 'xmr'>;
 
 export type CoinEarnings = {
   mint: string;
@@ -23,14 +25,11 @@ export type EarningsView = {
   networkGenesis: string;
   wallet: string;
   coins: CoinEarnings[];
-  /** Everything claimable in XMR or wXMR. */
+  /** Earnings available for conversion to wXMR. */
   totalLamports: string;
   /** SOL pays per coin, and parts below the per-payout minimum wait for more income. */
   solClaimableLamports: string;
-  minimumXmrLamports: string;
-  /** Native XMR payouts are working now. XMR claims queue either way. */
-  xmrAvailable: boolean;
-  /** wXMR is offered in XMR's place while native payouts are down, once it is switched on. */
+  minimumWxmrLamports: string;
   wxmrAvailable: boolean;
   openClaim: MaskedClaimView | null;
   history: MaskedClaimView[];
@@ -52,6 +51,9 @@ export const CURRENCY_LABEL: Record<ClaimCurrency, string> = {
   wxmr: 'wXMR on Solana',
   sol: 'SOL',
 };
+
+export const formatWxmr = (units: string | bigint) =>
+  `${formatTokenUnits(units, modePolicy.payouts.wxmr.decimals)} wXMR`;
 
 /** The wallet signs this exact text. It authorizes one payout of exactly this amount. */
 export function maskedClaimMessage(origin: string, input: MaskedClaimRequest): string {

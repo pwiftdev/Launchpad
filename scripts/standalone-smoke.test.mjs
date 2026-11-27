@@ -37,6 +37,9 @@ test(
         await new Promise((resolve) => setTimeout(resolve, 250));
       }
       assert.ok(ready, `Standalone failed to become ready: ${output}`);
+      const display = await fetch(`${base}/api/health?check=display`);
+      assert.equal(display.status, 503);
+      assert.deepEqual(await display.json(), { status: 'unavailable' });
       for (const url of ['/privacy', '/admin', '/logo.svg']) {
         const response = await fetch(base + url);
         assert.equal(response.status, 200, url);

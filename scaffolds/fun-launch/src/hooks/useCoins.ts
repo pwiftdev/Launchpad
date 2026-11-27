@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type {
   CoinResponse,
+  CoinPriceHistory,
   CoinsResponse,
   HoldersResponse,
-  TradesResponse,
   TrendingResponse,
 } from '@/lib/coin';
 import { syncServerClock } from './useNow';
@@ -15,9 +15,7 @@ import {
   getDemoTrending,
 } from '@/lib/demo';
 import { useDemoMode } from './useDemoMode';
-import { useLiveCoin } from './useLiveCoin';
 import { useBoardLive } from './useBoardLive';
-export { invalidateCoinQueries } from './useLiveCoin';
 
 async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(url, {
@@ -30,10 +28,8 @@ async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   return body as T;
 }
 
-const fetchTrades = (mint: string, signal?: AbortSignal) =>
-  getJson<TradesResponse>(`/api/coins/${mint}/trades`, signal);
 const fetchHolders = (mint: string, signal?: AbortSignal) =>
-  getJson<HoldersResponse>(`/api/coins/${mint}/holders`, signal);
+  getJson<HoldersResponse>(`/api/coins/${mint}/holders?view=top`, signal);
 
 export function useCoins() {
   const { visible } = useDemoMode();
@@ -63,10 +59,9 @@ const fromBoard = (client: QueryClient, mint: string | undefined) =>
     ? client.getQueryData<CoinsResponse>(['coins'])?.coins.find((c) => c.mint === mint)
     : undefined;
 
-/** One coin. Renders instantly from the board's cached list, then refreshes from chain. */
+/** One coin, starting with the board's cached list while the indexed snapshot loads. */
 export function useCoin(mint: string | undefined) {
   const client = useQueryClient();
-  const live = useLiveCoin(mint, !getDemoCoin(mint));
   return useQuery({
     queryKey: ['coin', mint],
     queryFn: async ({ signal }) => {
@@ -79,33 +74,57 @@ export function useCoin(mint: string | undefined) {
     enabled: !!mint,
     initialData: () => getDemoCoin(mint) ?? fromBoard(client, mint),
     initialDataUpdatedAt: 0,
-    refetchInterval: live.connected ? 60_000 : 10_000,
+    refetchInterval: (coin) => (coin?.isDemo ? false : coin ? 60_000 : 15_000),
+    staleTime: 15_000,
     retry: (count, error) => count < 2 && !String(error).includes('not found'),
   });
 }
 
-export function useTrades(mint: string | undefined) {
+const PRICES_STALE_MS = 30_000;
+
+function fetchCoinPrices(mint: string, signal?: AbortSignal): Promise<CoinPriceHistory> {
   const demo = getDemoCoin(mint);
-  const live = useLiveCoin(mint, !demo);
-  return useQuery({
-    queryKey: ['trades', mint],
-    queryFn: ({ signal }) => (demo ? getDemoTrades(demo) : fetchTrades(mint!, signal)),
-    enabled: !!mint,
-    refetchInterval: demo ? false : live.connected ? 60_000 : 10_000,
-    staleTime: 2_000,
+  if (!demo) return getJson<CoinPriceHistory>(`/api/coins/${mint}/trades?view=chart`, signal);
+  const prices = new Map(
+    getDemoTrades(demo)
+      .trades.reverse()
+      .map(({ ts, priceSol }) => [ts, priceSol])
+  );
+  return Promise.resolve({ points: [...prices].map(([time, priceSol]) => ({ time, priceSol })) });
+}
+
+export function useCoinPrices(mint: string) {
+  const demo = getDemoCoin(mint);
+  return useQuery<CoinPriceHistory>({
+    queryKey: ['coin-prices', mint],
+    queryFn: ({ signal }) => fetchCoinPrices(mint, signal),
+    refetchInterval: demo ? false : 60_000,
+    staleTime: PRICES_STALE_MS,
     retry: 1,
+  });
+}
+
+/**
+ * Warms what the coin panel needs before it opens (on hover or touch), so the chart is
+ * already drawn when the panel lands. Fresh data is left alone; failures stay silent and
+ * the panel simply loads as usual.
+ */
+export function prefetchCoin(client: QueryClient, mint: string) {
+  void client.prefetchQuery({
+    queryKey: ['coin-prices', mint],
+    queryFn: ({ signal }) => fetchCoinPrices(mint, signal),
+    staleTime: PRICES_STALE_MS,
   });
 }
 
 export function useHolders(mint: string | undefined) {
   const demo = getDemoCoin(mint);
-  const live = useLiveCoin(mint, !demo);
   return useQuery({
     queryKey: ['holders', mint],
     queryFn: ({ signal }) => (demo ? getDemoHolders(demo) : fetchHolders(mint!, signal)),
     enabled: !!mint,
-    refetchInterval: demo ? false : live.connected ? 120_000 : 30_000,
-    staleTime: 15_000,
+    refetchInterval: demo ? false : 5 * 60_000,
+    staleTime: 60_000,
     retry: 1,
   });
 }

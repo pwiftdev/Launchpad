@@ -15,12 +15,12 @@ const DialogCloseButton = React.forwardRef<
   <DialogPrimitive.Close
     ref={ref}
     className={cn(
-      'flex items-center justify-center rounded-lg p-2 text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200 focus:outline-primary',
+      'flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 transition-all duration-200 ease-out hover:rotate-90 hover:bg-white/10 hover:text-neutral-100 focus:outline-primary',
       className
     )}
     {...props}
   >
-    <span className="iconify ph--x-circle-fill w-4 h-4" />
+    <span className="iconify ph--x-bold h-4 w-4" />
   </DialogPrimitive.Close>
 ));
 DialogCloseButton.displayName = DialogPrimitive.Close.displayName;
@@ -32,7 +32,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-black/20 backdrop-blur-sm',
+      'fixed inset-0 z-50 bg-[rgb(10_8_7/0.62)] backdrop-blur-[6px]',
       'data-[state=open]:animate-fade-in',
       'data-[state=closed]:animate-fade-out',
       className
@@ -58,11 +58,11 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-neutral-850 bg-neutral-925 shadow-lg duration-200',
+        'glass-strong fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl duration-200 ease-out',
         animate &&
-          'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]',
+          'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[46%]',
         animate &&
-          'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.98] data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]',
+          'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=closed]:duration-200',
         className
       )}
       {...props}
@@ -92,10 +92,7 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn(
-      'text-base font-semibold leading-none tracking-tight text-neutral-200',
-      className
-    )}
+    className={cn('text-lg font-semibold leading-tight tracking-tight text-neutral-50', className)}
     {...props}
   />
 ));
@@ -112,12 +109,7 @@ DialogDescription.displayName = DialogPrimitive.Description.displayName;
 const DialogSubmitButton: React.FC<React.ComponentProps<'button'>> = ({ className, ...props }) => {
   return (
     <button
-      className={cn(
-        'w-full rounded-lg bg-primary py-2.5 text-base font-semibold text-neutral-950',
-        'enabled:hover:bg-primary-300',
-        'disabled:opacity-50',
-        className
-      )}
+      className={cn('btn-holo w-full py-3 text-[15px]', 'disabled:opacity-60', className)}
       {...props}
     />
   );

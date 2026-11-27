@@ -34,7 +34,7 @@ const AvatarImage = ({ image, symbol, className }: CoinAvatarProps) => {
       role="img"
       aria-label={`${symbol} token image`}
       className={cn(
-        'relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-neutral-900 font-term font-semibold text-neutral-300 ring-1 ring-inset ring-neutral-800',
+        'relative isolate flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-neutral-750 to-neutral-900 font-semibold text-neutral-200 ring-1 ring-inset ring-white/10',
         className
       )}
     >
@@ -46,15 +46,25 @@ const AvatarImage = ({ image, symbol, className }: CoinAvatarProps) => {
           src={src}
           alt=""
           loading="lazy"
+          decoding="async"
           referrerPolicy="no-referrer"
+          // An image the browser already has shows at once, with no fade, on every remount
+          ref={(node) => {
+            if (node?.complete && node.naturalWidth > 0) setLoadedSource(src);
+          }}
           onLoad={() => setLoadedSource(src)}
           onError={() => setAttempt((current) => current + 1)}
           className={cn(
-            'absolute inset-0 h-full w-full object-cover transition-opacity',
+            'absolute inset-0 h-full w-full object-cover transition-opacity duration-300',
             loadedSource === src ? 'opacity-100' : 'opacity-0'
           )}
         />
       )}
+      {/* Glossy top light: makes every token image read as a lit, rounded object */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-b from-white/20 via-transparent to-black/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]"
+      />
     </div>
   );
 };

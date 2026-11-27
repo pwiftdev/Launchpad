@@ -173,6 +173,14 @@
     {
       "file": "043-masked-proof.sql",
       "sha256": "2000a0e40e45a5e4ad765e82903c2b50b8d1fa7db851c60cb4e9a8da24470ad7"
+    },
+    {
+      "file": "044-display-forward-catchup.sql",
+      "sha256": "f409c620839df3ab824ce05d9fc524debdda492db71353671f931840c3c66c27"
+    },
+    {
+      "file": "045-wxmr-claim-review.sql",
+      "sha256": "1644a45458d11336f5bdf71f58d0a0d8f1580bf7bf45301f8d28099205f8555f"
     }
   ],
   "catalog": {
@@ -670,6 +678,26 @@
         "is_nullable": "NO",
         "column_default": "now()",
         "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_pool_cursors",
+        "column_name": "forward_head",
+        "udt_name": "varchar",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": 88,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "display_pool_cursors",
+        "column_name": "forward_before",
+        "udt_name": "varchar",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": 88,
         "numeric_precision": null,
         "numeric_scale": null
       },
@@ -4029,6 +4057,16 @@
         "udt_name": "timestamptz",
         "is_nullable": "NO",
         "column_default": "now()",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claims",
+        "column_name": "wxmr_retry_after",
+        "udt_name": "timestamptz",
+        "is_nullable": "YES",
+        "column_default": null,
         "character_maximum_length": null,
         "numeric_precision": null,
         "numeric_scale": null
@@ -7533,6 +7571,13 @@
         "type": "p",
         "validated": true,
         "definition": "PRIMARY KEY (network_genesis)"
+      },
+      {
+        "table_name": "display_pool_cursors",
+        "name": "check:d4256518804af332ec56762d9e9f8bd9044357ed63b8cae939381eb0e1a2ed9c",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((forward_head IS NULL) = (forward_before IS NULL)))"
       },
       {
         "table_name": "display_pool_cursors",
@@ -11504,6 +11549,11 @@
         "table_name": "wallet_jobs",
         "name": "wallet_jobs_signature_key",
         "definition": "CREATE UNIQUE INDEX wallet_jobs_signature_key ON public.wallet_jobs USING btree (signature)"
+      },
+      {
+        "table_name": "wallet_jobs",
+        "name": "wallet_wxmr_claim_attempts",
+        "definition": "CREATE INDEX wallet_wxmr_claim_attempts ON public.wallet_jobs USING btree (network_genesis, ((details ->> 'maskedClaim'::text)), created_at DESC, id DESC) WHERE (kind = 'wxmr_claim'::text)"
       },
       {
         "table_name": "wallet_mode_sol_expenses",

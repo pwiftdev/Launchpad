@@ -21,7 +21,7 @@ export const BondFill = ({
   return (
     <div
       className={cn(
-        'bond-fill h-full transition-[width] duration-700',
+        'bond-fill h-full transition-[width] duration-500',
         !isMigrated && progress >= HOT_BOND_PROGRESS && 'bond-hot',
         className
       )}
@@ -50,7 +50,10 @@ export const BondingBar = ({ progress, isMigrated, className }: BondingBarProps)
       aria-valuemax={100}
       aria-valuenow={Math.round(pct)}
       aria-label="Bonding progress"
-      className={cn('h-2 w-full overflow-hidden bg-white/[0.06]', className)}
+      className={cn(
+        'h-2 w-full overflow-hidden rounded-full bg-black/40 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)] ring-1 ring-inset ring-white/[0.05]',
+        className
+      )}
     >
       <BondFill progress={progress} isMigrated={isMigrated} />
     </div>

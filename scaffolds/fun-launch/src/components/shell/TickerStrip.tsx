@@ -80,11 +80,11 @@ export const TickerStrip = () => {
             : 'No coins yet.';
 
   return (
-    <div className="flex h-10 shrink-0 items-center border-b border-white/[0.08] bg-panel">
+    <div className="flex h-11 shrink-0 items-center overflow-hidden border-b border-white/[0.08] bg-[rgb(18_15_14/0.6)] backdrop-blur-xl md:glass md:rounded-2xl md:border">
       <div
         role="tablist"
         aria-label="Strip"
-        className="flex h-full shrink-0 items-center gap-0.5 border-r border-neutral-850 px-2"
+        className="flex h-full shrink-0 items-center gap-1 border-r border-white/[0.07] px-2"
       >
         {MODES.map((m) => (
           <button
@@ -95,11 +95,11 @@ export const TickerStrip = () => {
             title={m.label}
             onClick={() => setMode(m.id)}
             className={cn(
-              'flex h-7 items-center justify-center gap-1.5 rounded-md transition-colors',
-              m.id === 'watchlist' ? 'px-2' : 'w-7',
+              'flex h-8 items-center justify-center gap-1.5 rounded-xl transition-all duration-200 ease-out',
+              m.id === 'watchlist' ? 'px-2.5' : 'w-8',
               mode === m.id
-                ? 'bg-neutral-900 text-primary'
-                : 'text-neutral-600 hover:text-neutral-300'
+                ? 'bg-white/[0.08] text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                : 'text-neutral-500 hover:bg-white/[0.04] hover:text-neutral-200'
             )}
           >
             <span className={cn('iconify h-4 w-4', m.icon)} />
@@ -114,7 +114,7 @@ export const TickerStrip = () => {
 
       {starHint && (
         <span
-          className="hidden h-full shrink-0 items-center gap-1.5 border-r border-neutral-850 px-3 text-[11px] text-neutral-500 sm:flex"
+          className="hidden h-full shrink-0 items-center gap-1.5 border-r border-white/[0.07] px-3 text-[11px] text-neutral-400 sm:flex"
           title="Tap ☆ on any coin to follow it here"
         >
           <span className="iconify h-3.5 w-3.5 text-primary ph--sparkle-fill" />
@@ -140,7 +140,7 @@ export const TickerStrip = () => {
               <CoinLink
                 key={`${coin.mint}-${i}`}
                 mint={coin.mint}
-                className="flex h-full shrink-0 items-center gap-2 border-r border-neutral-900 px-3.5 transition-colors hover:bg-primary/5"
+                className="group mx-0.5 flex h-8 shrink-0 items-center gap-2 rounded-xl px-3 transition-all duration-200 ease-out hover:bg-white/[0.06]"
               >
                 {mode === 'runners' && (
                   <span className="font-mono text-[11px] text-neutral-600">
@@ -150,7 +150,7 @@ export const TickerStrip = () => {
                 <CoinAvatar
                   image={coin.image}
                   symbol={coin.symbol}
-                  className="h-5 w-5 rounded text-[10px]"
+                  className="h-5 w-5 rounded-md text-[10px] ring-1 ring-white/10 transition-transform duration-200 ease-spring group-hover:scale-110"
                 />
                 <span className="text-[13px] font-medium">${coin.symbol}</span>
                 <span className="font-mono text-xs tabular text-neutral-500">{meta}</span>
@@ -168,12 +168,12 @@ export const TickerStrip = () => {
           </div>
         )}
         {animate && (
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-background to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-[rgb(20_17_15)] to-transparent" />
         )}
       </div>
       {rankings && (rankingStale || trending?.partial) && (
         <span
-          className="shrink-0 border-l border-neutral-850 px-2 text-[9px] text-amber"
+          className="shrink-0 border-l border-white/[0.07] px-3 text-[10px] text-amber"
           role="status"
           title="Some activity is unavailable. Showing the last readable data."
         >

@@ -58,19 +58,20 @@ export function RewardsPanel({ coin }: { coin: Coin }) {
 // Masked coins pay creators and holders through one claim across every coin, on My earnings.
 function MaskedRewards() {
   return (
-    <section aria-label="Token rewards" className="px-4 pb-4">
-      <p className="flex h-10 items-center text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+    <section aria-label="Token rewards" className="surface rounded-3xl px-4 pb-4 sm:px-5">
+      <p className="flex h-14 items-center text-[15px] font-semibold tracking-tight text-foreground">
         Token rewards
       </p>
       <p className="mt-2 text-xs text-neutral-400">
         Creator and holder earnings from this coin are claimed together with your other Masked
-        coins, in XMR or SOL.
+        coins, in wXMR or SOL.
       </p>
       <Link
         href="/earnings"
-        className="mt-3 inline-flex h-8 items-center rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-100 hover:border-neutral-500"
+        className="btn-holo mt-3 inline-flex h-10 items-center gap-1.5 px-4 text-[13px]"
       >
         Open My earnings
+        <span aria-hidden className="iconify h-4 w-4 ph--arrow-right-bold" />
       </Link>
     </section>
   );
@@ -149,8 +150,8 @@ function WalletRewards({ coin }: { coin: Coin }) {
   if (coin.isDemo || !coin.mode) return null;
   if (!isWalletPolicy(coin.feePolicyVersion ?? ''))
     return (
-      <section aria-label="Token rewards" className="px-4 pb-4">
-        <p className="flex h-10 items-center text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+      <section aria-label="Token rewards" className="surface rounded-3xl px-4 pb-4 sm:px-5">
+        <p className="flex h-14 items-center text-[15px] font-semibold tracking-tight text-foreground">
           Token rewards
         </p>
         <p className="mt-2 text-xs text-neutral-500">
@@ -284,8 +285,8 @@ function WalletRewards({ coin }: { coin: Coin }) {
   const holderClaim = data?.holderClaim;
   const hourly = coin.mode === 'community' || batched;
   return (
-    <section aria-label="Token rewards" className="px-4 pb-4">
-      <p className="flex h-10 items-center text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+    <section aria-label="Token rewards" className="surface rounded-3xl px-4 pb-4 sm:px-5">
+      <p className="flex h-14 items-center text-[15px] font-semibold tracking-tight text-foreground">
         {hasCreatorRewards(coin.mode)
           ? 'Creator rewards'
           : batched
@@ -401,7 +402,7 @@ function WalletRewards({ coin }: { coin: Coin }) {
             data?.epochs.map((epoch) => (
               <div
                 key={epoch.epoch}
-                className="mt-3 flex items-center justify-between gap-2 border-t border-neutral-850 pt-3 text-xs"
+                className="mt-3 flex items-center justify-between gap-2 border-t border-white/[0.06] pt-3 text-xs"
               >
                 <div>
                   <p className="font-mono text-neutral-200">{formatAmount(epoch.lamports)}</p>

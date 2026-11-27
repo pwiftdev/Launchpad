@@ -404,7 +404,7 @@ export async function getCoin(
   const genesis = await networkGenesis();
   const cacheKey = `${genesis}:${mint}`;
   // Trading/validation callers retain fresh reads by default; only display endpoints opt into caching.
-  if (fresh) return loadCoin(mint, genesis, true);
+  if (fresh) return loadCoin(mint, genesis);
   const current = coinLookups.get(cacheKey);
   if (current && Date.now() - current.at < (current.value ? 3000 : 15_000)) return current.value;
   if (current?.pending) return current.pending;
@@ -415,7 +415,7 @@ export async function getCoin(
   }
   const entry = current ?? { at: 0, value: null, generation: 0 },
     generation = entry.generation,
-    pending = loadCoin(mint, genesis, false);
+    pending = loadCoin(mint, genesis);
   entry.pending = pending;
   coinLookups.set(cacheKey, entry);
   try {
@@ -430,18 +430,16 @@ export async function getCoin(
     delete entry.pending;
   }
 }
-async function loadCoin(mint: string, genesis: string, fresh: boolean): Promise<CoinLookup | null> {
+async function loadCoin(mint: string, genesis: string): Promise<CoinLookup | null> {
   const mintKey = new PublicKey(mint);
-  const registry = fresh ? null : await registeredCoin(genesis, mint);
-  const registeredPool =
-    !fresh && registry
-      ? await displayPools.read({
-          publicKey: new PublicKey(registry.dbc_pool),
-          mint: mintKey,
-          config: new PublicKey(registry.config_key),
-        })
-      : null;
-  const found = registeredPool ?? (await dbc.state.getPoolByBaseMint(mintKey));
+  const registry = await registeredCoin(genesis, mint);
+  const found = registry
+    ? await displayPools.read({
+        publicKey: new PublicKey(registry.dbc_pool),
+        mint: mintKey,
+        config: new PublicKey(registry.config_key),
+      })
+    : await dbc.state.getPoolByBaseMint(mintKey);
   if (!found) return null;
   const s = found.account.poolState;
   if (!(await supportedConfig(s.config))) return null;
@@ -458,7 +456,7 @@ async function loadCoin(mint: string, genesis: string, fresh: boolean): Promise<
     found.account,
     config,
     mintData,
-    fresh ? await registeredCoin(genesis, mint) : registry,
+    registry,
     metas.get(mint)
   );
   return coin ? { coin, account: found.account, config } : null;

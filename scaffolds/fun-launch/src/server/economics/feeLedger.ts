@@ -24,6 +24,24 @@ export type FeeAllocation = {
 const carried = (previous: bigint, available: bigint, bps: bigint) =>
   ((previous + available) * bps) / 10_000n - (previous * bps) / 10_000n;
 
+function cumulativeMaskedShares(
+  net: bigint,
+  beneficiaryBps: bigint,
+  buybackBps: bigint,
+  creatorBps: bigint
+) {
+  const mskdBuyback = (net * buybackBps) / 10_000n;
+  const remaining = net - mskdBuyback;
+  const beneficiary = (remaining * beneficiaryBps) / (10_000n - buybackBps);
+  const creator = (beneficiary * creatorBps) / 10_000n;
+  return {
+    creator,
+    community: beneficiary - creator,
+    platform: remaining - beneficiary,
+    mskdBuyback,
+  };
+}
+
 export function allocateExecutedFee({
   total,
   protocol,
@@ -68,24 +86,23 @@ export function allocateExecutedFee({
   if (isFeeModeId(mode) && feeMode(mode).beneficiary === 'split') {
     if (!isCreatorShareBps(creatorShareBps))
       throw new Error('A Masked coin requires its locked creator share');
-    const shares = netShares(mode),
-      beneficiaryBps = BigInt(shares.beneficiary);
-    // The creator's part is carried on its own so batching never moves value between creator and holders.
-    const beneficiary = carried(previousPhaseNet, available, beneficiaryBps),
-      creator = carried(
-        previousPhaseNet,
-        available,
-        (beneficiaryBps * BigInt(creatorShareBps)) / 10_000n
-      ),
-      mskdBuyback = carried(previousPhaseNet, available, BigInt(shares.buyback));
+    const shares = netShares(mode);
+    const weights = [
+      BigInt(shares.beneficiary),
+      BigInt(shares.buyback),
+      BigInt(creatorShareBps),
+    ] as const;
+    // Split each remainder in turn so rounding never makes a cumulative share decrease.
+    const before = cumulativeMaskedShares(previousPhaseNet, ...weights);
+    const after = cumulativeMaskedShares(previousPhaseNet + available, ...weights);
     return {
       protocol,
       referral,
       rinseBuyback: 0n,
-      creator,
-      community: beneficiary - creator,
-      platform: available - beneficiary - mskdBuyback,
-      mskdBuyback,
+      creator: after.creator - before.creator,
+      community: after.community - before.community,
+      platform: after.platform - before.platform,
+      mskdBuyback: after.mskdBuyback - before.mskdBuyback,
     };
   }
   if (creatorShareBps !== undefined && creatorShareBps !== null)

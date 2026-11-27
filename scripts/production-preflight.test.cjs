@@ -236,6 +236,7 @@ test('verifies wallet-v1 policy, protocol code, frozen schema and scoped unsigne
   assert.equal(f.counters().released, true);
   assert.equal(f.queries.at(-1), 'ROLLBACK');
   assert.ok(!report.checks.some((value) => /vault/.test(value.id)));
+  assert.ok(f.queries.includes("SET LOCAL TIME ZONE 'UTC'"));
 });
 
 test('recognizes the exact Bond it. slot scheduler and binds database admission to bond-v1', async () => {
@@ -264,6 +265,55 @@ test('recognizes the exact Bond it. slot scheduler and binds database admission 
   assert.equal(report.technicalChecksPassed, true, JSON.stringify(report.checks));
   assert.equal(report.scheduledEndpointNumerator, '12500000');
   assert.equal(f.counters().broadcasts, 0);
+});
+test('binds reviewed Masked policy to its own mainnet pin and the active Dev company wallets', async () => {
+  const f = fixture(),
+    old = f.configDecoder();
+  const { collector, treasury } = require('../docs/mskd-mainnet-dev-wallets.public.json');
+  f.expected.company = { collector, treasury };
+  Object.assign(f.expected.config, {
+    policyVersion: 'masked-v1',
+    feeClaimer: collector,
+    leftoverReceiver: treasury,
+  });
+  Object.assign(f.env, {
+    LAUNCH_POLICY_VERSION: 'dev-v1',
+    MAINNET_MASKED_CONFIG_KEY: f.expected.config.address,
+    POOL_CONFIG_KEY: pub(24).toBase58(),
+    NEXT_PUBLIC_POOL_CONFIG_KEY: pub(24).toBase58(),
+    FEE_COLLECTOR_PUBLIC_KEY: collector,
+    TREASURY_PUBLIC_KEY: treasury,
+  });
+  Object.assign(f.registry, {
+    policy_version: 'masked-v1',
+    expected_fee_claimer: collector,
+    expected_leftover_receiver: treasury,
+  });
+  f.configDecoder = () => ({
+    ...old,
+    feeClaimer: collector,
+    leftoverReceiver: treasury,
+    activationType: 0,
+    enableFirstSwapWithMinFee: true,
+    migratedPoolFeeBps: 125,
+    poolFees: {
+      ...old.poolFees,
+      baseFee: {
+        ...old.poolFees.baseFee,
+        cliffFeeNumerator: new BN(990000000),
+        firstFactor: 1,
+        secondFactor: new BN(1),
+        thirdFactor: new BN(977500000),
+        baseFeeMode: 0,
+      },
+    },
+  });
+  const report = await collectProductionPreflight(f);
+  assert.equal(report.policy, 'masked-v1');
+  assert.equal(report.technicalChecksPassed, true, JSON.stringify(report.checks));
+  assert.equal(f.counters().broadcasts, 0);
+  f.env.MAINNET_MASKED_CONFIG_KEY = f.env.POOL_CONFIG_KEY;
+  assert.equal(passed(await collectProductionPreflight(f), 'config.mainnetModePin'), false);
 });
 test('rejects native recipients or extra custom-program approvals instead of silently using old custody', async () => {
   for (const mutate of [

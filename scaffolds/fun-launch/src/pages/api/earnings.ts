@@ -4,6 +4,7 @@ import { PublicKey } from '@solana/web3.js';
 import { z } from 'zod';
 import { apiGuard, takeLimit } from '@/server/apiGuard';
 import { connection, networkGenesis } from '@/server/dbc';
+import { expectedGenesis } from '@/server/launchConfig';
 import { siteOriginForHeaders } from '@/server/siteOrigin';
 import { assertWalletExecutionGate } from '@/server/economics/walletGate';
 import {
@@ -12,10 +13,7 @@ import {
 } from '@/server/economics/walletRecipient';
 import { MaskedClaimError, MaskedClaimStore } from '@/server/economics/maskedClaimStore';
 import { verifyWalletSignature } from '@/server/economics/walletSignature';
-import { moneroSealConfigured } from '@/server/economics/moneroSeal';
-import { isMoneroAddress, type MoneroNetwork } from '@/lib/monero';
 import { maskedClaimMessage } from '@/lib/maskedEarnings';
-import { NETWORK_GENESIS } from '@/server/launchConfig';
 
 export const config = { api: { bodyParser: { sizeLimit: '3kb' } } };
 
@@ -35,8 +33,7 @@ const claim = z
     action: z.literal('claim'),
     networkGenesis: address,
     wallet: address,
-    currency: z.enum(['xmr', 'wxmr', 'sol']),
-    moneroAddress: z.string().max(106).optional(),
+    currency: z.enum(['wxmr', 'sol']),
     lamports: z.string().regex(/^[1-9]\d{0,19}$/),
     requestId: z.string().uuid(),
     issuedAt: z.number().int(),
@@ -44,40 +41,29 @@ const claim = z
   })
   .strict();
 
-/** Mainnet pays to mainnet Monero addresses; every test network uses stagenet. */
-export const moneroNetwork = (genesis: string): MoneroNetwork =>
-  genesis === NETWORK_GENESIS['mainnet-beta'] ? 'mainnet' : 'stagenet';
-
 const store = new MaskedClaimStore();
 
-/** A wallet's Masked earnings, and one signed claim to take them in XMR, wXMR or SOL. */
+/** A wallet's Masked earnings and its signed wXMR or SOL claim. */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!apiGuard(req, res)) return;
   res.setHeader('Cache-Control', 'private, no-store');
   if (!process.env.DATABASE_URL) return res.status(503).json({ error: 'Earnings are unavailable' });
   try {
-    const genesis = await networkGenesis();
     if (req.method === 'GET') {
       const wallet = address.safeParse(req.query.wallet);
       if (!wallet.success) return res.status(400).json({ error: 'Invalid wallet' });
-      return res.status(200).json(await store.earnings(genesis, wallet.data));
+      return res.status(200).json(await store.earnings(expectedGenesis(), wallet.data));
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
     const parsed = claim.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid claim' });
     const input = parsed.data;
+    const genesis = await networkGenesis();
     if (input.networkGenesis !== genesis)
       return res.status(409).json({ error: 'The network changed. Reload before claiming.' });
     const now = Date.now();
     if (input.issuedAt > now + 30_000 || input.issuedAt < now - 300_000)
       return res.status(401).json({ error: 'This signature expired. Sign again.' });
-    if (input.currency === 'xmr') {
-      if (!input.moneroAddress || !isMoneroAddress(input.moneroAddress, moneroNetwork(genesis)))
-        return res.status(400).json({ error: 'Enter a valid Monero address' });
-      if (!moneroSealConfigured())
-        return res.status(503).json({ error: 'XMR claims are not configured yet' });
-    } else if (input.moneroAddress !== undefined)
-      return res.status(400).json({ error: 'A Monero address is only for XMR claims' });
     const origin = siteOriginForHeaders(req.headers);
     const message = maskedClaimMessage(origin, input);
     if (!verifyWalletSignature(input.wallet, message, input.signature))
@@ -112,8 +98,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       lamports: BigInt(input.lamports),
       requestId: input.requestId,
       authorizationDigest: createHash('sha256').update(message).digest('hex'),
-      moneroAddress: input.moneroAddress,
-      xmrAvailable: await store.xmrAvailable(genesis),
     });
     return res.status(202).json(result);
   } catch (error) {
@@ -124,6 +108,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
     return res
       .status(503)
-      .json({ error: 'Earnings are temporarily unavailable. Nothing was claimed.' });
+      .json({ error: 'Earnings are temporarily unavailable. Check your claims before retrying.' });
   }
 }

@@ -14,7 +14,12 @@ import { FinalizedVerifier, validateSignedTransaction } from './chainEvidence';
 import { FinalizedFeeIndexer } from './finalizedIndexer';
 import { collectHolderSnapshot } from './holderSnapshot';
 import { configuredCompanyWallets } from '../launchConfig';
-import { mskdConversionPool, mskdPayoutMint, requireFreshMskdQuote } from './walletMskdPolicy';
+import {
+  isFreshMskdQuote,
+  mskdConversionPool,
+  mskdPayoutMint,
+  requireFreshMskdQuote,
+} from './walletMskdPolicy';
 import {
   hasBatchedHolderRewards,
   isCashbackMode,
@@ -44,6 +49,8 @@ export class WalletMessageExpired extends Error {
 
 /** A swap job's price quote expires; it must be signed and sent while still fresh. */
 const quoted = (job: WalletJob) => job.kind === 'holder_conversion' || job.kind === 'wxmr_claim';
+const needsNewQuote = (job: WalletJob) =>
+  quoted(job) && !isFreshMskdQuote(job.expectations.quoteCreatedAt);
 export class WalletWxmrUnavailable extends Error {
   override readonly name = 'WalletWxmrUnavailable';
   constructor(cause: unknown) {
@@ -55,6 +62,8 @@ export class WalletWxmrUnavailable extends Error {
 
 /** One finite private-worker operation. Signature bytes are durable before every relay. */
 export class WalletWorker {
+  private readonly checkedHolderEpochs = new Map<string, number>();
+
   constructor(
     readonly rpc: Connection,
     readonly store: WalletStore,
@@ -145,7 +154,9 @@ export class WalletWorker {
   async prepare(id: string) {
     await this.gate();
     let job = await this.required(id);
-    if (job.status === 'prepared') {
+    const replacedDigest =
+      job.status === 'prepared' && !job.signature && needsNewQuote(job) ? job.message_digest : null;
+    if (job.status === 'prepared' && !replacedDigest) {
       try {
         await this.unexpired(job);
         return job;
@@ -154,7 +165,7 @@ export class WalletWorker {
         job = await this.recover(id);
       }
     }
-    if (job.status !== 'queued') return job;
+    if (job.status !== 'queued' && !replacedDigest) return job;
     const coin = await this.coin(job.mint);
     let prepared;
     if (job.kind === 'collect') {
@@ -185,8 +196,7 @@ export class WalletWorker {
     } else if (job.kind === 'setup') prepared = await this.adapter.prepareSetup({ coin });
     else prepared = await this.adapter.preparePayout(job);
     await this.gate();
-    job = await this.store.prepareJob(id, prepared);
-    return job;
+    return this.store.prepareJob(id, prepared, replacedDigest);
   }
   async recover(id: string) {
     await this.gate();
@@ -263,9 +273,15 @@ export class WalletWorker {
     )
       await this.allocateHolderIncome(coin);
     if (isMaskedMode(coin.mode)) {
-      await this.sampleMaskedHolders(coin);
-      await this.fundMskdBuyback(coin);
-      await this.queueWxmrPayments();
+      const balances = await this.store.balances(this.genesis, coin.mint);
+      await this.sampleMaskedHolders(
+        coin,
+        BigInt(balances.find((row) => row.bucket === 'community')?.available ?? '0')
+      );
+      await this.fundMskdBuyback(
+        coin,
+        BigInt(balances.find((row) => row.bucket === 'mskd_buyback')?.available ?? '0')
+      );
     }
     pending = await this.store.pendingJobs(this.genesis, mint, maximumJobs);
     const jobs: WalletJob[] = [];
@@ -286,13 +302,8 @@ export class WalletWorker {
     }
     return { status: 'planned', jobs };
   }
-  /**
-   * Masked holder income follows time-weighted balances: one verified full snapshot per
-   * five-minute window while the coin has holder income waiting, and in the first window of each
-   * hour the previous hour is averaged and allocated.
-   */
   /** Queues the next payment of each open Masked wXMR claim, once a wXMR market is configured. */
-  private async queueWxmrPayments() {
+  async queueWxmrPayments() {
     const asset = mskdPayoutMint(this.genesis),
       market = mskdConversionPool();
     if (!asset || !market) return;
@@ -306,23 +317,18 @@ export class WalletWorker {
     });
   }
   /** Moves this Masked coin's $MSKD share onto the official $MSKD coin's buyback budget. */
-  private async fundMskdBuyback(coin: RegisteredCoin) {
+  private async fundMskdBuyback(coin: RegisteredCoin, available: bigint) {
+    if (available < MINIMUM_HOLDER_PAYOUT_LAMPORTS) return;
     const target = mskdBuybackMint(this.genesis);
     if (!target || target === coin.mint) return;
-    const balance = (await this.store.balances(this.genesis, coin.mint)).find(
-      (row) => row.bucket === 'mskd_buyback'
-    );
-    if (!balance || BigInt(balance.available) < MINIMUM_HOLDER_PAYOUT_LAMPORTS) return;
     await this.gate();
     await this.store.transferMskdBuyback(this.genesis, coin.mint, target);
   }
-  private async sampleMaskedHolders(coin: RegisteredCoin) {
-    const community = (await this.store.balances(this.genesis, coin.mint)).find(
-      (balance) => balance.bucket === 'community'
-    );
-    if (!community || BigInt(community.available) < MINIMUM_HOLDER_PAYOUT_LAMPORTS) return;
+  private async sampleMaskedHolders(coin: RegisteredCoin, available: bigint) {
+    if (available < MINIMUM_HOLDER_PAYOUT_LAMPORTS) return;
     const clock = await new FinalizedVerifier(this.rpc, this.genesis).clock();
-    const window = Math.floor(clock.blockTime / MASKED_SAMPLE_SECONDS);
+    let sampledAt = clock.blockTime;
+    const window = Math.floor(sampledAt / MASKED_SAMPLE_SECONDS);
     if (!(await this.store.hasMaskedSample(this.genesis, coin.mint, window))) {
       const { collector, treasury } = configuredCompanyWallets(this.genesis);
       const snapshot = await collectHolderSnapshot(this.rpc, {
@@ -343,24 +349,27 @@ export class WalletWorker {
       await this.gate();
       // A slow scan can land in the next window; it is stored under the window it observed.
       await this.store.recordMaskedSample(snapshot);
+      sampledAt = Math.max(sampledAt, snapshot.blockTime);
     }
-    if (clock.blockTime % 3600 < MASKED_SAMPLE_SECONDS) {
-      await this.gate();
-      const epoch = Math.floor(clock.blockTime / 3600) - 1;
-      const result = await this.store.createMaskedEpoch(this.genesis, coin.mint, epoch);
-      // Income is safe and rolls into the next hour, but a missed hour means sampling fell behind.
-      if (result.status === 'insufficient_samples')
-        console.error(
-          JSON.stringify({
-            event: 'masked_epoch_alert',
-            level: 'warning',
-            mint: coin.mint,
-            epoch,
-            samples: result.samples,
-            message: 'Too few holder samples; this hour’s holder income rolls into the next hour',
-          })
-        );
-    }
+    const epoch = Math.floor(sampledAt / 3600) - 1;
+    if (epoch <= (this.checkedHolderEpochs.get(coin.mint) ?? -1)) return;
+    await this.gate();
+    const result = await this.store.createMaskedEpoch(this.genesis, coin.mint, epoch);
+    if (result.status === 'no_income') return;
+    if (result.status === 'insufficient_samples' && sampledAt % 3600 < MASKED_SAMPLE_SECONDS)
+      return;
+    this.checkedHolderEpochs.set(coin.mint, epoch);
+    if (result.status === 'insufficient_samples')
+      console.error(
+        JSON.stringify({
+          event: 'masked_epoch_alert',
+          level: 'warning',
+          mint: coin.mint,
+          epoch,
+          samples: result.samples,
+          message: 'Too few holder samples; this hour’s holder income rolls into the next hour',
+        })
+      );
   }
   private async allocateHolderIncome(coin: RegisteredCoin) {
     const community = (await this.store.balances(this.genesis, coin.mint)).find(
@@ -461,6 +470,8 @@ export class WalletWorker {
   async sign(id: string) {
     if (!this.signer) throw new Error('External wallet signer required');
     let job = await this.required(id);
+    if (job.status === 'prepared' && !job.signature && needsNewQuote(job))
+      job = await this.prepare(id);
     if (job.signature) return job;
     if (job.status !== 'prepared') throw new Error('Prepared wallet job required');
     if (job.kind === 'buyback' && BigInt(job.lamports) < MINIMUM_BUYBACK_LAMPORTS)

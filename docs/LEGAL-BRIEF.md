@@ -23,17 +23,17 @@ how long during each hour.
 1. A company-controlled wallet collects the fees in SOL and holds them until claimed.
 2. Creators and holders sign a claim on our site for everything they earned across all coins.
 3. They choose to be paid in:
-   - **SOL**, sent to the wallet that signed;
-   - **native XMR (Monero)**, sent once a day to a Monero address they enter. The company converts
-     the SOL value at that day's market rate minus a 1% fee, paying from its own XMR treasury, which
-     it tops up by buying XMR;
-   - **wXMR**, a Monero-pegged token on Solana issued by a third party, only while native XMR
-     payouts are down.
-4. The Monero address is encrypted and deleted once the payout settles. We do not collect names,
-   emails or identity documents. We do not block any country today.
-5. A public proof page shows daily totals of fees collected, payouts, XMR bought and burns, and
-   publishes the Monero treasury's view key so anyone can audit it. It does not list individual
-   earners.
+   - **wXMR**, a Monero-pegged token on Solana issued by a third party. The company swaps the
+     claim's SOL for wXMR and sends it to the signing wallet in one transaction.
+   - **SOL**, sent to the wallet that signed.
+4. Trades and these payout transfers are public on Solana. The launch flow collects no names, email
+   addresses or identity documents. The site currently serves all countries.
+5. A public proof page shows daily totals of fees collected, SOL and wXMR payouts, and burns. Anyone
+   can look up a Solana wallet's unpaid earnings and claim history without connecting a wallet.
+
+Direct payouts to Monero wallets are in development. The planned flow converts SOL earnings at a
+daily rate, with a 1% fee, and pays from Masked's XMR treasury. The questions about native XMR and
+its treasury apply to that upgrade.
 
 ## Questions
 

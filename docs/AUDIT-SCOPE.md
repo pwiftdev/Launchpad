@@ -9,9 +9,9 @@ Every Masked coin trades on Meteora's bonding curve (DBC) and, after graduating,
 Each trade pays 1.25%: 0.25% to Meteora, 0.60% to the coin's creator and holders (split by a slider
 locked at launch), 0.30% to the company and 0.10% to buy back and burn $MSKD. A company fee wallet
 (the collector) claims the fees. A ledger in Postgres records every lamport per coin and per share.
-Creators and holders claim everything they earned across all coins on one screen, paid in native XMR
-from a Monero treasury, in wXMR while XMR is down, or in SOL. The collector's key lives only in a
-separate signing process that rebuilds and checks every transaction before signing it.
+Creators and holders claim across all their coins on one screen, paid in wXMR or SOL to their Solana
+wallet. Direct XMR payouts from a Monero treasury are in development. The collector's key lives in a
+separate signing process that rebuilds and checks each transaction before signing it.
 
 ## In scope
 
@@ -52,7 +52,7 @@ separate signing process that rebuilds and checks every transaction before signi
 
 ### 4. Database rules
 
-`scripts/migrations/017`, `019`, `027`, `028` and `035` to `043`: check constraints, immutability
+`scripts/migrations/017`, `019`, `027`, `028` and `035` to `045`: check constraints, immutability
 triggers, one-open-job and one-open-claim indexes.
 
 ## What we believe holds (please try to break these)
@@ -83,7 +83,8 @@ triggers, one-open-job and one-open-claim indexes.
 
 - The XMR exchange rate comes from one price source (CoinGecko), minus a 1% fee.
 - The Monero wallet currently uses a remote node.
-- wXMR's issuer and the SOL/wXMR market's depth are not yet verified.
+- The issuer's published wXMR mint matched the configured Meteora pool on mainnet. Quotes passed the
+  payout price impact limit from 0.05 to 1 SOL on 27 November 2026. Market depth varies.
 - XMR top-ups are bought by hand outside the system.
 - The 14-day stagenet rehearsal has not run yet.
 

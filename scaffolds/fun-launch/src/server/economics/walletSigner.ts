@@ -140,8 +140,8 @@ export async function validateWalletSignJob(
           : job.kind === 'wxmr_claim'
             ? await adapter.prepareWxmrClaim(saved, saved.expectations)
             : job.kind === 'setup'
-            ? await adapter.prepareSetup({ coin })
-            : await adapter.preparePayout(saved);
+              ? await adapter.prepareSetup({ coin })
+              : await adapter.preparePayout(saved);
   const expected = Transaction.from(Buffer.from(rebuilt.transactionBase64, 'base64'));
   const memos = tx.instructions.filter((ix) => ix.programId.equals(WALLET_MEMO_PROGRAM));
   if (

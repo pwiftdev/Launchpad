@@ -28,9 +28,9 @@ publicly and cleared with the lawyer first.
 ## Outreach message (draft; put it in our own voice)
 
 > Hey [name], we're relaunching Masked: every coin splits 0.60% of every trade between its creator
-> and holders, and you set the split with a slider at launch. Earnings are claimed in native Monero
-> or SOL, and every payout is public on our proof page. Want to be one of the first ten launches?
-> We'll help you set it up and post your launch from our account.
+> and holders, and you set the split with a slider at launch. Claim earnings in wXMR or SOL and see
+> daily payout totals on our proof page. Want to be one of the first ten launches? We'll help you
+> set it up and post your launch from our account.
 
 ## Tracker
 
