@@ -63,3 +63,16 @@ partly failed batch is logged for manual review and left untouched.
 The treasury needs XMR before claims can be paid. Buy XMR with the SOL the sweep withdraws, through
 any route, and send it to the treasury wallet's primary address. Funds count once they unlock (10
 blocks). Alerts are JSON lines with `"event":"xmr_payout_alert"`.
+
+## When the Monero wallet is down
+
+XMR claims keep queueing and are paid once the wallet is back. SOL claims are unaffected. The wXMR
+fallback stays off (`MASKED_WXMR_PAYOUTS_ENABLED` unset) until its swap-and-pay job exists in the
+signer; switching the flag on before then would queue wXMR claims that nothing pays.
+
+## \$MSKD buyback and burn
+
+Each Masked coin's 0.10% share moves in the ledger to the official \$MSKD coin's buyback budget
+(`masked_mskd_buyback_transfers`), and the existing buyback job buys \$MSKD from its pool and burns
+it. This only happens when \$MSKD uses the same collector wallet as the Masked coins. On test
+networks set `MASKED_TEST_BUYBACK_MINT` to a registered stand-in coin.

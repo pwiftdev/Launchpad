@@ -64,8 +64,7 @@ export default function Earnings() {
   const [address, setAddress] = useState('');
   const [submitting, setSubmitting] = useState(false);
   // XMR comes first; while native payouts are down, wXMR takes its place.
-  const currency: ClaimCurrency =
-    choice === 'sol' ? 'sol' : data?.xmrAvailable === false ? 'wxmr' : 'xmr';
+  const currency: ClaimCurrency = choice === 'sol' ? 'sol' : data?.wxmrAvailable ? 'wxmr' : 'xmr';
   const amount = data ? (currency === 'sol' ? data.solClaimableLamports : data.totalLamports) : '0';
   const addressValid = currency !== 'xmr' || isMoneroAddress(address.trim(), moneroNetwork);
   const belowMinimum =
@@ -239,7 +238,9 @@ export default function Earnings() {
                           ? `${formatSol(data.solClaimableLamports)} now, to this wallet`
                           : currency === 'wxmr'
                             ? 'Native XMR payouts are down, so this pays wXMR to this wallet instead'
-                            : 'Paid daily to your Monero address at that day’s rate'}
+                            : data.xmrAvailable
+                              ? 'Paid daily to your Monero address at that day’s rate'
+                              : 'XMR payouts are delayed; your claim waits and pays when they resume'}
                       </span>
                     </button>
                   );

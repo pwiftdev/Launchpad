@@ -1040,6 +1040,46 @@ export class WalletStore {
     });
   }
 
+  /**
+   * Moves a Masked coin's accrued $MSKD buyback share to the official $MSKD coin's buyback budget,
+   * where the existing buyback job buys and burns $MSKD. Only between coins that share the
+   * company collector, since no SOL moves. Returns the lamports moved.
+   */
+  async transferMskdBuyback(network: string, sourceMint: string, targetMint: string) {
+    if (sourceMint === targetMint) throw new Error('$MSKD buys back with other coins’ income');
+    return this.tx(async (client) => {
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+        `wallet-operating:${network}`,
+      ]);
+      for (const mint of [sourceMint, targetMint].sort())
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+          `wallet-settlement:${network}:${mint}`,
+        ]);
+      const source = await this.coin(client, network, sourceMint),
+        target = await this.coin(client, network, targetMint);
+      if (!isMaskedMode(source.mode)) throw new Error('Only Masked coins fund $MSKD buybacks');
+      if (source.collector !== target.collector)
+        throw new Error('$MSKD and this coin use different collector wallets');
+      const balance = await this.balance(client, network, sourceMint, 'mskd_buyback');
+      const available = BigInt(balance.funded) - BigInt(balance.reserved) - BigInt(balance.spent);
+      if (available <= 0n) return 0n;
+      await client.query(
+        "UPDATE wallet_balances SET spent=spent+$3 WHERE network_genesis=$1 AND mint=$2 AND bucket='mskd_buyback'",
+        [network, sourceMint, available.toString()]
+      );
+      await this.balance(client, network, targetMint, 'rinse_buyback');
+      await client.query(
+        "UPDATE wallet_balances SET funded=funded+$3 WHERE network_genesis=$1 AND mint=$2 AND bucket='rinse_buyback'",
+        [network, targetMint, available.toString()]
+      );
+      await client.query(
+        `INSERT INTO masked_mskd_buyback_transfers(id,network_genesis,source_mint,target_mint,lamports) VALUES($1,$2,$3,$4,$5)`,
+        [randomUUID(), network, sourceMint, targetMint, available.toString()]
+      );
+      return available;
+    });
+  }
+
   async indexCursor(network: string, pool: string): Promise<FinancialIndexCursor> {
     await this.db.query(
       'INSERT INTO wallet_index_cursors(network_genesis,pool)VALUES($1,$2)ON CONFLICT DO NOTHING',

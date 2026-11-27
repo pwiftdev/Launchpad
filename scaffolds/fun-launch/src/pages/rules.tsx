@@ -38,7 +38,7 @@ const RULES: [string, string][] = [
   ],
   [
     'Claim in Monero or SOL',
-    'Claim in native XMR, sent to the Monero address you enter, or in SOL to your wallet. If native XMR payouts are down, the claim is offered in wXMR on Solana instead. Conversion costs are shown before you confirm.',
+    'Claim everything on My earnings, in native XMR sent to the Monero address you enter, or in SOL to your wallet. XMR claims are paid once a day at that day’s market rate minus a stated fee. If XMR payouts are delayed, your claim waits and is paid when they resume.',
   ],
   [
     'No accounts, no KYC',

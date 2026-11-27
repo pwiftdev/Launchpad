@@ -20,6 +20,8 @@ export function minimumXmrLamports(env = process.env) {
   const value = env.MASKED_MINIMUM_XMR_CLAIM_LAMPORTS;
   return value && /^[1-9]\d{0,17}$/.test(value) ? BigInt(value) : DEFAULT_MINIMUM_XMR_LAMPORTS;
 }
+/** wXMR payouts need their own swap job in the signer; until then they stay switched off. */
+export const wxmrPayoutsEnabled = (env = process.env) => env.MASKED_WXMR_PAYOUTS_ENABLED === 'true';
 /** The operator's Monero heartbeat counts as current for this long. */
 const PAYOUT_STATUS_FRESH_SECONDS = 15 * 60;
 
@@ -149,6 +151,7 @@ export class MaskedClaimStore {
       solClaimableLamports: sol.toString(),
       minimumXmrLamports: minimumXmrLamports().toString(),
       xmrAvailable,
+      wxmrAvailable: !xmrAvailable && wxmrPayoutsEnabled(),
       openClaim: open,
       history: claims,
     };
@@ -207,11 +210,10 @@ export class MaskedClaimStore {
     env?: NodeJS.ProcessEnv;
   }): Promise<MaskedClaimView> {
     const { networkGenesis: network, wallet, currency } = input;
-    if (currency === 'xmr' && (!input.moneroAddress || !input.xmrAvailable))
-      throw new MaskedClaimError(
-        'Native XMR payouts need a Monero address and a working payout wallet'
-      );
-    if (currency === 'wxmr' && input.xmrAvailable)
+    // XMR claims queue even while the payout wallet is down and pay when it returns.
+    if (currency === 'xmr' && !input.moneroAddress)
+      throw new MaskedClaimError('Native XMR payouts need a Monero address');
+    if (currency === 'wxmr' && (input.xmrAvailable || !wxmrPayoutsEnabled(input.env)))
       throw new MaskedClaimError('wXMR is offered only while native XMR payouts are down');
     const client = await this.db.connect();
     try {

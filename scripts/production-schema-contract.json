@@ -161,6 +161,10 @@
     {
       "file": "040-masked-xmr-batches.sql",
       "sha256": "ea939957b37155966295e0089ffbee90b20f0904054ca18bf8526dd8533a817f"
+    },
+    {
+      "file": "041-mskd-buyback-transfers.sql",
+      "sha256": "84d2ba274b21323831c30d3245a884a8d461af06b133974617b558f167eb1bec"
     }
   ],
   "catalog": {
@@ -207,6 +211,7 @@
       "masked_claim_items",
       "masked_claims",
       "masked_holder_samples",
+      "masked_mskd_buyback_transfers",
       "masked_payout_status",
       "masked_xmr_batches",
       "masked_xmr_settlements",
@@ -4101,6 +4106,66 @@
         "udt_name": "jsonb",
         "is_nullable": "NO",
         "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_mskd_buyback_transfers",
+        "column_name": "id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_mskd_buyback_transfers",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_mskd_buyback_transfers",
+        "column_name": "source_mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_mskd_buyback_transfers",
+        "column_name": "target_mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_mskd_buyback_transfers",
+        "column_name": "lamports",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 78,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_mskd_buyback_transfers",
+        "column_name": "created_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": "now()",
         "character_maximum_length": null,
         "numeric_precision": null,
         "numeric_scale": null
@@ -8667,6 +8732,41 @@
         "definition": "PRIMARY KEY (network_genesis, mint, sample_window)"
       },
       {
+        "table_name": "masked_mskd_buyback_transfers",
+        "name": "check:46fa5ab93f6128128b52c49475b283c4e6f662ddea3293a8fc41d161d9ca3782",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((lamports > (0)::numeric))"
+      },
+      {
+        "table_name": "masked_mskd_buyback_transfers",
+        "name": "check:4b35900f80386fcd142464e9b6cbfed1be5def7e51c2aeaf7d763f87c3744abd",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((source_mint)::text <> (target_mint)::text))"
+      },
+      {
+        "table_name": "masked_mskd_buyback_transfers",
+        "name": "masked_mskd_buyback_transfers_network_genesis_source_mint_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (network_genesis, source_mint) REFERENCES launch_coins(network_genesis, mint)"
+      },
+      {
+        "table_name": "masked_mskd_buyback_transfers",
+        "name": "masked_mskd_buyback_transfers_network_genesis_target_mint_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (network_genesis, target_mint) REFERENCES launch_coins(network_genesis, mint)"
+      },
+      {
+        "table_name": "masked_mskd_buyback_transfers",
+        "name": "masked_mskd_buyback_transfers_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
         "table_name": "masked_payout_status",
         "name": "check:777811a9c24153f1f45b0fd16c6978c401420673f42feedc02e5fb5db54c890e",
         "type": "c",
@@ -10555,6 +10655,16 @@
         "definition": "CREATE UNIQUE INDEX masked_holder_samples_pkey ON public.masked_holder_samples USING btree (network_genesis, mint, sample_window)"
       },
       {
+        "table_name": "masked_mskd_buyback_transfers",
+        "name": "masked_mskd_buyback_transfers_pkey",
+        "definition": "CREATE UNIQUE INDEX masked_mskd_buyback_transfers_pkey ON public.masked_mskd_buyback_transfers USING btree (id)"
+      },
+      {
+        "table_name": "masked_mskd_buyback_transfers",
+        "name": "masked_mskd_buyback_transfers_source",
+        "definition": "CREATE INDEX masked_mskd_buyback_transfers_source ON public.masked_mskd_buyback_transfers USING btree (network_genesis, source_mint, created_at)"
+      },
+      {
         "table_name": "masked_payout_status",
         "name": "masked_payout_status_pkey",
         "definition": "CREATE UNIQUE INDEX masked_payout_status_pkey ON public.masked_payout_status USING btree (network_genesis)"
@@ -11063,6 +11173,13 @@
         "enabled": "O",
         "function_name": "masked_sample_immutable",
         "definition": "CREATE TRIGGER masked_holder_samples_immutable BEFORE UPDATE ON public.masked_holder_samples FOR EACH ROW EXECUTE FUNCTION masked_sample_immutable()"
+      },
+      {
+        "table_name": "masked_mskd_buyback_transfers",
+        "name": "masked_mskd_buyback_transfers_immutable",
+        "enabled": "O",
+        "function_name": "rinsed_wallet_immutable",
+        "definition": "CREATE TRIGGER masked_mskd_buyback_transfers_immutable BEFORE DELETE OR UPDATE ON public.masked_mskd_buyback_transfers FOR EACH ROW EXECUTE FUNCTION rinsed_wallet_immutable()"
       },
       {
         "table_name": "masked_xmr_batches",

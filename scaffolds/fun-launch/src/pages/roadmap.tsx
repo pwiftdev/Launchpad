@@ -56,6 +56,25 @@ const ROADMAP: Stage[] = [
           'Connect a Solana wallet and sign actions without creating an account. Screen privacy mode blurs wallet addresses in the interface.',
       },
       {
+        title: 'Live market data',
+        description:
+          'One indexer streams every Masked trade into our own database, so trades, charts and full holder lists update within seconds for every viewer.',
+      },
+      {
+        title: 'Time-weighted holder rewards',
+        description:
+          'Holder shares follow how much you held across each hour, measured every five minutes, so buying just before the hour earns almost nothing extra.',
+      },
+      {
+        title: 'Claim in native Monero or SOL',
+        description:
+          'One claim on My earnings for everything you earned as creator and holder. XMR is paid daily to the Monero address you enter, which is kept encrypted and erased once paid.',
+      },
+      {
+        title: `$MSKD buyback and burn`,
+        description: `${pct(MASKED_SPLIT.buybackBps)} of every Masked trade funds buying $MSKD from its pool and burning it.`,
+      },
+      {
         title: 'Official MSKD mint',
         description:
           'The board pins the verified $MSKD mint, and launches cannot reuse the Masked or MSKD name.',
@@ -69,9 +88,9 @@ const ROADMAP: Stage[] = [
     color: 'border-primary/50 text-primary',
     features: [
       {
-        title: 'Live market data',
+        title: 'Proof of payouts',
         description:
-          'Our own indexer streams every Masked trade into one database, so trades, charts and full holder lists update within seconds for every viewer.',
+          'A public page for every payout period: fees claimed, $MSKD burned, SOL and XMR paid out and how many people were paid, with a published Monero view key.',
       },
     ],
   },
@@ -82,27 +101,10 @@ const ROADMAP: Stage[] = [
     color: 'border-neutral-800 text-neutral-400',
     features: [
       {
-        title: 'Claim in native Monero or SOL',
+        title: 'wXMR while XMR is delayed',
         context: 'Planned',
         description:
-          'One claim screen for creators and holders. Claim in native XMR, sent to the Monero address you enter, or in SOL. If native XMR payouts are down, claims are offered in wXMR instead.',
-      },
-      {
-        title: 'Time-weighted holder rewards',
-        context: 'Planned',
-        description:
-          'Holder shares follow how much you held across each hour, not one snapshot, so buying just before the hour earns nothing extra.',
-      },
-      {
-        title: `$MSKD buyback and burn`,
-        context: 'Planned',
-        description: `${pct(MASKED_SPLIT.buybackBps)} of every Masked trade buys $MSKD on the market and burns it, with a public receipt for every burn.`,
-      },
-      {
-        title: 'Proof of payouts',
-        context: 'Planned',
-        description:
-          'A public page for every payout period: fees claimed, $MSKD burned, SOL and XMR paid out and how many people were paid, with a published Monero view key.',
+          'If native Monero payouts are delayed, an option to take the claim in wXMR on Solana instead of waiting.',
       },
       {
         title: 'Independent audit',

@@ -28,8 +28,10 @@ export type EarningsView = {
   /** SOL pays per coin, and parts below the per-payout minimum wait for more income. */
   solClaimableLamports: string;
   minimumXmrLamports: string;
-  /** Native XMR payouts are working; otherwise wXMR is offered instead. */
+  /** Native XMR payouts are working now. XMR claims queue either way. */
   xmrAvailable: boolean;
+  /** wXMR is offered in XMR's place while native payouts are down, once it is switched on. */
+  wxmrAvailable: boolean;
   openClaim: MaskedClaimView | null;
   history: MaskedClaimView[];
 };

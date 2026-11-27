@@ -138,9 +138,17 @@ describe('Masked earnings and claims', () => {
     await expect(claim({ currency: 'wxmr', moneroAddress: undefined })).rejects.toThrow(
       'only while native XMR payouts are down'
     );
-    await expect(claim({ xmrAvailable: false })).rejects.toThrow('working payout wallet');
+    // wXMR stays off until its payout job exists, even while XMR is down.
     await expect(
       claim({ currency: 'wxmr', moneroAddress: undefined, xmrAvailable: false })
+    ).rejects.toThrow('only while native XMR payouts are down');
+    await expect(
+      claim({
+        currency: 'wxmr',
+        moneroAddress: undefined,
+        xmrAvailable: false,
+        env: { ...env, MASKED_WXMR_PAYOUTS_ENABLED: 'true' },
+      })
     ).resolves.toMatchObject({ currency: 'wxmr' });
   });
 
@@ -160,6 +168,13 @@ describe('Masked earnings and claims', () => {
       (await db.query('SELECT epoch::text FROM wallet_claim_allocations ORDER BY epoch')).rows
     ).toEqual([{ epoch: '10' }, { epoch: '11' }]);
     expect((await store.earnings(fixtureGenesis, creator)).totalLamports).toBe('0');
+  });
+
+  it('queues an XMR claim while the payout wallet is down', async () => {
+    await expect(claim({ xmrAvailable: false })).resolves.toMatchObject({
+      currency: 'xmr',
+      status: 'queued',
+    });
   });
 
   it('never lets XMR and SOL claims take the same hour', async () => {

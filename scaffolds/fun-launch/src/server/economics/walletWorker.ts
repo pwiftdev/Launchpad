@@ -22,6 +22,7 @@ import {
   isMskdMode,
 } from '@/lib/launchModes';
 import { MINIMUM_HOLDER_PAYOUT_LAMPORTS } from '@/lib/rewards';
+import { mskdBuybackMint } from './maskedBuyback';
 import { assertPayoutTokenBacking } from './walletTokenCustody';
 import { MASKED_SAMPLE_SECONDS, WalletStore } from './walletStore';
 import { verifyWalletRecovery } from './walletRecovery';
@@ -242,7 +243,10 @@ export class WalletWorker {
         !pending.some((job) => job.kind === 'holder_conversion'))
     )
       await this.allocateHolderIncome(coin);
-    if (isMaskedMode(coin.mode)) await this.sampleMaskedHolders(coin);
+    if (isMaskedMode(coin.mode)) {
+      await this.sampleMaskedHolders(coin);
+      await this.fundMskdBuyback(coin);
+    }
     pending = await this.store.pendingJobs(this.genesis, mint, maximumJobs);
     const jobs: WalletJob[] = [];
     for (const job of pending) {
@@ -266,6 +270,17 @@ export class WalletWorker {
    * five-minute window while the coin has holder income waiting, and in the first window of each
    * hour the previous hour is averaged and allocated.
    */
+  /** Moves this Masked coin's $MSKD share onto the official $MSKD coin's buyback budget. */
+  private async fundMskdBuyback(coin: RegisteredCoin) {
+    const target = mskdBuybackMint(this.genesis);
+    if (!target || target === coin.mint) return;
+    const balance = (await this.store.balances(this.genesis, coin.mint)).find(
+      (row) => row.bucket === 'mskd_buyback'
+    );
+    if (!balance || BigInt(balance.available) < MINIMUM_HOLDER_PAYOUT_LAMPORTS) return;
+    await this.gate();
+    await this.store.transferMskdBuyback(this.genesis, coin.mint, target);
+  }
   private async sampleMaskedHolders(coin: RegisteredCoin) {
     const community = (await this.store.balances(this.genesis, coin.mint)).find(
       (balance) => balance.bucket === 'community'
@@ -296,11 +311,20 @@ export class WalletWorker {
     }
     if (clock.blockTime % 3600 < MASKED_SAMPLE_SECONDS) {
       await this.gate();
-      await this.store.createMaskedEpoch(
-        this.genesis,
-        coin.mint,
-        Math.floor(clock.blockTime / 3600) - 1
-      );
+      const epoch = Math.floor(clock.blockTime / 3600) - 1;
+      const result = await this.store.createMaskedEpoch(this.genesis, coin.mint, epoch);
+      // Income is safe and rolls into the next hour, but a missed hour means sampling fell behind.
+      if (result.status === 'insufficient_samples')
+        console.error(
+          JSON.stringify({
+            event: 'masked_epoch_alert',
+            level: 'warning',
+            mint: coin.mint,
+            epoch,
+            samples: result.samples,
+            message: 'Too few holder samples; this hour’s holder income rolls into the next hour',
+          })
+        );
     }
   }
   private async allocateHolderIncome(coin: RegisteredCoin) {
