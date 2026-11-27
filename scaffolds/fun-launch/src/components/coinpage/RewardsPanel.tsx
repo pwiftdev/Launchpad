@@ -9,8 +9,10 @@ import {
   hasBatchedHolderRewards,
   hasCreatorRewards,
   isWalletPolicy,
+  isMaskedMode,
   isMskdMode,
 } from '@/lib/launchModes';
+import Link from 'next/link';
 import {
   rewardHourEnd,
   type ClaimAuthorization,
@@ -50,7 +52,28 @@ async function request(body: object): Promise<RewardPayout> {
 }
 export function RewardsPanel({ coin }: { coin: Coin }) {
   const { publicKey } = useWallet();
+  if (!coin.isDemo && coin.mode && isMaskedMode(coin.mode)) return <MaskedRewards />;
   return <WalletRewards key={`${coin.mint}:${publicKey?.toBase58() ?? ''}`} coin={coin} />;
+}
+// Masked coins pay creators and holders through one claim across every coin, on My earnings.
+function MaskedRewards() {
+  return (
+    <section aria-label="Token rewards" className="px-4 pb-4">
+      <p className="flex h-10 items-center text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+        Token rewards
+      </p>
+      <p className="mt-2 text-xs text-neutral-400">
+        Creator and holder earnings from this coin are claimed together with your other Masked
+        coins, in XMR or SOL.
+      </p>
+      <Link
+        href="/earnings"
+        className="mt-3 inline-flex h-8 items-center rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-100 hover:border-neutral-500"
+      >
+        Open My earnings
+      </Link>
+    </section>
+  );
 }
 function WalletRewards({ coin }: { coin: Coin }) {
   const { publicKey, signMessage } = useWallet();
