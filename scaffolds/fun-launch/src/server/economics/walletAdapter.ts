@@ -43,7 +43,7 @@ import { walletMigrationPosition } from './walletPosition';
 import { assertWalletRecipientCredit } from './walletRecipient';
 import { walletOperatingCosts } from './walletOperatingCosts';
 import { isHsolMode } from '@/lib/feeModes';
-import { isMskdMode } from '@/lib/launchModes';
+import { isMaskedMode, isMskdMode } from '@/lib/launchModes';
 import { buildMskdSwap } from './walletMskdSwap';
 import { mskdPayoutMint } from './walletMskdPolicy';
 import type {
@@ -595,6 +595,58 @@ export class MeteoraWalletAdapter implements WalletChainAdapter {
       existing
     );
     return this.prepared(coin, job.kind, instructions, expectations);
+  }
+  /**
+   * A Masked wXMR claim payment: swap the job's SOL for wXMR into the company account, then send
+   * exactly the quote's guaranteed minimum to the claiming wallet, in one transaction.
+   */
+  async prepareWxmrClaim(job: WalletJob, existing?: WalletExpectations) {
+    const coin = await registeredCoin(this.genesis, job.mint);
+    if (
+      !coin ||
+      !isMaskedMode(coin.mode) ||
+      job.kind !== 'wxmr_claim' ||
+      job.network_genesis !== this.genesis ||
+      job.details.sourceMint !== undefined ||
+      typeof job.details.maskedClaim !== 'string' ||
+      !job.recipient
+    )
+      throw new Error('Reviewed Masked wXMR claim job required');
+    const recipient = new PublicKey(job.recipient);
+    if (!PublicKey.isOnCurve(recipient.toBytes()) || recipient.equals(this.collector))
+      throw new Error('wXMR claims pay an ordinary wallet');
+    await this.state(coin);
+    const swap = await buildMskdSwap(this.rpc, this.collector, job, existing);
+    const mint = new PublicKey(String(swap.expectations.payoutMint));
+    const units = BigInt(String(swap.expectations.minimumPayoutUnits));
+    const destination = getAssociatedTokenAddressSync(mint, recipient);
+    return this.prepared(
+      coin,
+      'wxmr_claim',
+      [
+        ...swap.instructions,
+        createAssociatedTokenAccountIdempotentInstruction(
+          this.collector,
+          destination,
+          recipient,
+          mint
+        ),
+        createTransferCheckedInstruction(
+          getAssociatedTokenAddressSync(mint, this.collector),
+          mint,
+          destination,
+          this.collector,
+          units,
+          modePolicy.payouts.wxmr.decimals
+        ),
+      ],
+      {
+        ...swap.expectations,
+        recipient: job.recipient,
+        recipientAta: destination.toBase58(),
+        expectedLamports: job.lamports,
+      }
+    );
   }
   verifyFinalized(job: WalletJob, evidence: Parameters<WalletChainAdapter['verifyFinalized']>[1]) {
     return verifyWalletEffect(this.rpc, job, evidence);

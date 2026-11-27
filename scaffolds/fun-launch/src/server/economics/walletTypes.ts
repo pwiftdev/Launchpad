@@ -14,7 +14,8 @@ export type WalletJobKind =
   | 'community_claim'
   | 'platform_claim'
   | 'setup'
-  | 'holder_conversion';
+  | 'holder_conversion'
+  | 'wxmr_claim';
 export type WalletJobStatus =
   'queued' | 'prepared' | 'signed' | 'submitted' | 'manual_review' | 'finalized' | 'failed';
 export type WalletEventId = { signature: string; instructionIndex: number; eventIndex: number };
@@ -108,6 +109,7 @@ export type WalletChainAdapter = {
     job: WalletJob,
     existing?: WalletExpectations
   ): Promise<PreparedWalletExecution>;
+  prepareWxmrClaim?(job: WalletJob, existing?: WalletExpectations): Promise<PreparedWalletExecution>;
   prepareSetup(input: { coin: RegisteredCoin }): Promise<PreparedWalletExecution>;
   verifyFinalized(job: WalletJob, evidence: FinalizedEvidence): Promise<WalletEffectFacts>;
 };

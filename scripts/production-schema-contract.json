@@ -165,6 +165,10 @@
     {
       "file": "041-mskd-buyback-transfers.sql",
       "sha256": "84d2ba274b21323831c30d3245a884a8d461af06b133974617b558f167eb1bec"
+    },
+    {
+      "file": "042-masked-wxmr-claims.sql",
+      "sha256": "5e79c1d23bec449b8a9201e9ced5663875fd3086dfc26592550183003d6a3f47"
     }
   ],
   "catalog": {
@@ -213,6 +217,8 @@
       "masked_holder_samples",
       "masked_mskd_buyback_transfers",
       "masked_payout_status",
+      "masked_wxmr_payments",
+      "masked_wxmr_settlements",
       "masked_xmr_batches",
       "masked_xmr_settlements",
       "offchain_metadata_cache",
@@ -4229,6 +4235,156 @@
         "character_maximum_length": null,
         "numeric_precision": null,
         "numeric_scale": null
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "column_name": "job_id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "column_name": "claim_id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "column_name": "recipient",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "column_name": "signature",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 88,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "column_name": "finalized_slot",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "column_name": "lamports",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 78,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "column_name": "payout_units",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 39,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "column_name": "created_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": "now()",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_wxmr_settlements",
+        "column_name": "job_id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_wxmr_settlements",
+        "column_name": "claim_id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_wxmr_settlements",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_wxmr_settlements",
+        "column_name": "mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_wxmr_settlements",
+        "column_name": "bucket",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_wxmr_settlements",
+        "column_name": "lamports",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 78,
+        "numeric_scale": 0
       },
       {
         "table_name": "masked_xmr_batches",
@@ -8586,17 +8742,17 @@
       },
       {
         "table_name": "masked_claims",
-        "name": "check:10d81618d2b193915ac7b6a2ed7bf9987745e86d84094c346fba01f5add7d20f",
-        "type": "c",
-        "validated": true,
-        "definition": "CHECK (((status <> ALL (ARRAY['batched'::text, 'sent'::text, 'paid'::text])) OR (currency = 'sol'::text) OR (batch_id IS NOT NULL)))"
-      },
-      {
-        "table_name": "masked_claims",
         "name": "check:46fa5ab93f6128128b52c49475b283c4e6f662ddea3293a8fc41d161d9ca3782",
         "type": "c",
         "validated": true,
         "definition": "CHECK ((lamports > (0)::numeric))"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "check:50f2e82253d117523cc296c6b844cddf5daedbc71316ac5b9d53de19e638fe02",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((status <> ALL (ARRAY['batched'::text, 'sent'::text, 'paid'::text])) OR (currency = ANY (ARRAY['sol'::text, 'wxmr'::text])) OR (batch_id IS NOT NULL)))"
       },
       {
         "table_name": "masked_claims",
@@ -8779,6 +8935,97 @@
         "type": "p",
         "validated": true,
         "definition": "PRIMARY KEY (network_genesis)"
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "name": "check:46fa5ab93f6128128b52c49475b283c4e6f662ddea3293a8fc41d161d9ca3782",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((lamports > (0)::numeric))"
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "name": "check:855f38879c8a212afd70b1775ecde8feef1f8386f57ae9f3e09e754fbde7100d",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((payout_units > (0)::numeric))"
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "name": "check:af5ac4c30edd3a0b0a440c658eaab3322b777a9d3d7c1c138ffdcd12da9d76ac",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((finalized_slot >= 0))"
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "name": "masked_wxmr_payments_claim_id_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (claim_id) REFERENCES masked_claims(id)"
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "name": "masked_wxmr_payments_job_id_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (job_id) REFERENCES wallet_jobs(id)"
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "name": "masked_wxmr_payments_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (job_id)"
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "name": "masked_wxmr_payments_signature_key",
+        "type": "u",
+        "validated": true,
+        "definition": "UNIQUE (signature)"
+      },
+      {
+        "table_name": "masked_wxmr_settlements",
+        "name": "check:46fa5ab93f6128128b52c49475b283c4e6f662ddea3293a8fc41d161d9ca3782",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((lamports > (0)::numeric))"
+      },
+      {
+        "table_name": "masked_wxmr_settlements",
+        "name": "check:9c1d1dd658b082dcfead5d49eafce30076ae75a0c6625f8faa8c2118c8ed902c",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((bucket = ANY (ARRAY['creator'::text, 'community'::text])))"
+      },
+      {
+        "table_name": "masked_wxmr_settlements",
+        "name": "masked_wxmr_settlements_claim_id_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (claim_id) REFERENCES masked_claims(id)"
+      },
+      {
+        "table_name": "masked_wxmr_settlements",
+        "name": "masked_wxmr_settlements_job_id_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (job_id) REFERENCES masked_wxmr_payments(job_id)"
+      },
+      {
+        "table_name": "masked_wxmr_settlements",
+        "name": "masked_wxmr_settlements_network_genesis_mint_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (network_genesis, mint) REFERENCES launch_coins(network_genesis, mint)"
+      },
+      {
+        "table_name": "masked_wxmr_settlements",
+        "name": "masked_wxmr_settlements_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (job_id, mint, bucket)"
       },
       {
         "table_name": "masked_xmr_batches",
@@ -9615,13 +9862,6 @@
       },
       {
         "table_name": "wallet_jobs",
-        "name": "check:0106d716ba62d0c7b6d8781dcd1efaf29694640f9cf1ef5b51466d271d6b7d02",
-        "type": "c",
-        "validated": true,
-        "definition": "CHECK ((((kind = ANY (ARRAY['collect'::text, 'setup'::text])) AND (bucket IS NULL) AND (lamports = (0)::numeric)) OR ((kind <> ALL (ARRAY['collect'::text, 'setup'::text])) AND (bucket IS NOT NULL) AND (lamports > (0)::numeric))))"
-      },
-      {
-        "table_name": "wallet_jobs",
         "name": "check:0e84e244573a3171429c53756fff0807592a40192d7cdf84f8793a6496ca0d92",
         "type": "c",
         "validated": true,
@@ -9678,17 +9918,24 @@
       },
       {
         "table_name": "wallet_jobs",
-        "name": "check:8aff86d1882b6522eeef10ac0cbe5c44e2a810686058ca6cbb13cbf8a3fd8d1b",
-        "type": "c",
-        "validated": true,
-        "definition": "CHECK ((kind = ANY (ARRAY['collect'::text, 'buyback'::text, 'creator_claim'::text, 'community_claim'::text, 'platform_claim'::text, 'setup'::text, 'holder_conversion'::text])))"
-      },
-      {
-        "table_name": "wallet_jobs",
         "name": "check:8f2380747748100ca3eb4c3ae3c1cdd3223badf2c939ae4a2368b035bec1aaf0",
         "type": "c",
         "validated": true,
         "definition": "CHECK ((burned_tokens >= (0)::numeric))"
+      },
+      {
+        "table_name": "wallet_jobs",
+        "name": "check:941ce698d92934c93dd309c799bf6b97456e5c6e639c36b1abeb14e1bbb688f5",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((kind <> 'wxmr_claim'::text) OR ((recipient IS NOT NULL) AND (epoch IS NULL) AND (details ? 'maskedClaim'::text))))"
+      },
+      {
+        "table_name": "wallet_jobs",
+        "name": "check:9b2ffa41aa55df84f8153476891b826befce0c84436b342835feff75de57e1f5",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((kind = ANY (ARRAY['collect'::text, 'buyback'::text, 'creator_claim'::text, 'community_claim'::text, 'platform_claim'::text, 'setup'::text, 'holder_conversion'::text, 'wxmr_claim'::text])))"
       },
       {
         "table_name": "wallet_jobs",
@@ -9703,6 +9950,13 @@
         "type": "c",
         "validated": true,
         "definition": "CHECK (((length(intent_key) >= 1) AND (length(intent_key) <= 200)))"
+      },
+      {
+        "table_name": "wallet_jobs",
+        "name": "check:d9ef2126ed06b9a946752a1913291ce9953fcd9bc52a86e021fca42282b40cfc",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((((kind = ANY (ARRAY['collect'::text, 'setup'::text])) AND (bucket IS NULL) AND (lamports = (0)::numeric)) OR ((kind = 'wxmr_claim'::text) AND (bucket IS NULL) AND (lamports > (0)::numeric)) OR ((kind <> ALL (ARRAY['collect'::text, 'setup'::text, 'wxmr_claim'::text])) AND (bucket IS NOT NULL) AND (lamports > (0)::numeric))))"
       },
       {
         "table_name": "wallet_jobs",
@@ -10670,6 +10924,31 @@
         "definition": "CREATE UNIQUE INDEX masked_payout_status_pkey ON public.masked_payout_status USING btree (network_genesis)"
       },
       {
+        "table_name": "masked_wxmr_payments",
+        "name": "masked_wxmr_payments_claim",
+        "definition": "CREATE INDEX masked_wxmr_payments_claim ON public.masked_wxmr_payments USING btree (claim_id)"
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "name": "masked_wxmr_payments_pkey",
+        "definition": "CREATE UNIQUE INDEX masked_wxmr_payments_pkey ON public.masked_wxmr_payments USING btree (job_id)"
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "name": "masked_wxmr_payments_signature_key",
+        "definition": "CREATE UNIQUE INDEX masked_wxmr_payments_signature_key ON public.masked_wxmr_payments USING btree (signature)"
+      },
+      {
+        "table_name": "masked_wxmr_settlements",
+        "name": "masked_wxmr_settlements_claim",
+        "definition": "CREATE INDEX masked_wxmr_settlements_claim ON public.masked_wxmr_settlements USING btree (claim_id)"
+      },
+      {
+        "table_name": "masked_wxmr_settlements",
+        "name": "masked_wxmr_settlements_pkey",
+        "definition": "CREATE UNIQUE INDEX masked_wxmr_settlements_pkey ON public.masked_wxmr_settlements USING btree (job_id, mint, bucket)"
+      },
+      {
         "table_name": "masked_xmr_batches",
         "name": "masked_xmr_batches_one_open",
         "definition": "CREATE UNIQUE INDEX masked_xmr_batches_one_open ON public.masked_xmr_batches USING btree (network_genesis) WHERE (status = ANY (ARRAY['planned'::text, 'signed'::text, 'sent'::text]))"
@@ -10868,6 +11147,11 @@
         "table_name": "wallet_jobs",
         "name": "wallet_active_setup",
         "definition": "CREATE UNIQUE INDEX wallet_active_setup ON public.wallet_jobs USING btree (network_genesis, mint) WHERE ((kind = 'setup'::text) AND (status = ANY (ARRAY['queued'::text, 'prepared'::text, 'signed'::text, 'submitted'::text, 'manual_review'::text])))"
+      },
+      {
+        "table_name": "wallet_jobs",
+        "name": "wallet_active_wxmr_claim",
+        "definition": "CREATE UNIQUE INDEX wallet_active_wxmr_claim ON public.wallet_jobs USING btree (((details ->> 'maskedClaim'::text))) WHERE ((kind = 'wxmr_claim'::text) AND (status = ANY (ARRAY['queued'::text, 'prepared'::text, 'signed'::text, 'submitted'::text, 'manual_review'::text])))"
       },
       {
         "table_name": "wallet_jobs",
@@ -11180,6 +11464,20 @@
         "enabled": "O",
         "function_name": "rinsed_wallet_immutable",
         "definition": "CREATE TRIGGER masked_mskd_buyback_transfers_immutable BEFORE DELETE OR UPDATE ON public.masked_mskd_buyback_transfers FOR EACH ROW EXECUTE FUNCTION rinsed_wallet_immutable()"
+      },
+      {
+        "table_name": "masked_wxmr_payments",
+        "name": "masked_wxmr_payments_immutable",
+        "enabled": "O",
+        "function_name": "rinsed_wallet_immutable",
+        "definition": "CREATE TRIGGER masked_wxmr_payments_immutable BEFORE DELETE OR UPDATE ON public.masked_wxmr_payments FOR EACH ROW EXECUTE FUNCTION rinsed_wallet_immutable()"
+      },
+      {
+        "table_name": "masked_wxmr_settlements",
+        "name": "masked_wxmr_settlements_immutable",
+        "enabled": "O",
+        "function_name": "rinsed_wallet_immutable",
+        "definition": "CREATE TRIGGER masked_wxmr_settlements_immutable BEFORE DELETE OR UPDATE ON public.masked_wxmr_settlements FOR EACH ROW EXECUTE FUNCTION rinsed_wallet_immutable()"
       },
       {
         "table_name": "masked_xmr_batches",

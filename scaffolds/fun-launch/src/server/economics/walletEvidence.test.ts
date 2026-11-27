@@ -141,6 +141,93 @@ it('reconciles exact finalized SOL input and actual wXMR output before funding h
     'finalized SOL and token balances'
   );
 });
+it('proves a Masked wXMR payment: the exact swap, then exactly the minimum to the claimant', async () => {
+  const payer = fixtureWallet(),
+    owner = payer.publicKey,
+    mint = fixtureWallet().publicKey,
+    claimant = fixtureWallet().publicKey;
+  const source = getAssociatedTokenAddressSync(NATIVE_MINT, owner);
+  const company = getAssociatedTokenAddressSync(mint, owner);
+  const destination = getAssociatedTokenAddressSync(mint, claimant);
+  const spend = 500_000_000n,
+    minimum = 200_000_000_000n,
+    received = 201_000_000_000n,
+    rent = 2_039_280;
+  const pool = fixtureWallet().publicKey;
+  const swap = new TransactionInstruction({
+    programId: new PublicKey('LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo'),
+    keys: [pool, source, company].map((pubkey) => ({ pubkey, isWritable: true, isSigner: false })),
+    data: Buffer.from([7]),
+  });
+  const build = (paid: bigint) =>
+    transactionFixture(
+      [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
+        createAssociatedTokenAccountIdempotentInstruction(owner, source, owner, NATIVE_MINT),
+        createAssociatedTokenAccountIdempotentInstruction(owner, company, owner, mint),
+        SystemProgram.transfer({ fromPubkey: owner, toPubkey: source, lamports: spend }),
+        createSyncNativeInstruction(source),
+        swap,
+        createCloseAccountInstruction(source, owner, owner),
+        createAssociatedTokenAccountIdempotentInstruction(owner, destination, claimant, mint),
+        createTransferCheckedInstruction(company, mint, destination, owner, paid, 12),
+        memoIx(),
+      ],
+      payer
+    );
+  const run = async (paid: bigint, credited = paid) => {
+    const t = build(paid);
+    const job = jobFor(t, 'wxmr_claim', {
+      lamports: spend.toString(),
+      recipient: claimant.toBase58(),
+      details: { assetMint: mint.toBase58(), market: pool.toBase58(), maskedClaim: 'claim' },
+    });
+    Object.assign(job.expectations, {
+      pool: pool.toBase58(),
+      payoutMint: mint.toBase58(),
+      quoteAta: source.toBase58(),
+      tokenAta: company.toBase58(),
+      recipient: claimant.toBase58(),
+      recipientAta: destination.toBase58(),
+      expectedLamports: spend.toString(),
+      maximumSpendLamports: spend.toString(),
+      minimumPayoutUnits: minimum.toString(),
+      instruction: {
+        program: swap.programId.toBase58(),
+        accounts: swap.keys.map((k) => k.pubkey.toBase58()),
+        dataBase64: swap.data.toString('base64'),
+      },
+    });
+    // The company wXMR account already exists; the claimant's is created by this payment.
+    t.balance(owner.toBase58(), 1_000_000_000, 1_000_000_000 - Number(spend) - rent - 5000);
+    t.balance(source.toBase58(), 0, 0);
+    const kept = t.balance(company.toBase58(), rent, rent);
+    const sent = t.balance(destination.toBase58(), 0, rent);
+    const token = (accountIndex: number, owned: PublicKey, amount: bigint) => ({
+      accountIndex,
+      mint: mint.toBase58(),
+      owner: owned.toBase58(),
+      uiTokenAmount: { amount: amount.toString(), decimals: 12, uiAmount: null as null },
+    });
+    t.response.meta!.preTokenBalances = [token(kept, owner, 5n)];
+    t.response.meta!.postTokenBalances = [
+      token(kept, owner, 5n + received - paid),
+      token(sent, claimant, credited),
+    ];
+    return verifyWalletEffect(t.rpc, job, await t.evidence());
+  };
+  expect(await run(minimum)).toMatchObject({
+    recipient: claimant.toBase58(),
+    paidLamports: spend,
+    collectorDebitLamports: spend,
+    receivedPayoutUnits: minimum,
+    operatingCostLamports: BigInt(rent + 5000),
+  });
+  // A transfer of anything but the quoted minimum is not the reviewed payout.
+  await expect(run(minimum - 1n)).rejects.toThrow('matching');
+  // The claimant must end up with exactly the minimum.
+  await expect(run(minimum, minimum - 1n)).rejects.toThrow('wXMR claim payment does not match');
+});
 it('reconciles the exact atomic hSOL bridge and rejects a partial WSOL handoff', async () => {
   const payer = fixtureWallet(),
     owner = payer.publicKey;

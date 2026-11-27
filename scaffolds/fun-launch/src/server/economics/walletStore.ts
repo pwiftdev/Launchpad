@@ -42,6 +42,7 @@ import {
   holderClaimTotal,
 } from './walletHolderClaims';
 import { insertMskdConversion, settleMskdConversion, mskdTokenLiability } from './walletMskdStore';
+import { queueWxmrPayments, settleWxmrPayment, type WxmrAlert } from './maskedWxmrClaims';
 import {
   MAXIMUM_MSKD_CONVERSION_LAMPORTS,
   mskdConversionPool,
@@ -434,10 +435,10 @@ export class WalletStore {
         WHERE j.network_genesis=$1 AND cfg.expected_fee_claimer=$2
         AND c.policy_version=cfg.policy_version
         AND (j.status IN ('prepared','signed','submitted','manual_review')
-          OR (j.status='queued' AND j.kind IN ('creator_claim','community_claim')))
+          OR (j.status='queued' AND j.kind IN ('creator_claim','community_claim','wxmr_claim')))
         AND ($4::text IS NULL OR j.mint=$4 OR j.signature IS NOT NULL)
         ORDER BY (j.signature IS NOT NULL) DESC,
-          CASE WHEN j.kind IN ('creator_claim','community_claim') THEN 0
+          CASE WHEN j.kind IN ('creator_claim','community_claim','wxmr_claim') THEN 0
                WHEN j.kind='platform_claim' THEN 2 ELSE 1 END,
           j.created_at,j.id LIMIT $3`,
         [network, collector, limit, mint ?? null]
@@ -452,7 +453,7 @@ export class WalletStore {
         JOIN launch_configs cfg USING(network_genesis,config_key)
         WHERE j.network_genesis=$1 AND cfg.expected_fee_claimer=$2
         AND c.policy_version=cfg.policy_version
-        AND j.kind IN ('creator_claim','community_claim') AND j.status=ANY($3::text[])`,
+        AND j.kind IN ('creator_claim','community_claim','wxmr_claim') AND j.status=ANY($3::text[])`,
         [network, collector, ACTIVE]
       )
     ).rows[0]!;
@@ -1040,6 +1041,22 @@ export class WalletStore {
     });
   }
 
+  /** Queues the next wXMR payment for each open Masked wXMR claim paid by this collector. */
+  async queueMaskedWxmrPayments(input: {
+    network: string;
+    collector: string;
+    assetMint: string;
+    market: string;
+    alert?: (alert: WxmrAlert) => void;
+  }) {
+    return this.tx(async (client) => {
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+        `wallet-operating:${input.network}`,
+      ]);
+      return queueWxmrPayments(client, input);
+    });
+  }
+
   /**
    * Moves a Masked coin's accrued $MSKD buyback share to the official $MSKD coin's buyback budget,
    * where the existing buyback job buys and burns $MSKD. Only between coins that share the
@@ -1431,6 +1448,15 @@ export class WalletStore {
         throw new Error('Prepared payout differs from its immutable entitlement');
       if (job.kind === 'buyback' && prepared.expectations.maximumSpendLamports !== job.lamports)
         throw new Error('Buyback exceeds its exact reserved budget');
+      if (
+        job.kind === 'wxmr_claim' &&
+        (!isMaskedMode(coin.mode) ||
+          !job.recipient ||
+          prepared.expectations.maximumSpendLamports !== job.lamports ||
+          prepared.expectations.pool !== job.details.market ||
+          prepared.expectations.payoutMint !== job.details.assetMint)
+      )
+        throw new Error('Prepared wXMR payment differs from its claim');
       const mskdPayout = isMskdMode(coin.mode) && job.kind === 'community_claim';
       if (
         (job.kind === 'holder_conversion' &&
@@ -1557,6 +1583,7 @@ export class WalletStore {
         )
           throw new Error('Verified effect conflicts with the finalized wallet receipt');
         if (job.kind === 'holder_conversion') await settleMskdConversion(client, job, effect);
+        else if (job.kind === 'wxmr_claim') await settleWxmrPayment(client, job, effect);
         else await this.recordSettlement(client, job, effect);
         return job;
       }
@@ -1565,6 +1592,7 @@ export class WalletStore {
       const coin = await this.coin(client, job.network_genesis, job.mint);
       if (job.kind === 'collect') await this.settleCollection(client, coin, job, effect);
       else if (job.kind === 'holder_conversion') await settleMskdConversion(client, job, effect);
+      else if (job.kind === 'wxmr_claim') await settleWxmrPayment(client, job, effect);
       else if (job.kind !== 'setup' && !(isMskdMode(coin.mode) && job.kind === 'community_claim')) {
         const reserved = BigInt(job.lamports),
           spent = job.kind === 'buyback' ? effect.collectorDebitLamports : effect.paidLamports;
@@ -1589,7 +1617,8 @@ export class WalletStore {
       }
       if (isMskdMode(coin.mode) || isHsolMode(coin.mode))
         await this.recordSplExpense(client, job, effect.operatingCostLamports);
-      if (job.kind !== 'holder_conversion') await this.recordSettlement(client, job, effect);
+      if (job.kind !== 'holder_conversion' && job.kind !== 'wxmr_claim')
+        await this.recordSettlement(client, job, effect);
       return (
         await client.query<WalletJob>(
           `UPDATE wallet_jobs SET status='finalized',finalized_slot=$2,received_lamports=$3,burned_tokens=$4,updated_at=now()WHERE id=$1 RETURNING *`,

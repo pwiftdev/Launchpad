@@ -11,6 +11,15 @@ export async function walletOperatingCosts(
   splQuote = false
 ) {
   if (maximumFee <= 0n) throw new Error('Positive operating fee bound required');
+  if (kind === 'wxmr_claim') {
+    // Temporary wrapped SOL, plus the company's and the recipient's wXMR accounts if missing.
+    const rent = await rpc.getMinimumBalanceForRentExemption(165, 'finalized');
+    if (!Number.isSafeInteger(rent) || rent <= 0) throw new Error('wXMR payout rent unavailable');
+    return {
+      operatingCostLamports: maximumFee + 2n * BigInt(rent),
+      temporaryFundingLamports: BigInt(rent),
+    };
+  }
   if (kind.endsWith('_claim') && splQuote) {
     if (!quoteAta) throw new Error('Missing payout token account');
     const rent = await rpc.getMinimumBalanceForRentExemption(165, 'finalized');

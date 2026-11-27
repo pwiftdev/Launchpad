@@ -42,6 +42,17 @@ export class WalletMessageExpired extends Error {
   }
 }
 
+/** A swap job's price quote expires; it must be signed and sent while still fresh. */
+const quoted = (job: WalletJob) => job.kind === 'holder_conversion' || job.kind === 'wxmr_claim';
+export class WalletWxmrUnavailable extends Error {
+  override readonly name = 'WalletWxmrUnavailable';
+  constructor(cause: unknown) {
+    super(
+      `wXMR payment cannot be quoted now: ${cause instanceof Error ? cause.message : 'unknown'}`
+    );
+  }
+}
+
 /** One finite private-worker operation. Signature bytes are durable before every relay. */
 export class WalletWorker {
   constructor(
@@ -163,6 +174,14 @@ export class WalletWorker {
       if (!this.adapter.prepareHolderConversion)
         throw new Error('MSKD conversion adapter is unavailable');
       prepared = await this.adapter.prepareHolderConversion(job);
+    } else if (job.kind === 'wxmr_claim') {
+      if (!this.adapter.prepareWxmrClaim) throw new Error('wXMR payout adapter is unavailable');
+      try {
+        prepared = await this.adapter.prepareWxmrClaim(job);
+      } catch (error) {
+        // Thin liquidity or a moved price: the payment waits and is quoted again next pass.
+        throw new WalletWxmrUnavailable(error);
+      }
     } else if (job.kind === 'setup') prepared = await this.adapter.prepareSetup({ coin });
     else prepared = await this.adapter.preparePayout(job);
     await this.gate();
@@ -246,6 +265,7 @@ export class WalletWorker {
     if (isMaskedMode(coin.mode)) {
       await this.sampleMaskedHolders(coin);
       await this.fundMskdBuyback(coin);
+      await this.queueWxmrPayments();
     }
     pending = await this.store.pendingJobs(this.genesis, mint, maximumJobs);
     const jobs: WalletJob[] = [];
@@ -257,7 +277,8 @@ export class WalletWorker {
           !(error instanceof WalletCollectionUnavailable) &&
           !(error instanceof WalletBuybackUnavailable) &&
           !(error instanceof WalletRecipientUnavailable) &&
-          !(error instanceof WalletOperatingUnavailable)
+          !(error instanceof WalletOperatingUnavailable) &&
+          !(error instanceof WalletWxmrUnavailable)
         )
           throw error;
         jobs.push(job);
@@ -270,6 +291,20 @@ export class WalletWorker {
    * five-minute window while the coin has holder income waiting, and in the first window of each
    * hour the previous hour is averaged and allocated.
    */
+  /** Queues the next payment of each open Masked wXMR claim, once a wXMR market is configured. */
+  private async queueWxmrPayments() {
+    const asset = mskdPayoutMint(this.genesis),
+      market = mskdConversionPool();
+    if (!asset || !market) return;
+    await this.gate();
+    await this.store.queueMaskedWxmrPayments({
+      network: this.genesis,
+      collector: this.collector.toBase58(),
+      assetMint: asset.toBase58(),
+      market: market.toBase58(),
+      alert: (alert) => console.error(JSON.stringify({ event: 'masked_wxmr_alert', ...alert })),
+    });
+  }
   /** Moves this Masked coin's $MSKD share onto the official $MSKD coin's buyback budget. */
   private async fundMskdBuyback(coin: RegisteredCoin) {
     const target = mskdBuybackMint(this.genesis);
@@ -434,7 +469,7 @@ export class WalletWorker {
     await this.store.assertNoUnsettledSigned(this.genesis, this.collector.toBase58(), id);
     await this.unexpired(job);
     await this.solvent(job);
-    if (job.kind === 'holder_conversion') requireFreshMskdQuote(job.expectations.quoteCreatedAt);
+    if (quoted(job)) requireFreshMskdQuote(job.expectations.quoteCreatedAt);
     const signed = await this.signer.sign(job),
       checked = validateSignedTransaction(signed.signedTransactionBase64, job.message_digest!);
     if (checked.signature !== signed.signature)
@@ -453,13 +488,13 @@ export class WalletWorker {
     await this.gate();
     await this.unexpired(job);
     await this.solvent(job);
-    if (job.kind === 'holder_conversion') requireFreshMskdQuote(job.expectations.quoteCreatedAt);
+    if (quoted(job)) requireFreshMskdQuote(job.expectations.quoteCreatedAt);
     job = await this.store.markSubmitted(id);
     try {
       await this.gate();
       await this.solvent(job);
       await this.gate();
-      if (job.kind === 'holder_conversion') requireFreshMskdQuote(job.expectations.quoteCreatedAt);
+      if (quoted(job)) requireFreshMskdQuote(job.expectations.quoteCreatedAt);
       const signature = await this.rpc.sendRawTransaction(
         Buffer.from(job.transaction_base64!, 'base64'),
         { skipPreflight: false, maxRetries: 0 }

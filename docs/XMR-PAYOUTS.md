@@ -66,9 +66,34 @@ blocks). Alerts are JSON lines with `"event":"xmr_payout_alert"`.
 
 ## When the Monero wallet is down
 
-XMR claims keep queueing and are paid once the wallet is back. SOL claims are unaffected. The wXMR
-fallback stays off (`MASKED_WXMR_PAYOUTS_ENABLED` unset) until its swap-and-pay job exists in the
-signer; switching the flag on before then would queue wXMR claims that nothing pays.
+XMR claims keep queueing and are paid once the wallet is back. SOL claims are unaffected. While the
+heartbeat is older than 15 minutes or the wallet is unreachable, the claim screen offers wXMR in
+XMR's place, if `MASKED_WXMR_PAYOUTS_ENABLED=true` on the web app.
+
+### wXMR payouts
+
+The ordinary wallet operator pays wXMR claims; the Monero process is not involved. Each payment is
+one company-wallet transaction that wraps the payment's SOL, swaps it for wXMR in the configured
+market and sends exactly the quote's guaranteed minimum to the claiming wallet. Either all of it
+happens or none of it does.
+
+| Setting                       | Where           | Meaning                                                                                  |
+| ----------------------------- | --------------- | ---------------------------------------------------------------------------------------- |
+| `MSKD_PAYOUT_POOL`            | Wallet operator | The SOL/wXMR Meteora DLMM market the swap uses                                           |
+| `MSKD_DEVNET_PAYOUT_MINT`     | Wallet operator | Test networks only: the wXMR stand-in mint                                               |
+| `MASKED_WXMR_PAYOUTS_ENABLED` | Web app         | Offers wXMR on the claim screen; set it only once the operator has the market configured |
+
+- A payment spends at most 1 SOL of earnings; larger claims are paid in several payments, one at a
+  time. The restricted signer also applies its payout limit to each one.
+- The quote is valid for 20 seconds. A payment that cannot be quoted (thin liquidity, price impact
+  above 1%) waits and is quoted again on the next pass.
+- The claimant gets the minimum the swap guarantees, up to 1% under the quote. Whatever the swap
+  returns above that stays in the company wXMR account.
+- After 5 failed payments in a row, a claim with nothing paid yet returns its earnings to the wallet
+  to claim again. A partly paid claim stops and is logged for review. Alerts are JSON lines with
+  `"event":"masked_wxmr_alert"`.
+- Every claim item's coin must use the same collector wallet as the operator; otherwise the claim is
+  left for review.
 
 ## \$MSKD buyback and burn
 

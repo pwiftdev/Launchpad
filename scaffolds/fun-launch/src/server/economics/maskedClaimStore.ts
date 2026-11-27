@@ -1,6 +1,6 @@
 // Masked claims: one request takes everything a wallet has earned across Masked coins.
-// SOL claims become ordinary per-coin payout jobs the operator executes; XMR and wXMR claims wait
-// for the daily batch. Every amount is reserved under the same locks the payout ledger uses.
+// SOL claims become ordinary per-coin payout jobs the operator executes; XMR claims wait for the
+// daily batch, and wXMR claims are paid by swap-and-send wallet jobs. Every amount is reserved under the same locks the payout ledger uses.
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { database } from '../database';
@@ -20,7 +20,10 @@ export function minimumXmrLamports(env = process.env) {
   const value = env.MASKED_MINIMUM_XMR_CLAIM_LAMPORTS;
   return value && /^[1-9]\d{0,17}$/.test(value) ? BigInt(value) : DEFAULT_MINIMUM_XMR_LAMPORTS;
 }
-/** wXMR payouts need their own swap job in the signer; until then they stay switched off. */
+/**
+ * wXMR stands in for XMR while native payouts are down. Switch it on only once the operator has
+ * the wXMR market configured (MSKD_PAYOUT_POOL and the payout mint), since that is what pays it.
+ */
 export const wxmrPayoutsEnabled = (env = process.env) => env.MASKED_WXMR_PAYOUTS_ENABLED === 'true';
 /** The operator's Monero heartbeat counts as current for this long. */
 const PAYOUT_STATUS_FRESH_SECONDS = 15 * 60;

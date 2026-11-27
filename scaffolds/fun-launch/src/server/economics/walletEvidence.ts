@@ -144,6 +144,84 @@ function verifyMskdConversion(
   };
 }
 
+/**
+ * A Masked wXMR claim payment: the exact reviewed swap of the job's SOL, then exactly the quoted
+ * minimum of wXMR into the claiming wallet. Anything the swap returned above the minimum stays
+ * in the company's wXMR account.
+ */
+function verifyWxmrClaim(
+  job: WalletJob,
+  evidence: FinalizedEvidence,
+  collector: string,
+  fee: bigint,
+  delta: bigint,
+  instructionCount: number
+) {
+  const payoutMint = requiredString(job, 'payoutMint');
+  const owner = new PublicKey(collector),
+    mint = new PublicKey(payoutMint),
+    recipient = new PublicKey(requiredString(job, 'recipient'));
+  const source = getAssociatedTokenAddressSync(NATIVE_MINT, owner).toBase58();
+  const companyAta = getAssociatedTokenAddressSync(mint, owner);
+  const recipientAta = getAssociatedTokenAddressSync(mint, recipient);
+  const spend = BigInt(requiredString(job, 'maximumSpendLamports'));
+  const units = BigInt(requiredString(job, 'minimumPayoutUnits'));
+  requireExpectedDexInstruction(evidence, job);
+  for (const instruction of [
+    createAssociatedTokenAccountIdempotentInstruction(owner, recipientAta, recipient, mint),
+    createTransferCheckedInstruction(
+      companyAta,
+      mint,
+      recipientAta,
+      owner,
+      units,
+      modePolicy.payouts.wxmr.decimals
+    ),
+  ])
+    if (
+      requireInstruction(evidence, {
+        program: instruction.programId.toBase58(),
+        accounts: instruction.keys.map((key) => key.pubkey.toBase58()),
+        data: instruction.data,
+      }).eventIndex !== 0
+    )
+      throw new Error('Expected a direct wXMR payout');
+  const companyRent = lamportDelta(evidence, companyAta.toBase58());
+  const recipientRent = lamportDelta(evidence, recipientAta.toBase58());
+  const kept = tokenDelta(evidence, companyAta.toBase58(), payoutMint);
+  const paid = tokenDelta(evidence, recipientAta.toBase58(), payoutMint);
+  if (
+    job.recipient !== recipient.toBase58() ||
+    recipient.equals(owner) ||
+    job.details.assetMint !== payoutMint ||
+    job.details.market !== job.expectations.pool ||
+    job.expectations.tokenAta !== companyAta.toBase58() ||
+    job.expectations.quoteAta !== source ||
+    job.expectations.recipientAta !== recipientAta.toBase58() ||
+    job.expectations.expectedLamports !== job.lamports ||
+    BigInt(job.lamports) !== spend ||
+    spend <= 0n ||
+    units <= 0n ||
+    paid !== units ||
+    kept < 0n ||
+    companyRent < 0n ||
+    recipientRent < 0n ||
+    fee + companyRent + recipientRent > BigInt(requiredString(job, 'operatingCostLamports')) ||
+    instructionCount !== 10 ||
+    balance(evidence, source) !== 0n ||
+    balance(evidence, source, true) !== 0n ||
+    delta !== -spend - fee - companyRent - recipientRent
+  )
+    throw new Error('wXMR claim payment does not match the finalized SOL and token balances');
+  return {
+    recipient: job.recipient,
+    paidLamports: spend,
+    collectorDebitLamports: spend,
+    receivedPayoutUnits: units,
+    operatingCostLamports: fee + companyRent + recipientRent,
+  };
+}
+
 function verifyHsolBridge(
   job: WalletJob,
   evidence: FinalizedEvidence,
@@ -227,6 +305,8 @@ export async function verifyWalletEffect(
   const spl = !quoteMint.equals(NATIVE_MINT);
   if (job.kind === 'holder_conversion') {
     Object.assign(facts, verifyMskdConversion(job, evidence, collector, fee, delta, top.length));
+  } else if (job.kind === 'wxmr_claim') {
+    Object.assign(facts, verifyWxmrClaim(job, evidence, collector, fee, delta, top.length));
   } else if (job.kind.endsWith('_claim') && (job.expectations.payoutMint || spl)) {
     const mint = new PublicKey(String(job.expectations.payoutMint ?? quoteMint));
     const decimals = job.expectations.payoutMint ? modePolicy.payouts.wxmr.decimals : 9;

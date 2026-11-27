@@ -56,3 +56,9 @@ it('needs no account rent reads for a direct payout and refuses incomplete accou
     'unavailable'
   );
 });
+it('budgets a wXMR payment for temporary wrapped SOL and both wXMR accounts', async () => {
+  expect(await walletOperatingCosts(rpc([]), 'wxmr_claim', 10000n)).toEqual({
+    operatingCostLamports: 10000n + 2n * 2039280n,
+    temporaryFundingLamports: 2039280n,
+  });
+});

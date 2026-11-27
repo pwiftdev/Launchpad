@@ -217,6 +217,29 @@ describe('MSKD conversion uses the durable wallet attempt', () => {
     expect(f.rpc.sendRawTransaction).not.toHaveBeenCalled();
   });
 });
+describe('Masked wXMR payments sign only with a fresh swap quote', () => {
+  function payment(quoteCreatedAt: number) {
+    const f = fixture();
+    Object.assign(f.getJob(), { kind: 'wxmr_claim', bucket: null });
+    f.getJob().expectations.quoteCreatedAt = quoteCreatedAt;
+    vi.spyOn(f.worker, 'coin').mockResolvedValue({
+      mode: 'masked',
+      policy_version: 'masked-v1',
+    } as never);
+    return f;
+  }
+  it('signs and relays a freshly quoted payment', async () => {
+    const f = payment(Date.now());
+    await f.worker.sign('1');
+    await f.worker.relay('1');
+    expect(f.rpc.sendRawTransaction).toHaveBeenCalledOnce();
+  });
+  it('refuses to sign once the quote is stale', async () => {
+    const f = payment(Date.now() - MSKD_QUOTE_LIFETIME_MS - 1);
+    await expect(f.worker.sign('1')).rejects.toThrow('quote has expired');
+    expect(f.signer.sign).not.toHaveBeenCalled();
+  });
+});
 it('another unsettled signed collector job cannot be mistaken for free operating income', async () => {
   const f = fixture();
   vi.mocked(f.store.assertNoUnsettledSigned).mockRejectedValue(

@@ -1,4 +1,4 @@
-import { isWalletPolicy } from '@/lib/launchModes';
+import { isMaskedMode, isWalletPolicy } from '@/lib/launchModes';
 import { Transaction, type Connection } from '@solana/web3.js';
 import { registeredCoin } from '../launchRegistry';
 import { messageDigest, validateSignedTransaction } from './chainEvidence';
@@ -109,7 +109,13 @@ export async function validateWalletSignJob(
     throw new Error('Signer requires an immutable wallet launch');
   if (job.kind === 'platform_claim' && number(job.lamports) > number(limits.maximumPayoutLamports))
     throw new Error('Signer treasury payout limit exceeded');
-  if (job.kind === 'holder_conversion') requireFreshMskdQuote(saved.expectations.quoteCreatedAt);
+  if (job.kind === 'wxmr_claim') {
+    if (!isMaskedMode(coin.mode)) throw new Error('Signer wXMR payments are for Masked claims');
+    if (number(job.lamports) > number(limits.maximumPayoutLamports))
+      throw new Error('Signer wXMR payout limit exceeded');
+  }
+  const quoted = job.kind === 'holder_conversion' || job.kind === 'wxmr_claim';
+  if (quoted) requireFreshMskdQuote(saved.expectations.quoteCreatedAt);
   // The transport intentionally omits details; only the durable row supplies the funding route.
   if (coin.policy_version === 'bond-v1') await store.assertOperatingFunding(saved);
   const slippage = job.kind === 'buyback' ? Number(job.expectations.slippageBps) : 100;
@@ -131,7 +137,9 @@ export async function validateWalletSignJob(
           )
         : job.kind === 'holder_conversion'
           ? await adapter.prepareHolderConversion(saved, saved.expectations)
-          : job.kind === 'setup'
+          : job.kind === 'wxmr_claim'
+            ? await adapter.prepareWxmrClaim(saved, saved.expectations)
+            : job.kind === 'setup'
             ? await adapter.prepareSetup({ coin })
             : await adapter.preparePayout(saved);
   const expected = Transaction.from(Buffer.from(rebuilt.transactionBase64, 'base64'));
@@ -190,7 +198,7 @@ export async function validateWalletSignJob(
   await assertWalletExecutionGate(rpc, job.network_genesis, { worker: true });
   await store.assertNoUnsettledSigned(job.network_genesis, wallets.collector.toBase58(), job.id);
   await assertPayoutTokenBacking(rpc, store, wallets.collector, saved, coin);
-  if (job.kind === 'holder_conversion') requireFreshMskdQuote(saved.expectations.quoteCreatedAt);
+  if (quoted) requireFreshMskdQuote(saved.expectations.quoteCreatedAt);
   return { transaction: tx, collector: wallets.collector };
 }
 
