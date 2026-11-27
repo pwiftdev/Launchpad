@@ -1,7 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { apiGuard } from '@/server/apiGuard';
-import { getAssociatedTokenAddressSync, NATIVE_MINT, TOKEN_PROGRAM_ID, unpackAccount } from '@solana/spl-token';
+import {
+  getAssociatedTokenAddressSync,
+  NATIVE_MINT,
+  TOKEN_PROGRAM_ID,
+  unpackAccount,
+} from '@solana/spl-token';
 import { registeredCoin } from '@/server/launchRegistry';
 import { connection, parseKey, networkGenesis } from '@/server/dbc';
 import type { BalanceResponse } from '@/lib/coin';
@@ -35,7 +40,8 @@ export default async function handler(
       const ata = getAssociatedTokenAddressSync(quoteMint, wallet);
       const info = await connection.getAccountInfo(ata, 'confirmed');
       const account = info && unpackAccount(ata, info, TOKEN_PROGRAM_ID);
-      if (account && (!account.owner.equals(wallet) || !account.mint.equals(quoteMint))) throw new Error('Invalid quote balance');
+      if (account && (!account.owner.equals(wallet) || !account.mint.equals(quoteMint)))
+        throw new Error('Invalid quote balance');
       quoteBalance = account && !account.isFrozen ? Number(account.amount) / 1e9 : 0;
     }
     res.setHeader('Cache-Control', 'private, no-store');

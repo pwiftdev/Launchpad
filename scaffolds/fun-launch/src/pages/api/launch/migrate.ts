@@ -20,7 +20,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const found = await getCoin(parsed.data.mint);
     if (!found) return res.status(404).json({ error: 'Unknown launch' });
     const mode = found.coin.mode;
-    if (!(await allowTrading(res, mode === 'creator' || mode === 'community' ? 'bond' : mode))) return;
+    if (!(await allowTrading(res, mode === 'creator' || mode === 'community' ? 'bond' : mode)))
+      return;
     const payer = new PublicKey(parsed.data.wallet);
     if (!PublicKey.isOnCurve(payer.toBytes())) throw new Error('A wallet signer is required');
     return res

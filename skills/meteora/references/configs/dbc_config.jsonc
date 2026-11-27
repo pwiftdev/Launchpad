@@ -90,7 +90,7 @@
       "baseFeeParams": {
         "baseFeeMode": 1, // 0 - Fee Scheduler: Linear | 1 - Fee Scheduler: Exponential | 2 - Rate Limiter
         "feeSchedulerParam": {
-          // Launch tax: 90% decaying every 3s to 1.25% at 27s (SDK derives reductionFactor 3782 bps)
+          // Launch tax: exact 90% start, nominal 1.25% target over 27s; integer exponential endpoint 1.2505439% (factor 3782 bps).
           "startingFeeBps": 9000, // starting fee (max 99% fee === 9900 bps)
           "endingFeeBps": 125, // ending fee (minimum 0.25% fee === 25 bps)
           "numberOfPeriod": 9, // number of period
@@ -114,7 +114,7 @@
        * Partner claims 90% via claimPartnerPoolCreationFee(), Meteora claims 10%.
        * Set to 0 for no fee, or between 0.001 SOL and 100 SOL.
        */
-      "poolCreationFee": 0, // New vault-backed launches charge trading fees only; legacy configs are unchanged.
+      "poolCreationFee": 0, // New wallet-operated launches charge trading fees only; legacy configs are unchanged.
       "enableFirstSwapWithMinFee": true // If true, the first swap on the pool will use the minimum fee instead of the starting fee (useful for creator bundled buys)
     },
 
@@ -197,7 +197,7 @@
 
     "activationType": 1, // 0 - Slot | 1 - Timestamp
 
-    "leftoverReceiver": "5iskTyXpKn7HeqvNUFBFc1rv2C2EoFNBNyFmXgGFztgS", // leftover receiver address (partner wallet)
+    "leftoverReceiver": "GfgpgQa2ZqNm17rJ6fw2t5nBApKKPZBn5M5niWW3riZZ", // company treasury
     "feeClaimer": "5iskTyXpKn7HeqvNUFBFc1rv2C2EoFNBNyFmXgGFztgS" // fee claimer address (partner wallet)
 
     /* Transfer Hook Launch (Token 2022 only)

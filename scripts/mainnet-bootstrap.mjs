@@ -95,15 +95,15 @@ Signatures created: 0. Transactions sent: 0. No signing, deployment, key generat
       throw new BootstrapError('REQUIRED_INPUTS_MISSING');
     if (mode === 'prepare' && (options['--elf-sha256'] || options['--max-data-length']))
       throw new BootstrapError('PREPARE_USES_REVIEWED_PROGRAM_PINS');
-    const output = privatePath(options['--output']);
-    if (fs.existsSync(output)) throw new BootstrapError('OUTPUT_ALREADY_EXISTS');
-    const owner = readJson(path.join(workspace, 'docs/mainnet-authorities.public.json'));
-    authorities(owner);
     if (options['--review-public'] && !options['--review-public'].endsWith('.public.json'))
       throw new BootstrapError('PUBLIC_REVIEW_FILE_REQUIRED');
     const review = options['--review-public'] ? readJson(options['--review-public']) : undefined;
     if (mode === 'prepare' && !review)
       throw new BootstrapError('INDEPENDENT_PROGRAM_AND_CONFIG_PINS_REQUIRED');
+    const output = privatePath(options['--output']);
+    if (fs.existsSync(output)) throw new BootstrapError('OUTPUT_ALREADY_EXISTS');
+    const owner = readJson(path.join(workspace, 'docs/mainnet-authorities.public.json'));
+    authorities(owner);
     const elf = readBoundedFile(options['--elf'], 10 * 1024 * 1024);
     const config = readJson(privatePath(options['--connection-file']));
     if (

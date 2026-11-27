@@ -31,9 +31,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!tx.verifySignatures()) throw new Error('A fully signed transaction is required');
     const claimMint = typeof req.body?.mint === 'string' ? new PublicKey(req.body.mint) : undefined;
     const modes = new Set<import('@/lib/launchModes').LaunchMode>();
-    await validateRelayTransaction(tx, { claimMint, onMode: mode => modes.add(mode ?? 'bond') });
+    await validateRelayTransaction(tx, { claimMint, onMode: (mode) => modes.add(mode ?? 'bond') });
     if (!modes.size) modes.add('bond');
-    for (const mode of modes) if (!(await allowTrading(res, mode === 'creator' || mode === 'community' ? 'bond' : mode))) return;
+    for (const mode of modes)
+      if (!(await allowTrading(res, mode === 'creator' || mode === 'community' ? 'bond' : mode)))
+        return;
   } catch {
     return res.status(400).json({ error: 'A fully signed launch or swap transaction is required' });
   }
