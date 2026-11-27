@@ -169,6 +169,10 @@
     {
       "file": "042-masked-wxmr-claims.sql",
       "sha256": "5e79c1d23bec449b8a9201e9ced5663875fd3086dfc26592550183003d6a3f47"
+    },
+    {
+      "file": "043-masked-proof.sql",
+      "sha256": "2000a0e40e45a5e4ad765e82903c2b50b8d1fa7db851c60cb4e9a8da24470ad7"
     }
   ],
   "catalog": {
@@ -215,11 +219,14 @@
       "masked_claim_items",
       "masked_claims",
       "masked_holder_samples",
+      "masked_key_image_exports",
       "masked_mskd_buyback_transfers",
       "masked_payout_status",
+      "masked_treasury_keys",
       "masked_wxmr_payments",
       "masked_wxmr_settlements",
       "masked_xmr_batches",
+      "masked_xmr_inflows",
       "masked_xmr_settlements",
       "offchain_metadata_cache",
       "otc_rings_deals",
@@ -4117,6 +4124,86 @@
         "numeric_scale": null
       },
       {
+        "table_name": "masked_key_image_exports",
+        "column_name": "id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_key_image_exports",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_key_image_exports",
+        "column_name": "wallet_height",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_key_image_exports",
+        "column_name": "key_image_count",
+        "udt_name": "int4",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_key_image_exports",
+        "column_name": "export_offset",
+        "udt_name": "int4",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_key_image_exports",
+        "column_name": "payload",
+        "udt_name": "jsonb",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_key_image_exports",
+        "column_name": "digest",
+        "udt_name": "bpchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 64,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_key_image_exports",
+        "column_name": "created_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": "now()",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
         "table_name": "masked_mskd_buyback_transfers",
         "column_name": "id",
         "udt_name": "uuid",
@@ -4229,6 +4316,56 @@
       {
         "table_name": "masked_payout_status",
         "column_name": "heartbeat_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": "now()",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_treasury_keys",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_treasury_keys",
+        "column_name": "primary_address",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 106,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_treasury_keys",
+        "column_name": "view_key",
+        "udt_name": "bpchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 64,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_treasury_keys",
+        "column_name": "restore_height",
+        "udt_name": "int8",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_treasury_keys",
+        "column_name": "published_at",
         "udt_name": "timestamptz",
         "is_nullable": "NO",
         "column_default": "now()",
@@ -4532,6 +4669,56 @@
         "udt_name": "timestamptz",
         "is_nullable": "NO",
         "column_default": "now()",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_inflows",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_inflows",
+        "column_name": "txid",
+        "udt_name": "bpchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 64,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_inflows",
+        "column_name": "amount_atomic",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 39,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_xmr_inflows",
+        "column_name": "height",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_xmr_inflows",
+        "column_name": "received_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": null,
         "character_maximum_length": null,
         "numeric_precision": null,
         "numeric_scale": null
@@ -8888,6 +9075,55 @@
         "definition": "PRIMARY KEY (network_genesis, mint, sample_window)"
       },
       {
+        "table_name": "masked_key_image_exports",
+        "name": "check:34aa039872f7d4fdf5d5d9640ed594b7e1d36644f6cdc0bb71c366a4a193beb6",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((digest ~ '^[a-f0-9]{64}$'::text))"
+      },
+      {
+        "table_name": "masked_key_image_exports",
+        "name": "check:920f18e9d5418d2aac12983dfd8a352d2651626ac0b087925542df06f845c5b2",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((jsonb_typeof(payload) = 'array'::text))"
+      },
+      {
+        "table_name": "masked_key_image_exports",
+        "name": "check:a54f0204389e419174d1ea13ac496bc6116bbef59f429a8a5732943727132a56",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((wallet_height >= 0))"
+      },
+      {
+        "table_name": "masked_key_image_exports",
+        "name": "check:b29a5c67d136662ee46cdfbde8e4164fd6602eb7b451e4c991876a31482eafbb",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((key_image_count >= 0))"
+      },
+      {
+        "table_name": "masked_key_image_exports",
+        "name": "check:ba9859dee89394972af3a0bc6558352f7039d4b01037df734fca9a204ac37b30",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((export_offset >= 0))"
+      },
+      {
+        "table_name": "masked_key_image_exports",
+        "name": "masked_key_image_exports_network_genesis_digest_key",
+        "type": "u",
+        "validated": true,
+        "definition": "UNIQUE (network_genesis, digest)"
+      },
+      {
+        "table_name": "masked_key_image_exports",
+        "name": "masked_key_image_exports_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
         "table_name": "masked_mskd_buyback_transfers",
         "name": "check:46fa5ab93f6128128b52c49475b283c4e6f662ddea3293a8fc41d161d9ca3782",
         "type": "c",
@@ -8932,6 +9168,34 @@
       {
         "table_name": "masked_payout_status",
         "name": "masked_payout_status_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (network_genesis)"
+      },
+      {
+        "table_name": "masked_treasury_keys",
+        "name": "check:3a36470b3ce1bff9f302ccbf0f18b94d4db3ef4941067678ccbd6e7adf75cc5c",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((length((primary_address)::text) = ANY (ARRAY[95, 106])))"
+      },
+      {
+        "table_name": "masked_treasury_keys",
+        "name": "check:57ab0439f79cfcad5c70e57e56dee671830866d124b4aac03bdf816d0fb32b6a",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((view_key ~ '^[a-f0-9]{64}$'::text))"
+      },
+      {
+        "table_name": "masked_treasury_keys",
+        "name": "check:fd7623b5dec28ec616bea38315f84015ad62d57c5e3216a74cf1d28cab49f011",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((restore_height IS NULL) OR (restore_height >= 0)))"
+      },
+      {
+        "table_name": "masked_treasury_keys",
+        "name": "masked_treasury_keys_pkey",
         "type": "p",
         "validated": true,
         "definition": "PRIMARY KEY (network_genesis)"
@@ -9103,6 +9367,34 @@
         "type": "p",
         "validated": true,
         "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "masked_xmr_inflows",
+        "name": "check:56a9727a724e624b5a4de45e341dcd27d6fe2444f8c15fd7492deb6c70e7b65e",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((txid ~ '^[a-f0-9]{64}$'::text))"
+      },
+      {
+        "table_name": "masked_xmr_inflows",
+        "name": "check:ab125dac7fb840f8e66e5097618d3e96b15ad1eaad4f2a82f2c7120868981f4b",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((amount_atomic > (0)::numeric))"
+      },
+      {
+        "table_name": "masked_xmr_inflows",
+        "name": "check:ecf712bba31ccb6b238fc992bc24f7447875f53aff847b3cc68d6f692f75d4c9",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((height >= 0))"
+      },
+      {
+        "table_name": "masked_xmr_inflows",
+        "name": "masked_xmr_inflows_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (network_genesis, txid)"
       },
       {
         "table_name": "masked_xmr_settlements",
@@ -10909,6 +11201,21 @@
         "definition": "CREATE UNIQUE INDEX masked_holder_samples_pkey ON public.masked_holder_samples USING btree (network_genesis, mint, sample_window)"
       },
       {
+        "table_name": "masked_key_image_exports",
+        "name": "masked_key_image_exports_latest",
+        "definition": "CREATE INDEX masked_key_image_exports_latest ON public.masked_key_image_exports USING btree (network_genesis, created_at DESC)"
+      },
+      {
+        "table_name": "masked_key_image_exports",
+        "name": "masked_key_image_exports_network_genesis_digest_key",
+        "definition": "CREATE UNIQUE INDEX masked_key_image_exports_network_genesis_digest_key ON public.masked_key_image_exports USING btree (network_genesis, digest)"
+      },
+      {
+        "table_name": "masked_key_image_exports",
+        "name": "masked_key_image_exports_pkey",
+        "definition": "CREATE UNIQUE INDEX masked_key_image_exports_pkey ON public.masked_key_image_exports USING btree (id)"
+      },
+      {
         "table_name": "masked_mskd_buyback_transfers",
         "name": "masked_mskd_buyback_transfers_pkey",
         "definition": "CREATE UNIQUE INDEX masked_mskd_buyback_transfers_pkey ON public.masked_mskd_buyback_transfers USING btree (id)"
@@ -10922,6 +11229,11 @@
         "table_name": "masked_payout_status",
         "name": "masked_payout_status_pkey",
         "definition": "CREATE UNIQUE INDEX masked_payout_status_pkey ON public.masked_payout_status USING btree (network_genesis)"
+      },
+      {
+        "table_name": "masked_treasury_keys",
+        "name": "masked_treasury_keys_pkey",
+        "definition": "CREATE UNIQUE INDEX masked_treasury_keys_pkey ON public.masked_treasury_keys USING btree (network_genesis)"
       },
       {
         "table_name": "masked_wxmr_payments",
@@ -10957,6 +11269,16 @@
         "table_name": "masked_xmr_batches",
         "name": "masked_xmr_batches_pkey",
         "definition": "CREATE UNIQUE INDEX masked_xmr_batches_pkey ON public.masked_xmr_batches USING btree (id)"
+      },
+      {
+        "table_name": "masked_xmr_inflows",
+        "name": "masked_xmr_inflows_pkey",
+        "definition": "CREATE UNIQUE INDEX masked_xmr_inflows_pkey ON public.masked_xmr_inflows USING btree (network_genesis, txid)"
+      },
+      {
+        "table_name": "masked_xmr_inflows",
+        "name": "masked_xmr_inflows_time",
+        "definition": "CREATE INDEX masked_xmr_inflows_time ON public.masked_xmr_inflows USING btree (network_genesis, received_at)"
       },
       {
         "table_name": "masked_xmr_settlements",
@@ -11459,6 +11781,13 @@
         "definition": "CREATE TRIGGER masked_holder_samples_immutable BEFORE UPDATE ON public.masked_holder_samples FOR EACH ROW EXECUTE FUNCTION masked_sample_immutable()"
       },
       {
+        "table_name": "masked_key_image_exports",
+        "name": "masked_key_image_exports_immutable",
+        "enabled": "O",
+        "function_name": "rinsed_wallet_immutable",
+        "definition": "CREATE TRIGGER masked_key_image_exports_immutable BEFORE DELETE OR UPDATE ON public.masked_key_image_exports FOR EACH ROW EXECUTE FUNCTION rinsed_wallet_immutable()"
+      },
+      {
         "table_name": "masked_mskd_buyback_transfers",
         "name": "masked_mskd_buyback_transfers_immutable",
         "enabled": "O",
@@ -11485,6 +11814,13 @@
         "enabled": "O",
         "function_name": "masked_batch_transition",
         "definition": "CREATE TRIGGER masked_xmr_batches_transition BEFORE DELETE OR UPDATE ON public.masked_xmr_batches FOR EACH ROW EXECUTE FUNCTION masked_batch_transition()"
+      },
+      {
+        "table_name": "masked_xmr_inflows",
+        "name": "masked_xmr_inflows_immutable",
+        "enabled": "O",
+        "function_name": "rinsed_wallet_immutable",
+        "definition": "CREATE TRIGGER masked_xmr_inflows_immutable BEFORE DELETE OR UPDATE ON public.masked_xmr_inflows FOR EACH ROW EXECUTE FUNCTION rinsed_wallet_immutable()"
       },
       {
         "table_name": "masked_xmr_settlements",

@@ -58,7 +58,7 @@ export async function displayCoin(mint: string) {
 const SHARED_MS = 1000;
 type Shared<T> = { at: number; value?: T; pending?: Promise<T> };
 const shared = new Map<string, Shared<unknown>>();
-function sharedRead<T>(key: string, load: () => Promise<T>, ttlMs = SHARED_MS): Promise<T> {
+export function sharedRead<T>(key: string, load: () => Promise<T>, ttlMs = SHARED_MS): Promise<T> {
   const entry = (shared.get(key) as Shared<T> | undefined) ?? { at: 0 };
   if (entry.value !== undefined && Date.now() - entry.at < ttlMs)
     return Promise.resolve(entry.value);

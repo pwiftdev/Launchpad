@@ -1,6 +1,7 @@
 // Monero address checks: Monero's block base58, the network prefix and the Keccak checksum.
 // A payout is only queued to an address that passes all three, so a typo cannot lose funds.
 import { keccak_256 } from '@noble/hashes/sha3';
+import { ed25519 } from '@noble/curves/ed25519';
 
 export type MoneroNetwork = 'mainnet' | 'stagenet' | 'testnet';
 export type MoneroAddressKind = 'standard' | 'subaddress' | 'integrated';
@@ -103,6 +104,44 @@ export function moneroAddressKind(
 
 export const isMoneroAddress = (address: string, network: MoneroNetwork) =>
   moneroAddressKind(address, network) !== null;
+
+/** The public spend and view keys inside a standard or subaddress. */
+function addressKeys(address: string) {
+  const bytes = decodeBase58(address);
+  const body = bytes.subarray(0, bytes.length - 4);
+  const { length } = readVarint(body);
+  return {
+    spend: body.subarray(length, length + 32),
+    view: body.subarray(length + 32, length + 64),
+  };
+}
+
+const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString('hex');
+
+/** The public key of a 32-byte little-endian private key (a Monero private view key). */
+export function moneroPublicKey(privateKeyHex: string): string {
+  if (!/^[a-f0-9]{64}$/.test(privateKeyHex)) throw new Error('A private key is 64 hex characters');
+  const scalar = BigInt(`0x${Buffer.from(privateKeyHex, 'hex').reverse().toString('hex')}`);
+  if (scalar <= 0n || scalar >= ed25519.CURVE.n) throw new Error('Private key is not reduced');
+  return hex(ed25519.Point.BASE.multiply(scalar).toBytes());
+}
+
+/**
+ * True when the private view key belongs to this standard address on this network, so anyone
+ * who imports the pair into a view-only wallet sees this treasury's incoming funds.
+ */
+export function viewKeyMatchesAddress(
+  address: string,
+  viewKeyHex: string,
+  network: MoneroNetwork
+): boolean {
+  if (moneroAddressKind(address, network) !== 'standard') return false;
+  try {
+    return moneroPublicKey(viewKeyHex) === hex(addressKeys(address).view);
+  } catch {
+    return false;
+  }
+}
 
 /** Builds an address from raw parts; used to create test vectors. */
 export function moneroAddressFrom(prefix: number, keys: Uint8Array): string {

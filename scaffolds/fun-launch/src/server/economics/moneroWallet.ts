@@ -167,6 +167,43 @@ export class MoneroWallet {
     }
   }
 
+  /** The treasury's primary address (account 0, index 0). */
+  async address() {
+    return (await this.call<{ address: string }>('get_address', { account_index: 0 })).address;
+  }
+
+  /** The private view key. It reveals incoming funds only and cannot spend. */
+  async viewKey() {
+    return (await this.call<{ key: string }>('query_key', { key_type: 'view_key' })).key;
+  }
+
+  /** Signed key images for every output, so a view-only wallet can see what was spent. */
+  async exportKeyImages() {
+    const result = await this.call<{
+      offset?: number;
+      signed_key_images?: { key_image: string; signature: string }[];
+    }>('export_key_images', { all: true });
+    return { offset: result.offset ?? 0, signedKeyImages: result.signed_key_images ?? [] };
+  }
+
+  /** Confirmed incoming transfers from this height on. Piconero. */
+  async incoming(minHeight: number) {
+    const result = await this.call<{
+      in?: { txid: string; amount: number | string; height: number; timestamp: number }[];
+    }>('get_transfers', {
+      in: true,
+      account_index: 0,
+      filter_by_height: true,
+      min_height: Math.max(0, minHeight - 1),
+    });
+    return (result.in ?? []).map((row) => ({
+      txid: row.txid,
+      amount: BigInt(row.amount),
+      height: row.height,
+      receivedAt: new Date(row.timestamp * 1000),
+    }));
+  }
+
   /** The key that lets a recipient prove they received a payment. */
   async txKey(txHash: string) {
     return (await this.call<{ tx_key: string }>('get_tx_key', { txid: txHash })).tx_key;

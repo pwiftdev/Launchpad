@@ -69,6 +69,8 @@ function pollingClass(req: NextApiRequest): keyof typeof POLLING_LIMITS | undefi
       '/api/solana-market',
       '/api/sol-price',
       '/api/token-image',
+      '/api/proof',
+      '/api/proof/key-images',
     ].includes(path) ||
     /^\/api\/coins\/[1-9A-HJ-NP-Za-km-z]{32,44}(?:\/(?:trades|holders|live))?$/.test(path)
   )

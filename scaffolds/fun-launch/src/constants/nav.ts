@@ -16,6 +16,7 @@ export const NAV_ITEMS: [NavItem, ...NavItem[]] = [
     icon: 'ph--coins',
     activeIcon: 'ph--coins-fill',
   },
+  { href: '/proof', label: 'Proof', icon: 'ph--seal-check', activeIcon: 'ph--seal-check-fill' },
   { href: '/rules', label: 'Rules', icon: 'ph--book-open', activeIcon: 'ph--book-open-fill' },
   { href: '/roadmap', label: 'Roadmap', icon: 'ph--git-branch', activeIcon: 'ph--git-branch-fill' },
 ];

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatXmr, moneroAddressFrom, moneroAddressKind } from './monero';
+import { formatXmr, moneroAddressFrom, moneroAddressKind, viewKeyMatchesAddress } from './monero';
 
 // The Monero Project's published general fund donation address.
 const GENERAL_FUND =
@@ -33,5 +33,14 @@ describe('Monero addresses', () => {
     expect(formatXmr(1_500_000_000_000n)).toBe('1.5');
     expect(formatXmr(123_456_789n)).toBe('0.000123');
     expect(formatXmr(0n)).toBe('0');
+  });
+  it('confirms a published view key belongs to its address', () => {
+    // The view key the general fund publishes for its donation address.
+    const fund = GENERAL_FUND;
+    const view = 'f359631075708155cc3d92a32b75a7d02a5dcf27756707b47a2b31b21c389501';
+    expect(viewKeyMatchesAddress(fund, view, 'mainnet')).toBe(true);
+    expect(viewKeyMatchesAddress(fund, view, 'stagenet')).toBe(false);
+    expect(viewKeyMatchesAddress(fund, `${view.slice(0, 63)}2`, 'mainnet')).toBe(false);
+    expect(viewKeyMatchesAddress(fund, 'f'.repeat(64), 'mainnet')).toBe(false);
   });
 });

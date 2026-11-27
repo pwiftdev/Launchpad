@@ -34,6 +34,7 @@ Use stagenet (`--stagenet` and a stagenet node) for every rehearsal.
 | `MASKED_XMR_FEE_BPS`                             | Fee taken from the market rate, default 100 (1%)                |
 | `MASKED_XMR_PAYOUT_HOUR_UTC`                     | Hour the daily batch is planned, default 12                     |
 | `MASKED_FIXED_SOL_XMR_RATE`                      | Test networks only: fixed XMR per SOL instead of the price feed |
+| `MASKED_TREASURY_RESTORE_HEIGHT`                 | Block the treasury wallet was created at; auditors scan from it |
 
 The web app also needs `MONERO_ADDRESS_KEY` and may set `MASKED_MINIMUM_XMR_CLAIM_LAMPORTS` (default
 0.05 SOL) until the minimum is decided.
@@ -57,6 +58,19 @@ the wallet is unreachable). From the payout hour, once a day, it:
 
 If every transaction in a batch fails, the claims fail and their earnings return to the wallets. A
 partly failed batch is logged for manual review and left untouched.
+
+## Public proof
+
+Hourly, and right after each batch settles, the process publishes the treasury's audit data for the
+Proof page (`/proof`):
+
+- The primary address and private view key, read from the wallet itself and checked to belong
+  together before publishing. They show everything the treasury receives and cannot spend.
+- Incoming transfers (the top-ups), shown on the Proof page as XMR bought.
+- Signed key images, stored when they change and downloadable from `/api/proof/key-images`. Imported
+  into a view-only wallet, they show what the treasury spent.
+
+A failure to publish is logged as a warning and never holds up payouts.
 
 ## Topping up the treasury
 

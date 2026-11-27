@@ -6,6 +6,11 @@ import { moneroWalletFromEnv } from './moneroWallet';
 import { DEFAULT_FEE_BPS, MaskedXmrPayouts } from './maskedXmrPayouts';
 import { moneroSealConfigured } from './moneroSeal';
 import { priceSourceFromEnv } from './xmrPrice';
+import { MaskedTreasuryProof } from './maskedTreasuryProof';
+import { NETWORK_GENESIS } from '../launchConfig';
+
+/** Passes between treasury proof updates (one pass a minute). */
+const PROOF_EVERY_PASSES = 60;
 
 async function main(mode: string) {
   const wallet = moneroWalletFromEnv();
@@ -21,8 +26,36 @@ async function main(mode: string) {
     feeBps,
     alert: (alert) => console.error(JSON.stringify({ event: 'xmr_payout_alert', ...alert })),
   });
+  const restore = process.env.MASKED_TREASURY_RESTORE_HEIGHT;
+  if (restore !== undefined && !/^\d{1,9}$/.test(restore))
+    throw new Error('Invalid MASKED_TREASURY_RESTORE_HEIGHT');
+  const proof = new MaskedTreasuryProof(
+    wallet,
+    genesis,
+    genesis === NETWORK_GENESIS['mainnet-beta'] ? 'mainnet' : 'stagenet',
+    { restoreHeight: restore === undefined ? undefined : Number(restore) }
+  );
+  let passes = 0;
   const pass = async () => {
     const result = await payouts.runOnce(await payouts.due(new Date(), hour));
+    // Publish the treasury's audit data hourly, and right after a batch settles.
+    if (passes++ % PROOF_EVERY_PASSES === 0 || result.status === 'paid') {
+      // A proof failure never holds up payouts; it is retried on the next proof pass.
+      await proof
+        .publish(await wallet.height())
+        .then((published) =>
+          console.info(JSON.stringify({ event: 'xmr_treasury_proof', ...published }))
+        )
+        .catch((error: unknown) =>
+          console.error(
+            JSON.stringify({
+              event: 'xmr_payout_alert',
+              level: 'warning',
+              message: `Treasury proof not published: ${error instanceof Error ? error.message.slice(0, 200) : 'unknown'}`,
+            })
+          )
+        );
+    }
     console.info(
       JSON.stringify({ event: 'xmr_payout_pass', ...result }, (_, v) =>
         typeof v === 'bigint' ? v.toString() : v
