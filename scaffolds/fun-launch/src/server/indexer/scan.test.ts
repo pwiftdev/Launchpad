@@ -98,6 +98,10 @@ describe('pool scan', () => {
   it('reads a small pool completely in one pass, oldest first', async () => {
     const f = fixture(5);
     const result = await scanPool({ rpc: f.rpc as never, store: f.store, pool: POOL, coin });
+    expect(f.rpc.getTransactions).toHaveBeenCalledWith(expect.any(Array), {
+      commitment: 'confirmed',
+      maxSupportedTransactionVersion: 1,
+    });
     expect(f.inserted).toEqual(['sig-1', 'sig-2', 'sig-3', 'sig-4', 'sig-5']);
     expect(result).toEqual({ inserted: 5, more: false });
     expect(f.cursor()).toEqual({

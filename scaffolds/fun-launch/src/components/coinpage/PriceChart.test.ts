@@ -13,9 +13,9 @@ describe('24-hour token price chart', () => {
   it('shows loading and empty states without making up price movement', () => {
     expect(render({ isLoading: true })).toContain('Loading price history');
     expect(render({ history: { points: [] } })).toContain('Waiting for more trades');
-    expect(render({ history: { points: [{ time: 100, priceSol: 1 }] } })).not.toContain(
-      'role="img"'
-    );
+    const single = render({ history: { points: [{ time: 100, priceSol: 1 }] } });
+    expect(single).toContain('Latest trade price');
+    expect(single).not.toContain('role="img"');
   });
   it('offers retry without exposing provider errors', () => {
     const html = render({ error: new Error('provider secret'), onRetry: () => {} });

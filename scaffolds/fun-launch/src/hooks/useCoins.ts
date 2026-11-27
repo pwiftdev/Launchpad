@@ -1,10 +1,12 @@
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import type {
-  CoinResponse,
-  CoinPriceHistory,
-  CoinsResponse,
-  HoldersResponse,
-  TrendingResponse,
+import {
+  RECENT_TRADE_LIMIT,
+  type CoinResponse,
+  type CoinPriceHistory,
+  type CoinsResponse,
+  type HoldersResponse,
+  type RecentTradesResponse,
+  type TrendingResponse,
 } from '@/lib/coin';
 import { syncServerClock } from './useNow';
 import {
@@ -99,6 +101,21 @@ export function useCoinPrices(mint: string) {
     queryKey: ['coin-prices', mint],
     queryFn: ({ signal }) => fetchCoinPrices(mint, signal),
     refetchInterval: demo ? false : 60_000,
+    staleTime: PRICES_STALE_MS,
+    retry: 1,
+  });
+}
+
+export function useRecentTrades(coin: { mint: string; isDemo?: boolean }) {
+  return useQuery<RecentTradesResponse>({
+    queryKey: ['recent-trades', coin.mint],
+    queryFn: ({ signal }) => {
+      const demo = getDemoCoin(coin.mint);
+      return demo
+        ? { trades: getDemoTrades(demo).trades.slice(0, RECENT_TRADE_LIMIT), complete: true }
+        : getJson<RecentTradesResponse>(`/api/coins/${coin.mint}/trades?view=recent`, signal);
+    },
+    refetchInterval: coin.isDemo ? false : 60_000,
     staleTime: PRICES_STALE_MS,
     retry: 1,
   });

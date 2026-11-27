@@ -61,6 +61,8 @@ type TradeRow = {
 };
 
 const STALE_AFTER_MS = 150_000;
+const RECENT_PRICE_LIMIT = 40;
+type PriceRow = { time: string; price_quote: number };
 
 export class DisplayStore {
   constructor(
@@ -336,20 +338,39 @@ export class DisplayStore {
     };
   }
 
-  async prices(
-    coin: Coin,
-    now = Math.floor(Date.now() / 1000)
-  ): Promise<CoinPriceHistory['points']> {
-    const { rows } = await this.db.query<{ time: string; price_quote: number }>(
+  async prices(coin: Coin, now = Math.floor(Date.now() / 1000)): Promise<CoinPriceHistory> {
+    const { rows } = await this.db.query<PriceRow>(
       `SELECT DISTINCT ON (ts/$5::bigint) ts::text AS time,price_quote FROM display_trades
        WHERE network_genesis=$1 AND mint=$2 AND ts BETWEEN $3 AND $4
        ORDER BY ts/$5::bigint,ts DESC,slot DESC,signature DESC,instruction_index DESC,event_index DESC`,
       [this.genesis, coin.mint, now - COIN_CHART_SECONDS, now, COIN_CHART_BUCKET_SECONDS]
     );
-    return rows.map((row) => ({
-      time: Number(row.time),
-      priceSol: row.price_quote * (coin.quoteToSol ?? 1),
-    }));
+    if (rows.length >= 2) return { points: pricePoints(rows, coin) };
+    const latest = (await this.latestPrices([coin.mint], now)).get(coin.mint) ?? [];
+    const points = pricePoints(latest, coin);
+    if (points.length > rows.length) return { points, range: 'recent' };
+    return { points: pricePoints(rows, coin) };
+  }
+
+  private async latestPrices(mints: string[], now: number) {
+    const byMint = new Map<string, PriceRow[]>();
+    if (!mints.length) return byMint;
+    const { rows } = await this.db.query<PriceRow & { mint: string }>(
+      `SELECT m.mint,p.ts::text AS time,p.price_quote
+       FROM unnest($2::varchar[]) AS m(mint)
+       CROSS JOIN LATERAL (
+         SELECT ts,slot,signature,instruction_index,event_index,price_quote FROM display_trades
+         WHERE network_genesis=$1 AND mint=m.mint AND ts<=$3
+         ORDER BY ts DESC,slot DESC,signature DESC,instruction_index DESC,event_index DESC LIMIT $4
+       ) p ORDER BY m.mint,p.ts,p.slot,p.signature,p.instruction_index,p.event_index`,
+      [this.genesis, mints, now, RECENT_PRICE_LIMIT]
+    );
+    for (const row of rows) {
+      const prices = byMint.get(row.mint) ?? [];
+      prices.push(row);
+      byMint.set(row.mint, prices);
+    }
+    return byMint;
   }
 
   /** Fees over the whole history plus launch-window tax, without loading every trade. */
@@ -423,8 +444,8 @@ export class DisplayStore {
   async markets(coins: Coin[], now = Math.floor(Date.now() / 1000)) {
     const rows = await this.db.query<TradeRow & { mint: string }>(
       `SELECT mint,signature,instruction_index,event_index,ts::text,side,wallet,wallet_role,quote_amount,tokens,fee_quote,
-         fee_is_estimate,price_quote,route FROM display_trades WHERE network_genesis=$1 AND ts>=$2 ORDER BY ts`,
-      [this.genesis, now - 86_400]
+         fee_is_estimate,price_quote,route FROM display_trades WHERE network_genesis=$1 AND ts BETWEEN $2 AND $3 ORDER BY ts`,
+      [this.genesis, now - COIN_CHART_SECONDS, now]
     );
     const byMint = new Map<string, TradeRow[]>();
     for (const row of rows.rows) {
@@ -433,6 +454,11 @@ export class DisplayStore {
       else byMint.set(row.mint, [row]);
     }
     const tokens: Record<string, TokenMarket> = {};
+    const quiet = coins.filter((coin) => !byMint.has(coin.mint));
+    const archived = await this.latestPrices(
+      quiet.map((coin) => coin.mint),
+      now
+    );
     for (const coin of coins)
       tokens[coin.mint] = summarizeMarket(
         (byMint.get(coin.mint) ?? []).map((row) => toTrade(row, coin)),
@@ -440,6 +466,13 @@ export class DisplayStore {
         false,
         now
       );
+    for (const coin of quiet) {
+      const points = pricePoints(archived.get(coin.mint) ?? [], coin);
+      if (points.length > 1)
+        tokens[coin.mint]!.points = points.map(
+          (point) => point.priceSol * (coin.tokenSupply ?? TOTAL_SUPPLY)
+        );
+    }
     return tokens;
   }
 
@@ -452,6 +485,12 @@ export class DisplayStore {
     );
     return new Map(rows.rows.map((row) => [row.mint, Number(row.count)]));
   }
+}
+
+function pricePoints(rows: PriceRow[], coin: Coin): CoinPriceHistory['points'] {
+  const rate = coin.quoteToSol ?? 1;
+  const values = new Map(rows.map((row) => [Number(row.time), row.price_quote * rate]));
+  return [...values].map(([time, priceSol]) => ({ time, priceSol }));
 }
 
 function toTrade(row: TradeRow, coin: Coin): Trade {

@@ -45,7 +45,8 @@ export const CoinCard = memo(({ coin, isNew, compact }: CoinCardProps) => {
   const { usd } = useUsd();
   const flash = useChangeFlash(coin.marketCapSol);
   const market = useTokenMarket(coin);
-  const down = (market?.changePercent ?? 0) < 0;
+  const prices = market?.points;
+  const down = (market?.changePercent ?? (prices?.at(-1) ?? 0) - (prices?.[0] ?? 0)) < 0;
   const pct = coin.progress * 100;
   const hot = !coin.isMigrated && coin.progress >= HOT_BOND_PROGRESS;
   const sniping =

@@ -107,7 +107,7 @@ const PHASES: Phase[] = [
         status: 'building',
         title: 'Native Monero payouts',
         description:
-          'Direct payouts to Monero wallets are in development. We are testing treasury settlement and payout recovery before opening claims.',
+          'Creators and holders will be able to claim their earned rewards in XMR directly to a Monero wallet. We are testing settlement and recovery for this payout option.',
       },
     ],
   },
@@ -132,27 +132,13 @@ const PHASES: Phase[] = [
         status: 'next',
         title: 'Independent audit',
         description:
-          'A third-party review of fee collection, the reward ledger and the Monero treasury before the public relaunch.',
-      },
-    ],
-  },
-  {
-    id: 'relaunch',
-    number: 4,
-    title: 'Relaunch',
-    summary: 'Open the doors, led by the proof page.',
-    features: [
-      {
-        status: 'next',
-        title: 'Public relaunch',
-        description:
-          'A relaunch that leads with the proof page, with the first launches seeded by creators who bring real volume.',
+          'A third-party review of fee collection, the reward ledger and the Monero treasury.',
       },
     ],
   },
   {
     id: 'grow',
-    number: 5,
+    number: 4,
     title: 'Grow',
     summary: 'After a clean month of payouts.',
     features: [

@@ -37,6 +37,7 @@ export function PriceChart({
   const points = history?.points ?? [];
   const first = points[0];
   const last = points.at(-1);
+  const recent = history?.range === 'recent';
   const change =
     first && last && points.length > 1 && first.priceSol > 0
       ? last.priceSol / first.priceSol - 1
@@ -45,7 +46,7 @@ export function PriceChart({
     <section aria-label="Token price history" className="surface rounded-3xl p-4 sm:p-5">
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <h3 className="text-[15px] font-semibold tracking-tight text-foreground">Price</h3>
-        <span className="chip">24h</span>
+        <span className="chip">{recent ? 'Recent trades' : '24h'}</span>
         {change !== null && (
           <span
             className={cn(
@@ -70,8 +71,14 @@ export function PriceChart({
           </p>
         )}
       </header>
-      {history && history.points.length > 1 ? (
-        <PriceLine points={history.points} down={(change ?? 0) < 0} />
+      {points.length > 1 ? (
+        <PriceLine points={points} down={(change ?? 0) < 0} recent={recent} />
+      ) : last ? (
+        <div className="mt-3 rounded-2xl border border-white/[0.08] p-4">
+          <p className="text-sm text-neutral-400">Latest trade price</p>
+          <p className="mt-1 font-mono text-lg">{formatReadableNumber(last.priceSol)} SOL</p>
+          <p className="mt-1 text-xs text-neutral-400">{chartTime.format(last.time * 1000)} UTC</p>
+        </div>
       ) : (
         <div className="mt-3 flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/[0.08] text-center text-sm text-neutral-400 sm:min-h-56">
           {isLoading ? (
@@ -98,7 +105,15 @@ export function PriceChart({
   );
 }
 
-function PriceLine({ points, down }: { points: CoinPriceHistory['points']; down: boolean }) {
+function PriceLine({
+  points,
+  down,
+  recent,
+}: {
+  points: CoinPriceHistory['points'];
+  down: boolean;
+  recent: boolean;
+}) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
   const host = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<number | null>(null);
@@ -146,7 +161,11 @@ function PriceLine({ points, down }: { points: CoinPriceHistory['points']; down:
       >
         <svg
           role="img"
-          aria-label="Recorded token prices in SOL over the past 24 hours"
+          aria-label={
+            recent
+              ? 'Recent recorded token prices in SOL'
+              : 'Recorded token prices in SOL over the past 24 hours'
+          }
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           preserveAspectRatio="none"
           className="h-52 w-full overflow-visible sm:h-64"

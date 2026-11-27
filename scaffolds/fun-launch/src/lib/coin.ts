@@ -68,9 +68,11 @@ export type CoinResponse = {
 export const COIN_CHART_SECONDS = 24 * 60 * 60;
 export const COIN_CHART_BUCKET_SECONDS = 15 * 60;
 export const TOP_HOLDER_LIMIT = 20;
+export const RECENT_TRADE_LIMIT = 12;
 
 export type CoinPriceHistory = {
   points: { time: number; priceSol: number }[];
+  range?: 'recent';
   stale?: boolean;
 };
 
@@ -134,6 +136,8 @@ export type TradesResponse = {
   stale?: boolean;
   pendingCount?: number;
 };
+
+export type RecentTradesResponse = Pick<TradesResponse, 'trades' | 'complete'>;
 
 export type TrendingCoin = Coin & { txLastHour: number };
 

@@ -23,7 +23,7 @@ async function decode(
     const batch = signatures.slice(offset, offset + BATCH);
     const rows = await rpc.getTransactions(
       batch.map((sig) => sig.signature),
-      { commitment: 'confirmed', maxSupportedTransactionVersion: 0 }
+      { commitment: 'confirmed', maxSupportedTransactionVersion: 1 }
     );
     for (const [index, info] of batch.entries()) {
       const tx = rows[index];

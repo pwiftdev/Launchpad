@@ -7,6 +7,7 @@ import { FeeSplit } from '@/components/fees/FeeSplit';
 import { LAUNCH_FEE_MODE, feeMode } from '@/lib/feeModes';
 import { TradeBox } from './TradeBox';
 import { PriceChart } from './PriceChart';
+import { RecentTrades } from './RecentTrades';
 import { HoldersPanel } from './HoldersPanel';
 import { RewardsPanel } from './RewardsPanel';
 import { TokenAbout } from './TokenAbout';
@@ -47,6 +48,7 @@ export function CoinPanel({
             error={prices.error}
             onRetry={() => void prices.refetch()}
           />
+          <RecentTrades coin={coin} />
           <HoldersPanel key={`holders-${coin.mint}`} coin={coin} />
           {coin.creatorShareBps != null && (
             <section aria-label="Fee split" className="surface rounded-3xl p-4 sm:p-5">

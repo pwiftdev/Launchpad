@@ -124,10 +124,33 @@ describe('display index store', () => {
       trade(4, { ts: 99_920, priceSol: 7 }),
       trade(5, { ts: 100_100, priceSol: 10 }),
     ]);
-    expect(await store.prices(coin({ quoteToSol: 2 }), 100_000)).toEqual([
-      { time: 99_030, priceSol: 8 },
-      { time: 99_920, priceSol: 14 },
+    expect(await store.prices(coin({ quoteToSol: 2 }), 100_000)).toEqual({
+      points: [
+        { time: 99_030, priceSol: 8 },
+        { time: 99_920, priceSol: 14 },
+      ],
+    });
+  });
+
+  it('uses actual earlier prices for quiet coins without changing their daily volume', async () => {
+    const c = coin({ tokenSupply: 100 });
+    await store.insertTrades(MINT, [
+      trade(1, { ts: 1000, priceSol: 2 }),
+      trade(2, { ts: 2000, priceSol: 3 }),
     ]);
+    expect(await store.prices(c, 100_000)).toEqual({
+      range: 'recent',
+      points: [
+        { time: 1000, priceSol: 2 },
+        { time: 2000, priceSol: 3 },
+      ],
+    });
+    expect((await store.markets([c], 100_000))[MINT]).toMatchObject({
+      points: [200, 300],
+      trades: 0,
+      volumeSol: 0,
+      changePercent: null,
+    });
   });
 
   it('sums every fee but counts launch tax only inside the launch window', async () => {
