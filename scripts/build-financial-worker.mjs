@@ -12,6 +12,7 @@ const outputs = {
   'ops.cjs': 'walletEntry.ts',
   'scheduler.cjs': 'walletSchedulerEntry.ts',
   'wallet-signer.cjs': 'walletSignerEntry.ts',
+  'masked-payouts.cjs': 'maskedPayoutEntry.ts',
 };
 const inputs = {};
 for (const [output, entry] of Object.entries(outputs)) {

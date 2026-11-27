@@ -157,6 +157,10 @@
     {
       "file": "039-masked-claims.sql",
       "sha256": "3ca7af805d4e5f6a88bb50d0b4c08c9c0c925888c2f051feb1491d402317d4ef"
+    },
+    {
+      "file": "040-masked-xmr-batches.sql",
+      "sha256": "ea939957b37155966295e0089ffbee90b20f0904054ca18bf8526dd8533a817f"
     }
   ],
   "catalog": {
@@ -204,6 +208,8 @@
       "masked_claims",
       "masked_holder_samples",
       "masked_payout_status",
+      "masked_xmr_batches",
+      "masked_xmr_settlements",
       "offchain_metadata_cache",
       "otc_rings_deals",
       "pending_launch_intents",
@@ -4152,6 +4158,226 @@
       {
         "table_name": "masked_payout_status",
         "column_name": "heartbeat_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": "now()",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "column_name": "id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "column_name": "status",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": "'planned'::text",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "column_name": "rate_atomic_per_sol",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 39,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "column_name": "fee_bps",
+        "udt_name": "int4",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "column_name": "price_source",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "column_name": "sol_usd",
+        "udt_name": "float8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 53,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "column_name": "xmr_usd",
+        "udt_name": "float8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 53,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "column_name": "total_atomic",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 39,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "column_name": "network_fee_atomic",
+        "udt_name": "numeric",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 39,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "column_name": "tx_hashes",
+        "udt_name": "_text",
+        "is_nullable": "NO",
+        "column_default": "'{}'::text[]",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "column_name": "tx_metadata",
+        "udt_name": "_text",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "column_name": "failure",
+        "udt_name": "text",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "column_name": "created_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": "now()",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "column_name": "updated_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": "now()",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_settlements",
+        "column_name": "batch_id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_settlements",
+        "column_name": "claim_id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_settlements",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_settlements",
+        "column_name": "mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_settlements",
+        "column_name": "bucket",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_xmr_settlements",
+        "column_name": "lamports",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 78,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_xmr_settlements",
+        "column_name": "settled_at",
         "udt_name": "timestamptz",
         "is_nullable": "NO",
         "column_default": "now()",
@@ -8358,6 +8584,13 @@
       },
       {
         "table_name": "masked_claims",
+        "name": "masked_claims_batch",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (batch_id) REFERENCES masked_xmr_batches(id)"
+      },
+      {
+        "table_name": "masked_claims",
         "name": "masked_claims_network_genesis_request_id_key",
         "type": "u",
         "validated": true,
@@ -8446,6 +8679,125 @@
         "type": "p",
         "validated": true,
         "definition": "PRIMARY KEY (network_genesis)"
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "name": "check:172dc9fa18fd0319d019b4c2df521c58d6a7f25d2070b576f547ad7a441fe79d",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((network_fee_atomic IS NULL) OR (network_fee_atomic >= (0)::numeric)))"
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "name": "check:2074d9fd9b8e887ae9505bbb204e4da1c4aebac25eb995051f8e6bcd386ca2c4",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((status = ANY (ARRAY['planned'::text, 'signed'::text, 'sent'::text, 'paid'::text, 'failed'::text])))"
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "name": "check:33b94a2726ac88977fe40b975e3fdd446922a55ea4d92bf2b64321ebe2fa973b",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((status = ANY (ARRAY['planned'::text, 'failed'::text])) OR (cardinality(tx_hashes) > 0)))"
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "name": "check:5278c911b60aa9d93034f64df8ba110de4ca04d7b7e8e9a598bb4703ee091ca3",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((sol_usd > (0)::double precision))"
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "name": "check:646670d53fc915cd18cb0729e90cb4a623e7990ffa6176587f63cba86ffb674d",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((xmr_usd > (0)::double precision))"
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "name": "check:7d6be602bead5896b5f5b36a66c8bee410d1569017495dd5da225c93dcb183cd",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((fee_bps >= 0) AND (fee_bps <= 1000)))"
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "name": "check:a1989917c4b261d5e842d6372f83f61dbfb5b5ab872cdfedb469994ae67f82a5",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((total_atomic > (0)::numeric))"
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "name": "check:ccc75a96e8f97a896654b4b4a23c6c92860744fc3ca82066fc5e07c68a487974",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((status <> ALL (ARRAY['signed'::text, 'sent'::text])) OR (tx_metadata IS NOT NULL)))"
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "name": "check:d85b2a4db4a94e3b232e270bf77a8923f638aaafbae39cb25695e02e9d8edaa6",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((rate_atomic_per_sol > (0)::numeric))"
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "name": "check:da82f9811a73411c0390434a3ebf9e2e1ce854949fb54bc986b1532f79510c07",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((length(price_source) >= 1) AND (length(price_source) <= 200)))"
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "name": "masked_xmr_batches_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "masked_xmr_settlements",
+        "name": "check:46fa5ab93f6128128b52c49475b283c4e6f662ddea3293a8fc41d161d9ca3782",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((lamports > (0)::numeric))"
+      },
+      {
+        "table_name": "masked_xmr_settlements",
+        "name": "check:9c1d1dd658b082dcfead5d49eafce30076ae75a0c6625f8faa8c2118c8ed902c",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((bucket = ANY (ARRAY['creator'::text, 'community'::text])))"
+      },
+      {
+        "table_name": "masked_xmr_settlements",
+        "name": "masked_xmr_settlements_batch_id_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (batch_id) REFERENCES masked_xmr_batches(id)"
+      },
+      {
+        "table_name": "masked_xmr_settlements",
+        "name": "masked_xmr_settlements_claim_id_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (claim_id) REFERENCES masked_claims(id)"
+      },
+      {
+        "table_name": "masked_xmr_settlements",
+        "name": "masked_xmr_settlements_network_genesis_mint_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (network_genesis, mint) REFERENCES launch_coins(network_genesis, mint)"
+      },
+      {
+        "table_name": "masked_xmr_settlements",
+        "name": "masked_xmr_settlements_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (claim_id, mint, bucket)"
       },
       {
         "table_name": "offchain_metadata_cache",
@@ -10208,6 +10560,21 @@
         "definition": "CREATE UNIQUE INDEX masked_payout_status_pkey ON public.masked_payout_status USING btree (network_genesis)"
       },
       {
+        "table_name": "masked_xmr_batches",
+        "name": "masked_xmr_batches_one_open",
+        "definition": "CREATE UNIQUE INDEX masked_xmr_batches_one_open ON public.masked_xmr_batches USING btree (network_genesis) WHERE (status = ANY (ARRAY['planned'::text, 'signed'::text, 'sent'::text]))"
+      },
+      {
+        "table_name": "masked_xmr_batches",
+        "name": "masked_xmr_batches_pkey",
+        "definition": "CREATE UNIQUE INDEX masked_xmr_batches_pkey ON public.masked_xmr_batches USING btree (id)"
+      },
+      {
+        "table_name": "masked_xmr_settlements",
+        "name": "masked_xmr_settlements_pkey",
+        "definition": "CREATE UNIQUE INDEX masked_xmr_settlements_pkey ON public.masked_xmr_settlements USING btree (claim_id, mint, bucket)"
+      },
+      {
         "table_name": "offchain_metadata_cache",
         "name": "offchain_metadata_cache_eviction",
         "definition": "CREATE INDEX offchain_metadata_cache_eviction ON public.offchain_metadata_cache USING btree (accessed_at)"
@@ -10698,6 +11065,20 @@
         "definition": "CREATE TRIGGER masked_holder_samples_immutable BEFORE UPDATE ON public.masked_holder_samples FOR EACH ROW EXECUTE FUNCTION masked_sample_immutable()"
       },
       {
+        "table_name": "masked_xmr_batches",
+        "name": "masked_xmr_batches_transition",
+        "enabled": "O",
+        "function_name": "masked_batch_transition",
+        "definition": "CREATE TRIGGER masked_xmr_batches_transition BEFORE DELETE OR UPDATE ON public.masked_xmr_batches FOR EACH ROW EXECUTE FUNCTION masked_batch_transition()"
+      },
+      {
+        "table_name": "masked_xmr_settlements",
+        "name": "masked_xmr_settlements_immutable",
+        "enabled": "O",
+        "function_name": "rinsed_wallet_immutable",
+        "definition": "CREATE TRIGGER masked_xmr_settlements_immutable BEFORE DELETE OR UPDATE ON public.masked_xmr_settlements FOR EACH ROW EXECUTE FUNCTION rinsed_wallet_immutable()"
+      },
+      {
         "table_name": "pending_launch_intents",
         "name": "launch_intent_bond_policy",
         "enabled": "O",
@@ -10826,6 +11207,15 @@
         "volatility": "v",
         "config": null,
         "body_sha256": "4b78b4843a18eba88bd1fef11e71e53c3b9d94d7b18b040fbee45acbd159a90e"
+      },
+      {
+        "name": "masked_batch_transition",
+        "arguments": "",
+        "language": "plpgsql",
+        "security_definer": false,
+        "volatility": "v",
+        "config": null,
+        "body_sha256": "4c8fee956f07b42573babfcb8bbdbbf548d47cee635a13e9a1e502c8bda2b952"
       },
       {
         "name": "masked_claim_transition",
