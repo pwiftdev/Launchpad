@@ -153,6 +153,10 @@
     {
       "file": "038-masked-holder-samples.sql",
       "sha256": "97898b6ec7d3c135ef6f166e1df807a49c0bb2e4114aa40261af40cf53c48e2e"
+    },
+    {
+      "file": "039-masked-claims.sql",
+      "sha256": "3ca7af805d4e5f6a88bb50d0b4c08c9c0c925888c2f051feb1491d402317d4ef"
     }
   ],
   "catalog": {
@@ -196,7 +200,10 @@
       "launch_schema_migrations",
       "launch_upload_authorizations",
       "launch_upload_budgets",
+      "masked_claim_items",
+      "masked_claims",
       "masked_holder_samples",
+      "masked_payout_status",
       "offchain_metadata_cache",
       "otc_rings_deals",
       "pending_launch_intents",
@@ -3783,6 +3790,226 @@
         "numeric_scale": null
       },
       {
+        "table_name": "masked_claim_items",
+        "column_name": "claim_id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claim_items",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claim_items",
+        "column_name": "mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claim_items",
+        "column_name": "kind",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claim_items",
+        "column_name": "epoch",
+        "udt_name": "int8",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_claim_items",
+        "column_name": "wallet",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claim_items",
+        "column_name": "lamports",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 78,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_claims",
+        "column_name": "id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claims",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claims",
+        "column_name": "wallet",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claims",
+        "column_name": "currency",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claims",
+        "column_name": "lamports",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 78,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_claims",
+        "column_name": "request_id",
+        "udt_name": "uuid",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claims",
+        "column_name": "authorization_digest",
+        "udt_name": "bpchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 64,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claims",
+        "column_name": "status",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": "'queued'::text",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claims",
+        "column_name": "address_sealed",
+        "udt_name": "bytea",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claims",
+        "column_name": "batch_id",
+        "udt_name": "uuid",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claims",
+        "column_name": "xmr_atomic",
+        "udt_name": "numeric",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 39,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_claims",
+        "column_name": "sol_jobs",
+        "udt_name": "_uuid",
+        "is_nullable": "NO",
+        "column_default": "'{}'::uuid[]",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claims",
+        "column_name": "failure",
+        "udt_name": "text",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claims",
+        "column_name": "created_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": "now()",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_claims",
+        "column_name": "updated_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": "now()",
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
         "table_name": "masked_holder_samples",
         "column_name": "network_genesis",
         "udt_name": "text",
@@ -3868,6 +4095,66 @@
         "udt_name": "jsonb",
         "is_nullable": "NO",
         "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_payout_status",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_payout_status",
+        "column_name": "monero_ok",
+        "udt_name": "bool",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_payout_status",
+        "column_name": "unlocked_atomic",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": "0",
+        "character_maximum_length": null,
+        "numeric_precision": 39,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_payout_status",
+        "column_name": "wallet_height",
+        "udt_name": "int8",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_payout_status",
+        "column_name": "detail",
+        "udt_name": "text",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_payout_status",
+        "column_name": "heartbeat_at",
+        "udt_name": "timestamptz",
+        "is_nullable": "NO",
+        "column_default": "now()",
         "character_maximum_length": null,
         "numeric_precision": null,
         "numeric_scale": null
@@ -7965,6 +8252,125 @@
         "definition": "PRIMARY KEY (bucket)"
       },
       {
+        "table_name": "masked_claim_items",
+        "name": "check:46fa5ab93f6128128b52c49475b283c4e6f662ddea3293a8fc41d161d9ca3782",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((lamports > (0)::numeric))"
+      },
+      {
+        "table_name": "masked_claim_items",
+        "name": "check:704ee283796cea9372dc09b0f2b936052842f8810f723e297e41690e19ec31ba",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((kind = 'holder'::text) = (epoch IS NOT NULL)))"
+      },
+      {
+        "table_name": "masked_claim_items",
+        "name": "check:d87cf88a96f38d2f75cbdb79cde44224f1d0cb0fedb112f8e78c892628b8568e",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((kind = ANY (ARRAY['creator'::text, 'holder'::text])))"
+      },
+      {
+        "table_name": "masked_claim_items",
+        "name": "masked_claim_items_claim_id_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (claim_id) REFERENCES masked_claims(id)"
+      },
+      {
+        "table_name": "masked_claim_items",
+        "name": "masked_claim_items_network_genesis_mint_epoch_wallet_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (network_genesis, mint, epoch, wallet) REFERENCES wallet_allocations(network_genesis, mint, epoch, wallet)"
+      },
+      {
+        "table_name": "masked_claim_items",
+        "name": "masked_claim_items_network_genesis_mint_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (network_genesis, mint) REFERENCES launch_coins(network_genesis, mint)"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "check:10d81618d2b193915ac7b6a2ed7bf9987745e86d84094c346fba01f5add7d20f",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((status <> ALL (ARRAY['batched'::text, 'sent'::text, 'paid'::text])) OR (currency = 'sol'::text) OR (batch_id IS NOT NULL)))"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "check:46fa5ab93f6128128b52c49475b283c4e6f662ddea3293a8fc41d161d9ca3782",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((lamports > (0)::numeric))"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "check:52e5f49ab9dba67ef56b4b3a6fb422963906e4988c68ff87a86988758e436adf",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((xmr_atomic IS NULL) OR (xmr_atomic > (0)::numeric)))"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "check:62c4a23745e34c71617e109a35804454ca65a89d6f3732e7de89d385551104db",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((currency <> 'xmr'::text) OR (status = ANY (ARRAY['paid'::text, 'failed'::text])) OR (address_sealed IS NOT NULL)))"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "check:6a3603aec37776d6ec90737399fd08735333200d01c919f58fb746f66388b091",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((authorization_digest ~ '^[a-f0-9]{64}$'::text))"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "check:9fe8f31c6293dc8340f4ca89decb4d69bc31d17701b297775dc7a7bb7e40ac3a",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((currency = 'xmr'::text) OR (address_sealed IS NULL)))"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "check:bb3ba63a85b2a965598ea0b27ec4c45963d77563c12098818f42b5a28ef4edc2",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((currency <> 'sol'::text) OR (status = ANY (ARRAY['sent'::text, 'paid'::text, 'failed'::text]))))"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "check:c558a9f180ccfa179204fe94250ea7c49539f9c2c50aa2061868be27d9af4906",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((currency = ANY (ARRAY['xmr'::text, 'wxmr'::text, 'sol'::text])))"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "check:ea3fff69eb902ae0363654d08762d5ebfc6d73416a0b4fe361921fba9f4d9d32",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((status = ANY (ARRAY['queued'::text, 'batched'::text, 'sent'::text, 'paid'::text, 'failed'::text])))"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "masked_claims_network_genesis_request_id_key",
+        "type": "u",
+        "validated": true,
+        "definition": "UNIQUE (network_genesis, request_id)"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "masked_claims_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
         "table_name": "masked_holder_samples",
         "name": "check:16f77566c9fefbee88f1b0852dafcc27e451419dcc89d66f051d5ab9f60a608c",
         "type": "c",
@@ -8026,6 +8432,20 @@
         "type": "p",
         "validated": true,
         "definition": "PRIMARY KEY (network_genesis, mint, sample_window)"
+      },
+      {
+        "table_name": "masked_payout_status",
+        "name": "check:777811a9c24153f1f45b0fd16c6978c401420673f42feedc02e5fb5db54c890e",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((unlocked_atomic >= (0)::numeric))"
+      },
+      {
+        "table_name": "masked_payout_status",
+        "name": "masked_payout_status_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (network_genesis)"
       },
       {
         "table_name": "offchain_metadata_cache",
@@ -9743,9 +10163,49 @@
         "definition": "CREATE UNIQUE INDEX launch_upload_budgets_pkey ON public.launch_upload_budgets USING btree (bucket)"
       },
       {
+        "table_name": "masked_claim_items",
+        "name": "masked_claim_items_claim",
+        "definition": "CREATE INDEX masked_claim_items_claim ON public.masked_claim_items USING btree (claim_id)"
+      },
+      {
+        "table_name": "masked_claim_items",
+        "name": "masked_claim_items_holder",
+        "definition": "CREATE UNIQUE INDEX masked_claim_items_holder ON public.masked_claim_items USING btree (network_genesis, mint, epoch, wallet) WHERE (kind = 'holder'::text)"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "masked_claims_network_genesis_request_id_key",
+        "definition": "CREATE UNIQUE INDEX masked_claims_network_genesis_request_id_key ON public.masked_claims USING btree (network_genesis, request_id)"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "masked_claims_one_open",
+        "definition": "CREATE UNIQUE INDEX masked_claims_one_open ON public.masked_claims USING btree (network_genesis, wallet) WHERE (status = ANY (ARRAY['queued'::text, 'batched'::text, 'sent'::text]))"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "masked_claims_pkey",
+        "definition": "CREATE UNIQUE INDEX masked_claims_pkey ON public.masked_claims USING btree (id)"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "masked_claims_queue",
+        "definition": "CREATE INDEX masked_claims_queue ON public.masked_claims USING btree (network_genesis, currency, status, created_at)"
+      },
+      {
+        "table_name": "masked_claims",
+        "name": "masked_claims_wallet",
+        "definition": "CREATE INDEX masked_claims_wallet ON public.masked_claims USING btree (network_genesis, wallet, created_at DESC)"
+      },
+      {
         "table_name": "masked_holder_samples",
         "name": "masked_holder_samples_pkey",
         "definition": "CREATE UNIQUE INDEX masked_holder_samples_pkey ON public.masked_holder_samples USING btree (network_genesis, mint, sample_window)"
+      },
+      {
+        "table_name": "masked_payout_status",
+        "name": "masked_payout_status_pkey",
+        "definition": "CREATE UNIQUE INDEX masked_payout_status_pkey ON public.masked_payout_status USING btree (network_genesis)"
       },
       {
         "table_name": "offchain_metadata_cache",
@@ -9910,7 +10370,7 @@
       {
         "table_name": "wallet_jobs",
         "name": "wallet_active_claim",
-        "definition": "CREATE UNIQUE INDEX wallet_active_claim ON public.wallet_jobs USING btree (network_genesis, mint, recipient) WHERE ((kind = ANY (ARRAY['creator_claim'::text, 'community_claim'::text])) AND (status = ANY (ARRAY['queued'::text, 'prepared'::text, 'signed'::text, 'submitted'::text, 'manual_review'::text])))"
+        "definition": "CREATE UNIQUE INDEX wallet_active_claim ON public.wallet_jobs USING btree (network_genesis, mint, recipient, kind) WHERE ((kind = ANY (ARRAY['creator_claim'::text, 'community_claim'::text])) AND (status = ANY (ARRAY['queued'::text, 'prepared'::text, 'signed'::text, 'submitted'::text, 'manual_review'::text])))"
       },
       {
         "table_name": "wallet_jobs",
@@ -10224,6 +10684,13 @@
         "definition": "CREATE TRIGGER launch_migration_immutable BEFORE DELETE OR UPDATE ON public.launch_migrations FOR EACH ROW EXECUTE FUNCTION rinsed_reject_registry_reassignment()"
       },
       {
+        "table_name": "masked_claims",
+        "name": "masked_claims_transition",
+        "enabled": "O",
+        "function_name": "masked_claim_transition",
+        "definition": "CREATE TRIGGER masked_claims_transition BEFORE DELETE OR UPDATE ON public.masked_claims FOR EACH ROW EXECUTE FUNCTION masked_claim_transition()"
+      },
+      {
         "table_name": "masked_holder_samples",
         "name": "masked_holder_samples_immutable",
         "enabled": "O",
@@ -10359,6 +10826,15 @@
         "volatility": "v",
         "config": null,
         "body_sha256": "4b78b4843a18eba88bd1fef11e71e53c3b9d94d7b18b040fbee45acbd159a90e"
+      },
+      {
+        "name": "masked_claim_transition",
+        "arguments": "",
+        "language": "plpgsql",
+        "security_definer": false,
+        "volatility": "v",
+        "config": null,
+        "body_sha256": "76af8b17c9f00608b2083cc27746363148986e9d5a4d231b5acdc10d8c2f4756"
       },
       {
         "name": "masked_sample_immutable",

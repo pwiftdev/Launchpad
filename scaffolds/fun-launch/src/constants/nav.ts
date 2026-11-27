@@ -10,6 +10,12 @@ export type NavItem = {
 
 export const NAV_ITEMS: [NavItem, ...NavItem[]] = [
   { href: '/', label: 'Board', icon: 'ph--squares-four', activeIcon: 'ph--squares-four-fill' },
+  {
+    href: '/earnings',
+    label: 'Earnings',
+    icon: 'ph--coins',
+    activeIcon: 'ph--coins-fill',
+  },
   { href: '/rules', label: 'Rules', icon: 'ph--book-open', activeIcon: 'ph--book-open-fill' },
   { href: '/roadmap', label: 'Roadmap', icon: 'ph--git-branch', activeIcon: 'ph--git-branch-fill' },
 ];

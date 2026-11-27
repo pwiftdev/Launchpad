@@ -26,6 +26,7 @@ const LAUNCHPAD_APIS = [
   '/api/send-transaction',
   '/api/transaction-status',
   '/api/rewards',
+  '/api/earnings',
   '/api/live',
   '/api/upload',
   '/api/dev-buy-quote',
@@ -76,7 +77,7 @@ function mintAddress(value: string): boolean {
 /** Only actual launchpad documents qualify for the renderer's admin bypass. */
 export function launchpadPage(url: string): boolean {
   const path = accessPath(url);
-  if (['/', '/launch', '/rules', '/roadmap', '/404'].includes(path)) return true;
+  if (['/', '/launch', '/earnings', '/rules', '/roadmap', '/404'].includes(path)) return true;
   const token = path.match(/^\/token\/([^/]+)$/);
   return !!token && mintAddress(token[1]!);
 }

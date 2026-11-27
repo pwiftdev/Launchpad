@@ -23,6 +23,7 @@
     "@meteora-ag/cp-amm-sdk": "^1.4.5",
     "@meteora-ag/dlmm": "^1.9.14",
     "@meteora-ag/dynamic-bonding-curve-sdk": "^1.5.11",
+    "@noble/hashes": "^1.8.0",
     "@solana/spl-token": "^0.4.15",
     "@solana/wallet-adapter-phantom": "^0.9.29",
     "@solana/wallet-adapter-solflare": "^0.6.33",

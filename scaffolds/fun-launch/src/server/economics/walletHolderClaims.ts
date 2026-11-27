@@ -12,6 +12,12 @@ const CLAIMABLE = `FROM wallet_allocations a
    AND j.status<>'failed'
  )`;
 
+/** Hours held by a Masked XMR or wXMR claim; items of failed claims are removed. */
+export const MASKED_UNCLAIMED = `AND NOT EXISTS (
+   SELECT 1 FROM masked_claim_items i WHERE i.kind='holder'
+   AND (i.network_genesis,i.mint,i.epoch,i.wallet)=(a.network_genesis,a.mint,a.epoch,a.wallet)
+ )`;
+
 export async function holderClaimTotal(db: Queryable, holder: Holder, assetMint: string) {
   return (
     await db.query<{ amount: string; source: string; throughEpoch: string | null }>(
@@ -28,12 +34,15 @@ export async function attachHolderAllocations(
   throughEpoch: number,
   jobId: string,
   exactAmount: bigint,
-  minimumSource: bigint
+  minimumSource: bigint,
+  /** Masked coins: hours already taken by an XMR or wXMR claim are not claimable again. */
+  masked = false
 ) {
   const recorded = (
     await db.query<{ amount: string; source: string; throughEpoch: string | null }>(
       `WITH claimable AS (
          SELECT a.network_genesis,a.mint,a.epoch,a.wallet,a.lamports,coalesce(a.source_lamports,a.lamports) AS source ${CLAIMABLE} AND a.epoch<=$5
+         ${masked ? MASKED_UNCLAIMED : ''}
        ), reserved AS (
          INSERT INTO wallet_claim_allocations(job_id,network_genesis,mint,epoch,wallet)
          SELECT $6,network_genesis,mint,epoch,wallet FROM claimable RETURNING epoch

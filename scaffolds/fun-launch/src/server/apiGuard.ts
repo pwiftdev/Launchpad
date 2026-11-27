@@ -81,6 +81,7 @@ function pollingClass(req: NextApiRequest): keyof typeof POLLING_LIMITS | undefi
       '/api/launch/status',
       '/api/launch/receipt-status',
       '/api/rewards',
+      '/api/earnings',
     ].includes(path) ||
     /^\/api\/coins\/[1-9A-HJ-NP-Za-km-z]{32,44}\/balance$/.test(path)
   )
