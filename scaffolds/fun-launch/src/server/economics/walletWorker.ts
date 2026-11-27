@@ -15,9 +15,15 @@ import { FinalizedFeeIndexer } from './finalizedIndexer';
 import { collectHolderSnapshot } from './holderSnapshot';
 import { configuredCompanyWallets } from '../launchConfig';
 import { mskdConversionPool, mskdPayoutMint, requireFreshMskdQuote } from './walletMskdPolicy';
-import { hasBatchedHolderRewards, isCashbackMode, isMskdMode } from '@/lib/launchModes';
+import {
+  hasBatchedHolderRewards,
+  isCashbackMode,
+  isMaskedMode,
+  isMskdMode,
+} from '@/lib/launchModes';
+import { MINIMUM_HOLDER_PAYOUT_LAMPORTS } from '@/lib/rewards';
 import { assertPayoutTokenBacking } from './walletTokenCustody';
-import { WalletStore } from './walletStore';
+import { MASKED_SAMPLE_SECONDS, WalletStore } from './walletStore';
 import { verifyWalletRecovery } from './walletRecovery';
 import { WalletCollectionUnavailable, WalletBuybackUnavailable } from './walletAdapter';
 import { WalletRecipientUnavailable } from './walletRecipient';
@@ -236,6 +242,7 @@ export class WalletWorker {
         !pending.some((job) => job.kind === 'holder_conversion'))
     )
       await this.allocateHolderIncome(coin);
+    if (isMaskedMode(coin.mode)) await this.sampleMaskedHolders(coin);
     pending = await this.store.pendingJobs(this.genesis, mint, maximumJobs);
     const jobs: WalletJob[] = [];
     for (const job of pending) {
@@ -253,6 +260,48 @@ export class WalletWorker {
       }
     }
     return { status: 'planned', jobs };
+  }
+  /**
+   * Masked holder income follows time-weighted balances: one verified full snapshot per
+   * five-minute window while the coin has holder income waiting, and in the first window of each
+   * hour the previous hour is averaged and allocated.
+   */
+  private async sampleMaskedHolders(coin: RegisteredCoin) {
+    const community = (await this.store.balances(this.genesis, coin.mint)).find(
+      (balance) => balance.bucket === 'community'
+    );
+    if (!community || BigInt(community.available) < MINIMUM_HOLDER_PAYOUT_LAMPORTS) return;
+    const clock = await new FinalizedVerifier(this.rpc, this.genesis).clock();
+    const window = Math.floor(clock.blockTime / MASKED_SAMPLE_SECONDS);
+    if (!(await this.store.hasMaskedSample(this.genesis, coin.mint, window))) {
+      const { collector, treasury } = configuredCompanyWallets(this.genesis);
+      const snapshot = await collectHolderSnapshot(this.rpc, {
+        networkGenesis: this.genesis,
+        mint: coin.mint,
+        excludedOwners: new Set([
+          PublicKey.default.toBase58(),
+          deriveDbcPoolAuthority().toBase58(),
+          deriveDammV2PoolAuthority().toBase58(),
+          collector.toBase58(),
+          treasury.toBase58(),
+          '1nc1nerator11111111111111111111111111111111',
+        ]),
+        excludedTokenAccounts: new Set([
+          getAssociatedTokenAddressSync(new PublicKey(coin.mint), this.collector).toBase58(),
+        ]),
+      });
+      await this.gate();
+      // A slow scan can land in the next window; it is stored under the window it observed.
+      await this.store.recordMaskedSample(snapshot);
+    }
+    if (clock.blockTime % 3600 < MASKED_SAMPLE_SECONDS) {
+      await this.gate();
+      await this.store.createMaskedEpoch(
+        this.genesis,
+        coin.mint,
+        Math.floor(clock.blockTime / 3600) - 1
+      );
+    }
   }
   private async allocateHolderIncome(coin: RegisteredCoin) {
     const community = (await this.store.balances(this.genesis, coin.mint)).find(

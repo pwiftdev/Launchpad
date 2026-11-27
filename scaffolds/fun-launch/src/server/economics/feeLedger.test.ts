@@ -268,3 +268,37 @@ describe('hourly holder allocation', () => {
     expect(() => allocateHolderSnapshot(10n, { ...snapshot, finalized: false })).toThrow();
   });
 });
+
+describe('time-weighted holder balances', () => {
+  it('averages each wallet over every sample and keeps exclusions from any sample', async () => {
+    const { timeWeightedBalances, allocateHolderSnapshot } = await import('./feeLedger');
+    const sample = (rows: [string, bigint][], excluded: string[] = []) => ({
+      balances: rows.map(([wallet, tokens]) => ({ wallet, tokens })),
+      excluded: new Set(excluded),
+    });
+    // Alice holds all hour; Sniper buys only in the last of twelve samples.
+    const samples = [
+      ...Array.from({ length: 11 }, () => sample([['alice', 1200n]])),
+      sample(
+        [
+          ['alice', 1200n],
+          ['sniper', 1200n],
+          ['pool', 5000n],
+        ],
+        ['pool']
+      ),
+    ];
+    const averaged = timeWeightedBalances(samples);
+    expect(averaged.balances).toEqual([
+      { wallet: 'alice', tokens: 1200n },
+      { wallet: 'sniper', tokens: 100n },
+      { wallet: 'pool', tokens: 416n },
+    ]);
+    const { allocations } = allocateHolderSnapshot(1300n, averaged);
+    expect(allocations).toEqual([
+      { wallet: 'alice', lamports: 1200n },
+      { wallet: 'sniper', lamports: 100n },
+    ]);
+    expect(() => timeWeightedBalances([])).toThrow('At least one');
+  });
+});

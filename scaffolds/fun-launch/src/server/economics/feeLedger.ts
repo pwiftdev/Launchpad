@@ -158,3 +158,34 @@ export function allocateHolderSnapshot(budget: bigint, snapshot: HolderBalances)
   const allocated = allocations.reduce((sum, item) => sum + item.lamports, 0n);
   return { allocations, carryForward: budget - allocated };
 }
+
+export type HolderSample = {
+  balances: { wallet: string; tokens: bigint }[];
+  excluded: ReadonlySet<string>;
+};
+
+/**
+ * Time-weighted holder balances: each wallet's average over evenly spaced samples, so a wallet
+ * that buys just before an epoch closes earns only for the samples it actually held through.
+ * Wallets excluded in any sample stay excluded.
+ */
+export function timeWeightedBalances(samples: HolderSample[]) {
+  if (!samples.length) throw new Error('At least one holder sample is required');
+  const excluded = new Set<string>();
+  for (const sample of samples) for (const owner of sample.excluded) excluded.add(owner);
+  const totals = new Map<string, bigint>();
+  for (const sample of samples)
+    for (const { wallet, tokens } of sample.balances) {
+      if (!wallet || tokens < 0n) throw new Error('Invalid holder balance');
+      totals.set(wallet, (totals.get(wallet) ?? 0n) + tokens);
+    }
+  const count = BigInt(samples.length);
+  return {
+    complete: true as const,
+    finalized: true as const,
+    excluded,
+    balances: [...totals]
+      .map(([wallet, tokens]) => ({ wallet, tokens: tokens / count }))
+      .filter((row) => row.tokens > 0n),
+  };
+}

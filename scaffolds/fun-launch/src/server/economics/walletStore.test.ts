@@ -439,6 +439,47 @@ describe('wallet-v1 durable cash ledger', () => {
   });
 });
 
+async function registerMaskedCoin() {
+  await db.exec('DROP SCHEMA public CASCADE;CREATE SCHEMA public;');
+  for (const file of [
+    '003-launch-registry.sql',
+    '017-wallet-settlement.sql',
+    '018-wallet-hourly-processing.sql',
+    '019-wallet-settlement-receipts.sql',
+    '024-bond-it-policy.sql',
+    '025-mskd-modes.sql',
+    '026-mskd-sol-pair.sql',
+    '027-holder-payout-allocations.sql',
+    '033-hsol-launch-pair.sql',
+    '034-hsol-holder-modes.sql',
+    '035-mskd-buyback-bucket.sql',
+    '036-masked-launch.sql',
+    '038-masked-holder-samples.sql',
+  ])
+    await db.exec(migration(file));
+  await db.query(
+    `INSERT INTO launch_configs(network_genesis,config_key,policy_version,expected_fee_claimer,expected_leftover_receiver,config_digest,verified_slot)VALUES($1,$2,'masked-v1',$3,$4,$5,1)`,
+    [
+      fixtureGenesis,
+      config,
+      collector.publicKey.toBase58(),
+      treasury.publicKey.toBase58(),
+      'a'.repeat(64),
+    ]
+  );
+  await db.query(
+    `INSERT INTO launch_coins(network_genesis,mint,dbc_pool,config_key,original_deployer,mode,recipient,policy_version,activation_point,activation_time,creation_signature,finalized_slot,creator_share_bps)VALUES($1,$2,$3,$4,$5,'masked',$6,'masked-v1',1000,1000,'creation',1,3000)`,
+    [
+      fixtureGenesis,
+      mint,
+      pool,
+      config,
+      creator.publicKey.toBase58(),
+      collector.publicKey.toBase58(),
+    ]
+  );
+}
+
 async function seedEvent(
   signature: string,
   phase: 0 | 1,
@@ -516,43 +557,7 @@ describe('actual collected income only', () => {
     await expect(db.query('UPDATE wallet_collections SET received=100')).rejects.toThrow();
   });
   it('splits a Masked collection between creator, holders, treasury and the $MSKD buyback', async () => {
-    await db.exec('DROP SCHEMA public CASCADE;CREATE SCHEMA public;');
-    for (const file of [
-      '003-launch-registry.sql',
-      '017-wallet-settlement.sql',
-      '018-wallet-hourly-processing.sql',
-      '019-wallet-settlement-receipts.sql',
-      '024-bond-it-policy.sql',
-      '025-mskd-modes.sql',
-      '026-mskd-sol-pair.sql',
-      '027-holder-payout-allocations.sql',
-      '033-hsol-launch-pair.sql',
-      '034-hsol-holder-modes.sql',
-      '035-mskd-buyback-bucket.sql',
-      '036-masked-launch.sql',
-    ])
-      await db.exec(migration(file));
-    await db.query(
-      `INSERT INTO launch_configs(network_genesis,config_key,policy_version,expected_fee_claimer,expected_leftover_receiver,config_digest,verified_slot)VALUES($1,$2,'masked-v1',$3,$4,$5,1)`,
-      [
-        fixtureGenesis,
-        config,
-        collector.publicKey.toBase58(),
-        treasury.publicKey.toBase58(),
-        'a'.repeat(64),
-      ]
-    );
-    await db.query(
-      `INSERT INTO launch_coins(network_genesis,mint,dbc_pool,config_key,original_deployer,mode,recipient,policy_version,activation_point,activation_time,creation_signature,finalized_slot,creator_share_bps)VALUES($1,$2,$3,$4,$5,'masked',$6,'masked-v1',1000,1000,'creation',1,3000)`,
-      [
-        fixtureGenesis,
-        mint,
-        pool,
-        config,
-        creator.publicKey.toBase58(),
-        collector.publicKey.toBase58(),
-      ]
-    );
+    await registerMaskedCoin();
     await seedEvent('masked', 1, '1000000');
     const job = await signGeneric(
       await store.queueCollection(
@@ -586,6 +591,84 @@ describe('actual collected income only', () => {
         authorizationDigest: 'e'.repeat(64),
       })
     ).rejects.toThrow('claim screen');
+  });
+  it('allocates a Masked hour by time-weighted samples and rolls income over when samples are missing', async () => {
+    await registerMaskedCoin();
+    await seedEvent('masked-epoch', 1, '1000000');
+    const job = await signGeneric(
+      await store.queueCollection(
+        fixtureGenesis,
+        mint,
+        await store.pendingFeeEvents(fixtureGenesis, mint)
+      )
+    );
+    await store.settle(job.id, effect(job, { receivedLamports: 1_000_000n }));
+    const epoch = 500_000;
+    const sample = async (window: number, rows: [string, string][]) =>
+      db.query(
+        `INSERT INTO masked_holder_samples(network_genesis,mint,sample_window,slot,block_time,digest,supply,balances,excluded)
+         VALUES($1,$2,$3,$4,$5,$6,0,$7,$8)`,
+        [
+          fixtureGenesis,
+          mint,
+          window,
+          100_000 + window,
+          window * 300,
+          'e'.repeat(64),
+          JSON.stringify(rows),
+          JSON.stringify([collector.publicKey.toBase58()]),
+        ]
+      );
+    const first = epoch * 12;
+    // Too few samples: nothing is allocated and the income waits for a later hour.
+    await sample(first, [['alice', '100']]);
+    await sample(first + 12, [['alice', '100']]);
+    expect(await store.createMaskedEpoch(fixtureGenesis, mint, epoch)).toMatchObject({
+      status: 'insufficient_samples',
+      samples: 1,
+    });
+    for (let i = 1; i < 12; i++)
+      await sample(
+        first + i,
+        i === 11
+          ? [
+              ['alice', '100'],
+              ['sniper', '1200'],
+            ]
+          : [['alice', '100']]
+      );
+    const result = await store.createMaskedEpoch(fixtureGenesis, mint, epoch);
+    expect(result).toMatchObject({
+      status: 'created',
+      epoch: { sample_count: 13, budget: '420000' },
+    });
+    const allocations = (
+      await db.query<{ wallet: string; lamports: string }>(
+        'SELECT wallet,lamports::text FROM wallet_allocations WHERE mint=$1 ORDER BY wallet',
+        [mint]
+      )
+    ).rows;
+    // Alice held 100 in all 13 samples; the sniper held 1200 in one: 1200/13 = 92.
+    expect(allocations).toEqual([
+      { wallet: 'alice', lamports: String((420_000n * 100n) / 192n) },
+      { wallet: 'sniper', lamports: String((420_000n * 92n) / 192n) },
+    ]);
+    const community = (await store.balances(fixtureGenesis, mint)).find(
+      (b) => b.bucket === 'community'
+    )!;
+    expect(BigInt(community.reserved)).toBe(
+      allocations.reduce((sum, row) => sum + BigInt(row.lamports), 0n)
+    );
+    expect(
+      (
+        await db.query('SELECT sample_window::text FROM masked_holder_samples WHERE mint=$1', [
+          mint,
+        ])
+      ).rows
+    ).toEqual([{ sample_window: String(first + 12) }]);
+    expect(await store.createMaskedEpoch(fixtureGenesis, mint, epoch)).toMatchObject({
+      status: 'existing',
+    });
   });
   it('does not fund on raw events, mismatched receipts or operating rent/fees', async () => {
     await seedEvent('raw', 0, '10');

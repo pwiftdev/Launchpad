@@ -10,14 +10,14 @@ import { HSOL_REWARD_MINT, MINIMUM_HOLDER_PAYOUT_LAMPORTS } from '@/lib/rewards'
 import { companyWallets } from '../../../../../scripts/company-wallets.cjs';
 import bondPolicy from '@/constants/bondPolicy.json';
 import { WalletOperatingUnavailable } from './walletPolicy';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { PublicKey, VersionedTransaction } from '@solana/web3.js';
 import type { Pool, PoolClient } from 'pg';
 import { database } from '../database';
 import type { RegisteredCoin } from '../launchRegistry';
 import { verifiedFinancialPool } from '../migrationRegistry';
 import { assertVerifiedFee, type VerifiedFeeEvent } from './feeIngestion';
-import { allocateExecutedFee, allocateHolderSnapshot } from './feeLedger';
+import { allocateExecutedFee, allocateHolderSnapshot, timeWeightedBalances } from './feeLedger';
 import { assertHolderSnapshot, type FinalizedHolderSnapshot } from './holderSnapshot';
 import {
   messageDigest,
@@ -51,6 +51,9 @@ import {
 export type { WalletJob, WalletBalance } from './walletTypes';
 
 const ACTIVE = ['queued', 'prepared', 'signed', 'submitted', 'manual_review'];
+/** Masked holder samples: one per five-minute window, at least half an hour's worth per epoch. */
+export const MASKED_SAMPLE_SECONDS = 300;
+export const MASKED_MINIMUM_SAMPLES = 6;
 const BUCKETS: WalletBucket[] = [
   'rinse_buyback',
   'creator',
@@ -900,6 +903,143 @@ export class WalletStore {
       return saved;
     });
   }
+  /** Stores one verified finalized holder snapshot as the sample for its five-minute window. */
+  async recordMaskedSample(snapshot: FinalizedHolderSnapshot) {
+    const { networkGenesis: network, mint } = snapshot;
+    assertHolderSnapshot(snapshot, network, mint);
+    const coin = await this.coin(this.db, network, mint);
+    if (!isMaskedMode(coin.mode)) throw new Error('Only Masked coins use time-weighted samples');
+    if (!snapshot.excluded.has(coin.collector) || !snapshot.excluded.has(coin.treasury))
+      throw new Error('Holder samples must exclude the company wallets');
+    const inserted = await this.db.query(
+      `INSERT INTO masked_holder_samples(network_genesis,mint,sample_window,slot,block_time,digest,supply,balances,excluded)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING RETURNING sample_window`,
+      [
+        network,
+        mint,
+        Math.floor(snapshot.blockTime / MASKED_SAMPLE_SECONDS),
+        snapshot.slot,
+        snapshot.blockTime,
+        snapshot.digest,
+        snapshot.supply.toString(),
+        JSON.stringify(snapshot.balances.map((row) => [row.wallet, row.tokens.toString()])),
+        JSON.stringify([...snapshot.excluded].sort()),
+      ]
+    );
+    return inserted.rows.length > 0;
+  }
+
+  async hasMaskedSample(network: string, mint: string, window: number) {
+    return (
+      (
+        await this.db.query(
+          'SELECT 1 FROM masked_holder_samples WHERE network_genesis=$1 AND mint=$2 AND sample_window=$3',
+          [network, mint, window]
+        )
+      ).rows.length > 0
+    );
+  }
+
+  /**
+   * Allocates one completed hour of a Masked coin's holder income by time-weighted balances:
+   * that hour's samples plus the closing sample taken in the first window of the next hour.
+   * Too few samples leaves the income unallocated; it rolls into the next hour.
+   */
+  async createMaskedEpoch(network: string, mint: string, epoch: number) {
+    if (!Number.isSafeInteger(epoch) || epoch < 0) throw new Error('Invalid epoch');
+    return this.tx(async (client) => {
+      await this.lock(client, network, mint);
+      const coin = await this.coin(client, network, mint);
+      if (!isMaskedMode(coin.mode)) throw new Error('Only Masked coins use time-weighted epochs');
+      const prior = (
+        await client.query<WalletEpoch>(
+          'SELECT * FROM wallet_epochs WHERE network_genesis=$1 AND mint=$2 AND epoch=$3',
+          [network, mint, epoch]
+        )
+      ).rows[0];
+      if (prior) return { status: 'existing' as const, epoch: prior };
+      const first = (epoch * 3600) / MASKED_SAMPLE_SECONDS,
+        closing = ((epoch + 1) * 3600) / MASKED_SAMPLE_SECONDS;
+      const rows = (
+        await client.query<{
+          sample_window: string;
+          slot: string;
+          block_time: string;
+          digest: string;
+          balances: [string, string][];
+          excluded: string[];
+        }>(
+          `SELECT sample_window::text,slot::text,block_time::text,digest,balances,excluded FROM masked_holder_samples
+           WHERE network_genesis=$1 AND mint=$2 AND sample_window BETWEEN $3 AND $4 ORDER BY sample_window`,
+          [network, mint, first, closing]
+        )
+      ).rows;
+      const close = rows.find((row) => Number(row.sample_window) === closing);
+      const hourSamples = rows.filter((row) => Number(row.sample_window) < closing);
+      if (!close || hourSamples.length < MASKED_MINIMUM_SAMPLES)
+        return { status: 'insufficient_samples' as const, samples: hourSamples.length };
+      const used = [...hourSamples, close];
+      const snapshot = timeWeightedBalances(
+        used.map((row) => ({
+          balances: row.balances.map(([wallet, tokens]) => ({ wallet, tokens: BigInt(tokens) })),
+          excluded: new Set(row.excluded),
+        }))
+      );
+      const budget = await this.holderBudget(client, network, mint, Number(close.slot));
+      if (budget <= 0n) return { status: 'no_income' as const };
+      const allocation = allocateHolderSnapshot(budget, snapshot),
+        allocated = budget - allocation.carryForward;
+      const digest = createHash('sha256')
+        .update(JSON.stringify(['masked-time-weighted-v1', ...used.map((row) => row.digest)]))
+        .digest('hex');
+      const saved = (
+        await client.query<WalletEpoch>(
+          `INSERT INTO wallet_epochs(network_genesis,mint,epoch,snapshot_slot,snapshot_time,snapshot_digest,budget,allocated,carry,snapshot_exclusions,sample_count)
+           VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+          [
+            network,
+            mint,
+            epoch,
+            close.slot,
+            close.block_time,
+            digest,
+            budget.toString(),
+            allocated.toString(),
+            allocation.carryForward.toString(),
+            JSON.stringify([...snapshot.excluded].sort()),
+            used.length,
+          ]
+        )
+      ).rows[0]!;
+      if (allocation.allocations.length)
+        await client.query(
+          `INSERT INTO wallet_allocations(network_genesis,mint,epoch,wallet,lamports)
+           SELECT $1,$2,$3,holder.wallet,holder.lamports::numeric FROM jsonb_to_recordset($4::jsonb)AS holder(wallet text,lamports text)`,
+          [
+            network,
+            mint,
+            epoch,
+            JSON.stringify(
+              allocation.allocations.map((row) => ({
+                wallet: row.wallet,
+                lamports: row.lamports.toString(),
+              }))
+            ),
+          ]
+        );
+      await client.query(
+        "UPDATE wallet_balances SET reserved=reserved+$3 WHERE network_genesis=$1 AND mint=$2 AND bucket='community'",
+        [network, mint, allocated.toString()]
+      );
+      // The closing sample opens the next hour; earlier samples are committed to by the digest.
+      await client.query(
+        'DELETE FROM masked_holder_samples WHERE network_genesis=$1 AND mint=$2 AND sample_window<$3',
+        [network, mint, closing]
+      );
+      return { status: 'created' as const, epoch: saved };
+    });
+  }
+
   async indexCursor(network: string, pool: string): Promise<FinancialIndexCursor> {
     await this.db.query(
       'INSERT INTO wallet_index_cursors(network_genesis,pool)VALUES($1,$2)ON CONFLICT DO NOTHING',

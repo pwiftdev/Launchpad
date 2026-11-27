@@ -149,6 +149,10 @@
     {
       "file": "037-display-index.sql",
       "sha256": "24e8495925c9bea172a4ee97c4b35882a14fb8368038bdb79a2003b7628b29a2"
+    },
+    {
+      "file": "038-masked-holder-samples.sql",
+      "sha256": "97898b6ec7d3c135ef6f166e1df807a49c0bb2e4114aa40261af40cf53c48e2e"
     }
   ],
   "catalog": {
@@ -192,6 +196,7 @@
       "launch_schema_migrations",
       "launch_upload_authorizations",
       "launch_upload_budgets",
+      "masked_holder_samples",
       "offchain_metadata_cache",
       "otc_rings_deals",
       "pending_launch_intents",
@@ -3778,6 +3783,96 @@
         "numeric_scale": null
       },
       {
+        "table_name": "masked_holder_samples",
+        "column_name": "network_genesis",
+        "udt_name": "text",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_holder_samples",
+        "column_name": "mint",
+        "udt_name": "varchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 44,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_holder_samples",
+        "column_name": "sample_window",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_holder_samples",
+        "column_name": "slot",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_holder_samples",
+        "column_name": "block_time",
+        "udt_name": "int8",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 64,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_holder_samples",
+        "column_name": "digest",
+        "udt_name": "bpchar",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": 64,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_holder_samples",
+        "column_name": "supply",
+        "udt_name": "numeric",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 39,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "masked_holder_samples",
+        "column_name": "balances",
+        "udt_name": "jsonb",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "masked_holder_samples",
+        "column_name": "excluded",
+        "udt_name": "jsonb",
+        "is_nullable": "NO",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
         "table_name": "offchain_metadata_cache",
         "column_name": "uri_digest",
         "udt_name": "text",
@@ -4875,6 +4970,16 @@
         "column_default": "0",
         "character_maximum_length": null,
         "numeric_precision": 78,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "wallet_epochs",
+        "column_name": "sample_count",
+        "udt_name": "int2",
+        "is_nullable": "YES",
+        "column_default": null,
+        "character_maximum_length": null,
+        "numeric_precision": 16,
         "numeric_scale": 0
       },
       {
@@ -7860,6 +7965,69 @@
         "definition": "PRIMARY KEY (bucket)"
       },
       {
+        "table_name": "masked_holder_samples",
+        "name": "check:16f77566c9fefbee88f1b0852dafcc27e451419dcc89d66f051d5ab9f60a608c",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((slot >= 0))"
+      },
+      {
+        "table_name": "masked_holder_samples",
+        "name": "check:34aa039872f7d4fdf5d5d9640ed594b7e1d36644f6cdc0bb71c366a4a193beb6",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((digest ~ '^[a-f0-9]{64}$'::text))"
+      },
+      {
+        "table_name": "masked_holder_samples",
+        "name": "check:6fffb32bb9137b0efedb09a89b1298fec0d5569b81f645cd45f8ec6c886fdf7a",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((block_time >= 0) AND ((block_time / 300) = sample_window)))"
+      },
+      {
+        "table_name": "masked_holder_samples",
+        "name": "check:9f5b8fc1235c7d21a53e4718278eb4f0de34eb369915b3597644893b51d9d350",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((sample_window >= 0))"
+      },
+      {
+        "table_name": "masked_holder_samples",
+        "name": "check:c53b8b308d233a5caaa0383bd6bd415c98fffae30b98372bf83f411fc7f35ed2",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((supply >= (0)::numeric))"
+      },
+      {
+        "table_name": "masked_holder_samples",
+        "name": "check:e7ffb8c652c6eccb238a7d29d4097d58c7afe37aff78bf30914f3f666c162a6e",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((jsonb_typeof(balances) = 'array'::text))"
+      },
+      {
+        "table_name": "masked_holder_samples",
+        "name": "check:eb5d689998fe04f94ee4950bd19d0d0f06869ba2cd0151c7adf0635e4d215215",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK ((jsonb_typeof(excluded) = 'array'::text))"
+      },
+      {
+        "table_name": "masked_holder_samples",
+        "name": "masked_holder_samples_network_genesis_mint_fkey",
+        "type": "f",
+        "validated": true,
+        "definition": "FOREIGN KEY (network_genesis, mint) REFERENCES launch_coins(network_genesis, mint)"
+      },
+      {
+        "table_name": "masked_holder_samples",
+        "name": "masked_holder_samples_pkey",
+        "type": "p",
+        "validated": true,
+        "definition": "PRIMARY KEY (network_genesis, mint, sample_window)"
+      },
+      {
         "table_name": "offchain_metadata_cache",
         "name": "check:25e37a19e8a178aeb01470706d91cd81bc9b1639e8b98026992b14a2c9501cb4",
         "type": "c",
@@ -8355,6 +8523,13 @@
         "type": "c",
         "validated": true,
         "definition": "CHECK (((snapshot_time >= 0) AND (((snapshot_time / 3600) - 1) = epoch)))"
+      },
+      {
+        "table_name": "wallet_epochs",
+        "name": "check:1531fd8faedfbd9e2d7a77a4a72cc7a74d7cf265b2416d06af146853717984ba",
+        "type": "c",
+        "validated": true,
+        "definition": "CHECK (((sample_count IS NULL) OR (sample_count > 0)))"
       },
       {
         "table_name": "wallet_epochs",
@@ -9568,6 +9743,11 @@
         "definition": "CREATE UNIQUE INDEX launch_upload_budgets_pkey ON public.launch_upload_budgets USING btree (bucket)"
       },
       {
+        "table_name": "masked_holder_samples",
+        "name": "masked_holder_samples_pkey",
+        "definition": "CREATE UNIQUE INDEX masked_holder_samples_pkey ON public.masked_holder_samples USING btree (network_genesis, mint, sample_window)"
+      },
+      {
         "table_name": "offchain_metadata_cache",
         "name": "offchain_metadata_cache_eviction",
         "definition": "CREATE INDEX offchain_metadata_cache_eviction ON public.offchain_metadata_cache USING btree (accessed_at)"
@@ -10044,6 +10224,13 @@
         "definition": "CREATE TRIGGER launch_migration_immutable BEFORE DELETE OR UPDATE ON public.launch_migrations FOR EACH ROW EXECUTE FUNCTION rinsed_reject_registry_reassignment()"
       },
       {
+        "table_name": "masked_holder_samples",
+        "name": "masked_holder_samples_immutable",
+        "enabled": "O",
+        "function_name": "masked_sample_immutable",
+        "definition": "CREATE TRIGGER masked_holder_samples_immutable BEFORE UPDATE ON public.masked_holder_samples FOR EACH ROW EXECUTE FUNCTION masked_sample_immutable()"
+      },
+      {
         "table_name": "pending_launch_intents",
         "name": "launch_intent_bond_policy",
         "enabled": "O",
@@ -10172,6 +10359,15 @@
         "volatility": "v",
         "config": null,
         "body_sha256": "4b78b4843a18eba88bd1fef11e71e53c3b9d94d7b18b040fbee45acbd159a90e"
+      },
+      {
+        "name": "masked_sample_immutable",
+        "arguments": "",
+        "language": "plpgsql",
+        "security_definer": false,
+        "volatility": "v",
+        "config": null,
+        "body_sha256": "84c23da00e2b04a129398a6e5223690c345d323c83f391827275d98e39df372d"
       },
       {
         "name": "rinsed_epoch_immutable",
