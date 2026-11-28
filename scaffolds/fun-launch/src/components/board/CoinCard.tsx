@@ -1,10 +1,9 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { Coin } from '@/lib/coin';
 import { formatAge } from '@/lib/format/date';
-import { formatReadableNumber } from '@/lib/format/number';
 import { useNow } from '@/hooks/useNow';
-import { useUsd } from '@/hooks/useUsd';
-import { LAUNCH_TAX_WINDOW_SECONDS } from '@/constants/launch';
+import { formatUsd, solToUsd, useSolPrice } from '@/hooks/useUsd';
+import { LAUNCH_TAX_WINDOW_SECONDS, TOTAL_SUPPLY } from '@/constants/launch';
 import { cn, shortenAddress } from '@/lib/utils';
 import { CoinAvatar } from '../coin/CoinAvatar';
 import { SplitBadge } from '@/components/coin/SplitBadge';
@@ -42,10 +41,16 @@ type CoinCardProps = {
 
 export const CoinCard = memo(({ coin, isNew, compact }: CoinCardProps) => {
   const now = useNow(1000, coin.isDemo);
-  const { usd } = useUsd();
+  const { data: solUsd } = useSolPrice();
+  const usd = (sol: number) => formatUsd(solToUsd(sol, solUsd));
   const flash = useChangeFlash(coin.marketCapSol);
   const market = useTokenMarket(coin);
-  const prices = market?.points;
+  const prices = useMemo(() => {
+    const usdPerMarketCapSol = solToUsd(1 / (coin.tokenSupply ?? TOTAL_SUPPLY), solUsd);
+    return usdPerMarketCapSol === undefined
+      ? undefined
+      : market?.points.map((marketCap) => marketCap * usdPerMarketCapSol);
+  }, [coin.tokenSupply, market?.points, solUsd]);
   const down = (market?.changePercent ?? (prices?.at(-1) ?? 0) - (prices?.[0] ?? 0)) < 0;
   const pct = coin.progress * 100;
   const hot = !coin.isMigrated && coin.progress >= HOT_BOND_PROGRESS;
@@ -66,9 +71,9 @@ export const CoinCard = memo(({ coin, isNew, compact }: CoinCardProps) => {
         sniping && 'snipe-sheen'
       )}
     >
-      {market && (
+      {prices && (
         <PriceBackdrop
-          points={market.points}
+          points={prices}
           down={down}
           className="absolute -right-2 bottom-0 top-3 -z-10 h-[calc(100%-0.75rem)] w-[60%] opacity-25 transition-opacity duration-300 [mask-image:linear-gradient(90deg,transparent,#000_45%)] group-hover:opacity-50"
         />
@@ -139,7 +144,7 @@ export const CoinCard = memo(({ coin, isNew, compact }: CoinCardProps) => {
           <AnimatedNumber
             value={coin.marketCapSol}
             format={usd}
-            title={`${formatReadableNumber(coin.marketCapSol)} SOL`}
+            title="Market cap in USD"
             className={cn(
               'font-mono text-[15px] font-semibold tabular tracking-tight transition-colors duration-500',
               flash === 'up' && 'text-emerald',

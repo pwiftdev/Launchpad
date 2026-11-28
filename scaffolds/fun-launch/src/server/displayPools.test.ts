@@ -64,11 +64,21 @@ it('refreshes pool state by address between discovery scans', async () => {
 
 it('does not use a registered address with the wrong owner or mint', async () => {
   const f = fixture();
-  f.batch.mockResolvedValueOnce([{ ...f.account, owner: key(5) }]);
+  f.batch.mockResolvedValueOnce([{ ...f.account, owner: key(5) }, null]);
   expect(await f.reader.read(identity)).toBeNull();
-  f.batch.mockResolvedValueOnce([{ ...f.account, data: Buffer.alloc(0) }]);
+  f.batch.mockResolvedValueOnce([{ ...f.account, data: Buffer.alloc(0) }, null]);
   expect(await f.reader.read(identity)).toBeNull();
-  expect(await f.reader.read(identity)).toEqual({ ...f.initial, account: pool(2) });
+  expect(f.scan).not.toHaveBeenCalled();
+});
+
+it('reads the registered pool and its mint together and rejects an incomplete batch', async () => {
+  const f = fixture();
+  await expect(f.reader.read(identity)).rejects.toThrow('Incomplete display pool batch');
+  f.batch.mockClear();
+  const mintInfo = { ...f.account, owner: key(5) };
+  f.batch.mockResolvedValueOnce([f.account, mintInfo]);
+  expect(await f.reader.read(identity)).toEqual({ ...f.initial, account: pool(2), mintInfo });
+  expect(f.batch).toHaveBeenCalledExactlyOnceWith([identity.publicKey, identity.mint]);
   expect(f.scan).not.toHaveBeenCalled();
 });
 

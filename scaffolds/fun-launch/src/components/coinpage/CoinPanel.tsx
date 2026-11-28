@@ -1,5 +1,6 @@
 import type { Coin } from '@/lib/coin';
 import { useCoinPrices } from '@/hooks/useCoins';
+import { useSolPrice } from '@/hooks/useUsd';
 import { cn } from '@/lib/utils';
 import { CoinHeader } from './CoinHeader';
 import { TaxBanner } from './TaxBanner';
@@ -22,9 +23,10 @@ export function CoinPanel({
   className?: string;
 }) {
   const prices = useCoinPrices(coin.mint);
+  const solPrice = useSolPrice();
   return (
     <div className={cn('flex flex-col', className)}>
-      <CoinHeader key={coin.mint} coin={coin} actions={headerActions} />
+      <CoinHeader key={coin.mint} coin={coin} solUsd={solPrice.data} actions={headerActions} />
       <div className="grid flex-1 grid-cols-[minmax(0,1fr)] gap-3 px-3 pb-3 sm:px-4 sm:pb-4 lg:grid-cols-[minmax(0,1fr)_348px]">
         <aside className="enter enter-1 min-w-0 lg:col-start-2 lg:row-start-1">
           <div className="surface overflow-hidden rounded-3xl lg:sticky lg:top-4">
@@ -44,11 +46,15 @@ export function CoinPanel({
           <PriceChart
             key={`chart-${coin.mint}`}
             history={prices.data}
-            isLoading={prices.isLoading}
+            solUsd={solPrice.data}
+            isLoading={prices.isLoading || (!!prices.data?.points.length && solPrice.isLoading)}
             error={prices.error}
-            onRetry={() => void prices.refetch()}
+            onRetry={() => {
+              if (!solPrice.data) void solPrice.refetch();
+              if (!prices.data?.points.length || prices.error) void prices.refetch();
+            }}
           />
-          <RecentTrades coin={coin} />
+          <RecentTrades coin={coin} solUsd={solPrice.data} />
           <HoldersPanel key={`holders-${coin.mint}`} coin={coin} />
           {coin.creatorShareBps != null && (
             <section aria-label="Fee split" className="surface rounded-3xl p-4 sm:p-5">

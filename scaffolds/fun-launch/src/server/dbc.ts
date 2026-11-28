@@ -38,7 +38,6 @@ import {
 } from './launchRegistry';
 import { loadMigratedPool, migratedPrice, migratedQuoteReserve } from './damm';
 import { hasSocials, SOCIAL_KINDS, type Socials } from '@/lib/socials';
-import { readDisplayClock } from './displayClock';
 import { allowsMskdIdentity } from './officialMskd';
 import { readBorshString } from './mintMetadata';
 import { createDisplayPoolReader } from './displayPools';
@@ -433,20 +432,21 @@ export async function getCoin(
 async function loadCoin(mint: string, genesis: string): Promise<CoinLookup | null> {
   const mintKey = new PublicKey(mint);
   const registry = await registeredCoin(genesis, mint);
-  const found = registry
+  const registered = registry
     ? await displayPools.read({
         publicKey: new PublicKey(registry.dbc_pool),
         mint: mintKey,
         config: new PublicKey(registry.config_key),
       })
-    : await dbc.state.getPoolByBaseMint(mintKey);
+    : null;
+  const found = registry ? registered : await dbc.state.getPoolByBaseMint(mintKey);
   if (!found) return null;
   const s = found.account.poolState;
   if (!(await supportedConfig(s.config))) return null;
   const [config, metas, info] = await Promise.all([
     getConfig(s.config),
     getMetas([s.baseMint]),
-    connection.getAccountInfo(s.baseMint),
+    registered ? registered.mintInfo : connection.getAccountInfo(s.baseMint),
   ]);
   if (!info || (!info.owner.equals(TOKEN_PROGRAM_ID) && !info.owner.equals(TOKEN_2022_PROGRAM_ID)))
     return null;
@@ -478,19 +478,4 @@ export async function chainTime(): Promise<number> {
   const time = await connection.getBlockTime(slot);
   if (time === null) throw new Error('On-chain clock is unavailable');
   return time;
-}
-let displayClock: { at: number; time: number } | undefined;
-let displayClockPending: Promise<number> | undefined;
-/** Display endpoints share one brief clock read; quotes and transaction preparation keep fresh chainTime(). */
-export async function displayChainTime(): Promise<number> {
-  if (displayClock && Date.now() - displayClock.at < 1000) return displayClock.time;
-  displayClockPending ??= readDisplayClock(connection)
-    .then((time) => {
-      displayClock = { at: Date.now(), time };
-      return time;
-    })
-    .finally(() => {
-      displayClockPending = undefined;
-    });
-  return displayClockPending;
 }

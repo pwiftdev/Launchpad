@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Coin } from '@/lib/coin';
-import { Keypair } from '@solana/web3.js';
+import { Keypair, PublicKey, SYSVAR_CLOCK_PUBKEY } from '@solana/web3.js';
 import type { DisplayStore } from './store';
 
 const scans = vi.hoisted(() => ({ pool: vi.fn(), holders: vi.fn() }));
@@ -22,14 +22,20 @@ const coin = (mint: string, extra: Partial<Coin> = {}) =>
 function fixture(coins: Coin[]) {
   const changes = new Map<string, () => void>();
   let nextId = 0;
+  const clock = Buffer.alloc(40);
+  clock.writeBigUInt64LE(50n, 0);
+  clock.writeBigInt64LE(1_800_000_000n, 32);
   const rpc = {
     onAccountChange: vi.fn((key: { toBase58(): string }, callback: () => void) => {
       changes.set(key.toBase58(), callback);
       return nextId++;
     }),
     removeAccountChangeListener: vi.fn(async () => {}),
-    getSlot: vi.fn(async () => 50),
-    getBlockTime: vi.fn(async () => 1_800_000_000),
+    getAccountInfo: vi.fn(async () => ({
+      data: clock,
+      executable: false,
+      owner: new PublicKey('Sysvar1111111111111111111111111111111111111'),
+    })),
     getRecentPerformanceSamples: vi.fn(async () => [
       { numTransactions: 600, samplePeriodSecs: 60 },
     ]),
@@ -138,9 +144,22 @@ describe('display indexer', () => {
   it('records the chain clock and network rate in its heartbeat', async () => {
     const f = fixture([]);
     await f.indexer.heartbeat();
+    expect(f.rpc.getAccountInfo).toHaveBeenCalledExactlyOnceWith(SYSVAR_CLOCK_PUBKEY, 'confirmed');
     expect(f.store.heartbeat).toHaveBeenCalledWith(
       expect.objectContaining({ slot: 50, chainTime: 1_800_000_000, tps: 10 })
     );
+  });
+
+  it('keeps network stats available when the on-chain clock account is unavailable', async () => {
+    const f = fixture([]);
+    f.rpc.getAccountInfo.mockRejectedValueOnce(new Error('rpc unavailable'));
+    await f.indexer.heartbeat();
+    expect(f.store.heartbeat).toHaveBeenCalledWith({
+      slot: null,
+      chainTime: null,
+      rpcMs: null,
+      tps: 10,
+    });
   });
   it('fetches network stats at most once per minute after startup', async () => {
     const f = fixture([]);

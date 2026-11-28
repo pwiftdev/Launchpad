@@ -13,9 +13,19 @@ describe('24-hour token price chart', () => {
   it('shows loading and empty states without making up price movement', () => {
     expect(render({ isLoading: true })).toContain('Loading price history');
     expect(render({ history: { points: [] } })).toContain('Waiting for more trades');
-    const single = render({ history: { points: [{ time: 100, priceSol: 1 }] } });
+    const single = render({
+      solUsd: 200,
+      history: { points: [{ time: 100, priceSol: 0.0000006 }] },
+    });
     expect(single).toContain('Latest trade price');
+    expect(single).toContain('$0.00012');
     expect(single).not.toContain('role="img"');
+  });
+  it('shows USD as unavailable when the conversion rate is missing', () => {
+    const html = render({ history: { points: [{ time: 100, priceSol: 1 }] }, onRetry: () => {} });
+    expect(html).toContain('USD price unavailable');
+    expect(html).toContain('Retry');
+    expect(html).not.toContain('1 SOL');
   });
   it('offers retry without exposing provider errors', () => {
     const html = render({ error: new Error('provider secret'), onRetry: () => {} });
@@ -25,6 +35,7 @@ describe('24-hour token price chart', () => {
   });
   it('keeps available prices visible when the display index is stale', () => {
     const html = render({
+      solUsd: 100,
       history: {
         stale: true,
         points: [
@@ -34,10 +45,12 @@ describe('24-hour token price chart', () => {
       },
     });
     expect(html).toContain('Price updates delayed');
-    expect(html).toContain('Recorded token prices in SOL');
+    expect(html).toContain('Token prices in USD');
+    expect(html).toContain('$100.00 → $200.00');
   });
   it('positions prices using real elapsed time between trades', () => {
     const html = render({
+      solUsd: 100,
       history: {
         points: [
           { time: 100, priceSol: 1 },

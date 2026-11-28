@@ -7,6 +7,7 @@ import type { Coin } from '@/lib/coin';
 import type { DisplayStore } from './store';
 import { scanPool, type ScanRpc } from './scan';
 import { scanHolders, type HolderRpc } from './holders';
+import { readDisplayClock } from '../displayClock';
 
 export type IndexerRpc = ScanRpc &
   HolderRpc &
@@ -14,8 +15,7 @@ export type IndexerRpc = ScanRpc &
     Connection,
     | 'onAccountChange'
     | 'removeAccountChangeListener'
-    | 'getSlot'
-    | 'getBlockTime'
+    | 'getAccountInfo'
     | 'getRecentPerformanceSamples'
   >;
 
@@ -235,18 +235,17 @@ export class DisplayIndexer {
 
   async heartbeat() {
     const began = Date.now();
-    const slot = await this.deps.rpc.getSlot('confirmed').catch((): null => null);
-    const rpcMs = slot === null ? null : Date.now() - began;
-    const chainTime =
-      slot === null ? null : await this.deps.rpc.getBlockTime(slot).catch((): null => null);
-    const sample = (
-      await this.deps.rpc.getRecentPerformanceSamples(1).catch((): PerfSample[] => [])
-    )[0];
+    const [clock, [sample]] = await Promise.all([
+      readDisplayClock(this.deps.rpc)
+        .then((clock) => ({ ...clock, rpcMs: Date.now() - began }))
+        .catch((): null => null),
+      this.deps.rpc.getRecentPerformanceSamples(1).catch((): PerfSample[] => []),
+    ]);
     if (this.stopped) return;
     await this.deps.store.heartbeat({
-      slot,
-      chainTime,
-      rpcMs,
+      slot: clock?.slot ?? null,
+      chainTime: clock?.chainTime ?? null,
+      rpcMs: clock?.rpcMs ?? null,
       tps:
         sample && sample.samplePeriodSecs > 0
           ? sample.numTransactions / sample.samplePeriodSecs

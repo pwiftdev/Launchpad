@@ -26,12 +26,28 @@ const dollars = new Intl.NumberFormat('en-US', {
   currency: 'USD',
   maximumFractionDigits: 2,
 });
+const smallPrice = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumSignificantDigits: 5,
+});
 
 /** "$25.7K" for big values, "$4.18" for small, "<$0.01" for dust. */
-export function formatUsd(usd: number): string {
-  if (!Number.isFinite(usd)) return '—';
+export function formatUsd(usd: number | undefined): string {
+  if (usd === undefined || !Number.isFinite(usd)) return '—';
   if (usd !== 0 && Math.abs(usd) < 0.01) return '<$0.01';
   return Math.abs(usd) >= 10_000 ? compact.format(usd) : dollars.format(usd);
+}
+
+export function solToUsd(sol: number | null | undefined, solUsd?: number): number | undefined {
+  if (typeof sol !== 'number' || solUsd === undefined || !Number.isFinite(solUsd) || solUsd <= 0)
+    return undefined;
+  const usd = sol * solUsd;
+  return Number.isFinite(usd) ? usd : undefined;
+}
+
+export function formatUsdPrice(usd: number | undefined): string {
+  return usd !== undefined && usd > 0 && usd < 1 ? smallPrice.format(usd) : formatUsd(usd);
 }
 
 /**

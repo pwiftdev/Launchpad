@@ -4,6 +4,7 @@ import { readDisplayClock } from './displayClock';
 const owner = new PublicKey('Sysvar1111111111111111111111111111111111111');
 function fixture(timestamp = 1_790_000_000n) {
   const data = Buffer.alloc(40);
+  data.writeBigUInt64LE(250n, 0);
   data.writeBigInt64LE(timestamp, 32);
   const account = { owner, data, executable: false, lamports: 1 };
   const getAccountInfo = vi.fn(async () => account);
@@ -15,13 +16,16 @@ function fixture(timestamp = 1_790_000_000n) {
 }
 it('reads observed time in one confirmed sysvar request without a latest-block lookup', async () => {
   const f = fixture();
-  expect(await readDisplayClock(f.rpc)).toBe(1_790_000_000);
+  expect(await readDisplayClock(f.rpc)).toEqual({ slot: 250, chainTime: 1_790_000_000 });
   expect(f.getAccountInfo).toHaveBeenCalledExactlyOnceWith(SYSVAR_CLOCK_PUBKEY, 'confirmed');
 });
 it('rejects malformed clocks without substituting the host clock', async () => {
   for (const value of [0n, -1n, BigInt(Number.MAX_SAFE_INTEGER) + 1n])
     await expect(readDisplayClock(fixture(value).rpc)).rejects.toThrow();
   const f = fixture();
+  f.account.data.writeBigUInt64LE(BigInt(Number.MAX_SAFE_INTEGER) + 1n, 0);
+  await expect(readDisplayClock(f.rpc)).rejects.toThrow();
+  f.account.data.writeBigUInt64LE(250n, 0);
   f.account.owner = PublicKey.default;
   await expect(readDisplayClock(f.rpc)).rejects.toThrow();
   f.account.owner = owner;

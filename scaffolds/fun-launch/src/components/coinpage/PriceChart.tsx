@@ -1,6 +1,6 @@
 import { useId, useMemo, useRef, useState } from 'react';
 import type { CoinPriceHistory } from '@/lib/coin';
-import { formatReadableNumber } from '@/lib/format/number';
+import { formatUsdPrice, solToUsd } from '@/hooks/useUsd';
 import { sparklinePaths } from '@/lib/market';
 import { cn } from '@/lib/utils';
 
@@ -22,30 +22,41 @@ const hoverTime = new Intl.DateTimeFormat('en', {
 const WIDTH = 600;
 const HEIGHT = 200;
 const PADDING = 6;
+type UsdPricePoint = { time: number; priceUsd: number };
 
 export function PriceChart({
   history,
+  solUsd,
   isLoading,
   error,
   onRetry,
 }: {
   history?: CoinPriceHistory;
+  solUsd?: number;
   isLoading?: boolean;
   error?: unknown;
   onRetry?: () => void;
 }) {
-  const points = history?.points ?? [];
+  const points = useMemo(
+    () =>
+      (history?.points ?? []).flatMap(({ time, priceSol }) => {
+        const priceUsd = solToUsd(priceSol, solUsd);
+        return priceUsd === undefined ? [] : [{ time, priceUsd }];
+      }),
+    [history, solUsd]
+  );
   const first = points[0];
   const last = points.at(-1);
   const recent = history?.range === 'recent';
+  const missingUsd = !!history?.points.length && !points.length;
   const change =
-    first && last && points.length > 1 && first.priceSol > 0
-      ? last.priceSol / first.priceSol - 1
+    first && last && points.length > 1 && first.priceUsd > 0
+      ? last.priceUsd / first.priceUsd - 1
       : null;
   return (
     <section aria-label="Token price history" className="surface rounded-3xl p-4 sm:p-5">
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <h3 className="text-[15px] font-semibold tracking-tight text-foreground">Price</h3>
+        <h3 className="text-[15px] font-semibold tracking-tight text-foreground">Price in USD</h3>
         <span className="chip">{recent ? 'Recent trades' : '24h'}</span>
         {change !== null && (
           <span
@@ -71,12 +82,15 @@ export function PriceChart({
           </p>
         )}
       </header>
+      {points.length > 0 && (
+        <p className="mt-1 text-xs text-neutral-400">At the current SOL/USD rate</p>
+      )}
       {points.length > 1 ? (
         <PriceLine points={points} down={(change ?? 0) < 0} recent={recent} />
       ) : last ? (
         <div className="mt-3 rounded-2xl border border-white/[0.08] p-4">
           <p className="text-sm text-neutral-400">Latest trade price</p>
-          <p className="mt-1 font-mono text-lg">{formatReadableNumber(last.priceSol)} SOL</p>
+          <p className="mt-1 font-mono text-lg">{formatUsdPrice(last.priceUsd)}</p>
           <p className="mt-1 text-xs text-neutral-400">{chartTime.format(last.time * 1000)} UTC</p>
         </div>
       ) : (
@@ -86,6 +100,8 @@ export function PriceChart({
               <span className="skeleton h-1.5 w-40" />
               Loading price history…
             </>
+          ) : missingUsd ? (
+            'USD price unavailable.'
           ) : error ? (
             'Price history unavailable.'
           ) : (
@@ -94,7 +110,7 @@ export function PriceChart({
               Waiting for more trades.
             </>
           )}
-          {!!error && onRetry && (
+          {!isLoading && (!!error || missingUsd) && onRetry && (
             <button type="button" className="btn-glass h-8 px-3 text-xs" onClick={onRetry}>
               Retry
             </button>
@@ -110,14 +126,14 @@ function PriceLine({
   down,
   recent,
 }: {
-  points: CoinPriceHistory['points'];
+  points: UsdPricePoint[];
   down: boolean;
   recent: boolean;
 }) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
   const host = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<number | null>(null);
-  const values = points.map(({ priceSol }) => priceSol);
+  const values = points.map(({ priceUsd }) => priceUsd);
   const start = points[0]!;
   const end = points.at(-1)!;
   const duration = end.time - start.time;
@@ -162,9 +178,7 @@ function PriceLine({
         <svg
           role="img"
           aria-label={
-            recent
-              ? 'Recent recorded token prices in SOL'
-              : 'Recorded token prices in SOL over the past 24 hours'
+            recent ? 'Recent token prices in USD' : 'Token prices in USD over the past 24 hours'
           }
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           preserveAspectRatio="none"
@@ -221,7 +235,7 @@ function PriceLine({
               style={{ left: `${Math.min(Math.max(marker.x * 100, 12), 88)}%` }}
             >
               <span className="block font-mono text-[12.5px] font-semibold text-foreground">
-                {formatReadableNumber(shown.priceSol)} SOL
+                {formatUsdPrice(shown.priceUsd)}
               </span>
               <span className="block font-mono text-[10.5px] text-neutral-400">
                 {hoverTime.format(shown.time * 1000)} UTC
@@ -233,7 +247,7 @@ function PriceLine({
       <figcaption className="mt-2 flex flex-wrap justify-between gap-2 font-mono text-[11px] text-neutral-500">
         <span>{chartTime.format(start.time * 1000)} UTC</span>
         <span className="text-neutral-400">
-          {formatReadableNumber(start.priceSol)} → {formatReadableNumber(end.priceSol)} SOL
+          {formatUsdPrice(start.priceUsd)} → {formatUsdPrice(end.priceUsd)}
         </span>
         <span>{chartTime.format(end.time * 1000)} UTC</span>
       </figcaption>

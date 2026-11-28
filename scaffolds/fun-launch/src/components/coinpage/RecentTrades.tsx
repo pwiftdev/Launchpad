@@ -1,5 +1,6 @@
 import { explorerUrl } from '@/constants/network';
 import { useRecentTrades } from '@/hooks/useCoins';
+import { formatUsd, solToUsd } from '@/hooks/useUsd';
 import type { Coin } from '@/lib/coin';
 import { formatReadableNumber } from '@/lib/format/number';
 
@@ -11,7 +12,7 @@ const tradeTime = new Intl.DateTimeFormat('en', {
   timeZone: 'UTC',
 });
 
-export function RecentTrades({ coin }: { coin: Coin }) {
+export function RecentTrades({ coin, solUsd }: { coin: Coin; solUsd?: number }) {
   const { data, isLoading, isError, refetch } = useRecentTrades(coin);
   return (
     <section aria-label="Recent trades" className="surface rounded-3xl p-4 sm:p-5">
@@ -31,12 +32,23 @@ export function RecentTrades({ coin }: { coin: Coin }) {
             {data.trades.map((trade) => {
               const side = trade.side === 'buy' ? 'Buy' : 'Sell';
               const time = `${tradeTime.format(trade.ts * 1000)} UTC`;
+              const usd = solToUsd(trade.sol, solUsd);
               return (
                 <li key={trade.id ?? trade.sig} className="flex items-center gap-3 py-2">
                   <span className={trade.side === 'buy' ? 'text-emerald-400' : 'text-rose-400'}>
                     {side}
                   </span>
-                  <span className="font-mono">{formatReadableNumber(trade.sol)} SOL</span>
+                  <div className="min-w-0 font-mono">
+                    <span>{formatReadableNumber(trade.sol)} SOL</span>
+                    {usd !== undefined && (
+                      <span
+                        className="block text-xs text-neutral-400"
+                        title="At the current SOL/USD rate"
+                      >
+                        ≈ {formatUsd(usd)}
+                      </span>
+                    )}
+                  </div>
                   {coin.isDemo ? (
                     <span className="ml-auto text-right text-xs text-neutral-400">{time}</span>
                   ) : (

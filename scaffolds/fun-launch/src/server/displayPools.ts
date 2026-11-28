@@ -76,7 +76,10 @@ export function createDisplayPoolReader(
       return pools;
     },
     async read(identity: PoolIdentity) {
-      return (await readKnown([identity]))[0] ?? null;
+      const accounts = await rpc.getMultipleAccountsInfo([identity.publicKey, identity.mint]);
+      if (accounts.length !== 2) throw new Error('Incomplete display pool batch');
+      const pool = decode(identity, accounts[0]);
+      return pool ? { ...pool, mintInfo: accounts[1] ?? null } : null;
     },
     invalidate() {
       generation++;

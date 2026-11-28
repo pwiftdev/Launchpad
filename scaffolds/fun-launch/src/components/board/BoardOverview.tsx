@@ -3,9 +3,8 @@ import type { Coin } from '@/lib/coin';
 import { BRAND } from '@/constants/brand';
 import { useLocalSetting } from '@/hooks/useLocalSetting';
 import { useLaunchpadMarket } from '@/hooks/useMarket';
-import { useUsd } from '@/hooks/useUsd';
+import { formatUsd, solToUsd, useSolPrice } from '@/hooks/useUsd';
 import { SCHEDULE, SPLIT, pct } from '@/lib/feeModes';
-import { formatReadableNumber } from '@/lib/format/number';
 import { POOL_RESERVES_DESCRIPTION } from '@/lib/market';
 import { cn } from '@/lib/utils';
 import { LogoMark } from '../brand/Logo';
@@ -85,7 +84,7 @@ function OverviewStats({
   bonded?: number;
 }) {
   const market = useLaunchpadMarket(coins);
-  const { usd, price } = useUsd();
+  const { data: solUsd } = useSolPrice();
   return (
     <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:gap-5">
       {/* Both columns stretch to one height: eyebrow, a body that fills, then a footnote */}
@@ -107,18 +106,13 @@ function OverviewStats({
           <Tile
             label="Pool reserves"
             icon="ph--drop"
-            value={market.liquidity === undefined ? '—' : usd(market.liquidity)}
-            detail={
-              price && market.liquidity !== undefined
-                ? `${formatReadableNumber(market.liquidity)} SOL eq.`
-                : undefined
-            }
+            value={formatUsd(solToUsd(market.liquidity, solUsd))}
             title={POOL_RESERVES_DESCRIPTION}
           />
           <Tile
             label={market.preview ? 'Sample volume' : 'Volume · 24h'}
             icon="ph--chart-line-up"
-            value={market.volume === null ? '—' : usd(market.volume)}
+            value={formatUsd(solToUsd(market.volume, solUsd))}
             title={market.coverage}
             wide
           />
@@ -218,7 +212,6 @@ function BoardIntro() {
 function Tile({
   label,
   value,
-  detail,
   title,
   icon,
   accent,
@@ -226,7 +219,6 @@ function Tile({
 }: {
   label: string;
   value: string;
-  detail?: string;
   title?: string;
   icon: string;
   accent?: boolean;
@@ -252,7 +244,6 @@ function Tile({
       >
         {value}
       </dd>
-      {detail && <dd className="mt-1.5 font-mono text-[10.5px] text-neutral-500">{detail}</dd>}
     </div>
   );
 }

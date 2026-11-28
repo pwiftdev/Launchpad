@@ -1,21 +1,24 @@
 import { useState } from 'react';
 import type { Coin } from '@/lib/coin';
 import { explorerUrl } from '@/constants/network';
-import { formatReadableNumber } from '@/lib/format/number';
-import { useUsd } from '@/hooks/useUsd';
+import { formatUsd, formatUsdPrice, solToUsd } from '@/hooks/useUsd';
 import { shortenAddress } from '@/lib/utils';
 import { CoinAvatar } from '../coin/CoinAvatar';
 import { MskdV1Badge } from '../coin/MskdV1Badge';
 import { StarButton } from '../coin/StarButton';
 import { ShareButton } from '../coin/ShareButton';
 import { SocialLinks } from '../coin/SocialLinks';
-import { quoteAsset } from '@/lib/feeModes';
 
-export function CoinHeader({ coin, actions }: { coin: Coin; actions?: React.ReactNode }) {
+export function CoinHeader({
+  coin,
+  solUsd,
+  actions,
+}: {
+  coin: Coin;
+  solUsd?: number;
+  actions?: React.ReactNode;
+}) {
   const [copied, setCopied] = useState(false);
-  const { usd } = useUsd();
-  const quoteUnit = quoteAsset(coin.quoteMint).symbol;
-  const price = coin.priceSol / (coin.quoteToSol ?? 1);
 
   return (
     <header className="enter px-4 pb-4 pt-4 sm:px-5 sm:pt-5">
@@ -77,11 +80,8 @@ export function CoinHeader({ coin, actions }: { coin: Coin; actions?: React.Reac
         </div>
       </div>
       <dl className="mt-4 grid grid-cols-3 gap-2 text-sm">
-        <Stat label="Price">
-          <span className="whitespace-nowrap">{formatReadableNumber(price)}</span>{' '}
-          <span className="inline-block text-[10px] text-neutral-400 sm:text-xs">{quoteUnit}</span>
-        </Stat>
-        <Stat label="Market cap">{usd(coin.marketCapSol)}</Stat>
+        <Stat label="Price">{formatUsdPrice(solToUsd(coin.priceSol, solUsd))}</Stat>
+        <Stat label="Market cap">{formatUsd(solToUsd(coin.marketCapSol, solUsd))}</Stat>
         <Stat label="Bonding">
           {coin.isMigrated
             ? 'Bonded'
